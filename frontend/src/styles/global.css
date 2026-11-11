@@ -1,0 +1,21 @@
+/* 문서 기본 배경 · 텍스트 · 글꼴 */
+body {
+  margin: 0;
+  background-color: var(--color-white);
+  color: var(--color-text);
+  font-family: "Noto Sans KR", sans-serif;
+}
+
+/* 링크 기본 스타일 */
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* 공통 콘텐츠 너비 */
+.site-container {
+  width: min(100% - 40px, var(--content-width));
+  margin: 0 auto;
+}
+
+

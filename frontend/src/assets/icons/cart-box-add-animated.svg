@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none" role="img" aria-labelledby="animated-title animated-desc">
+  <title id="animated-title">장바구니 박스에 상품 담기</title>
+  <desc id="animated-desc">처음에는 빈 택배 박스가 보이고 과자 봉지와 음료 팩이 위에서 내려와 담깁니다. 한 번 실행한 뒤 상품이 담긴 상태를 유지합니다. 동작 줄이기 설정에서는 완성 상태를 바로 표시합니다.</desc>
+  <style>
+    .products { animation: cart-products-in 560ms cubic-bezier(.22,.8,.3,1) 650ms both; transform-box: view-box; transform-origin: 32px 40px; }
+    .parcel { animation: cart-box-settle 400ms ease-out 940ms both; transform-box: view-box; transform-origin: 32px 56px; }
+    @keyframes cart-products-in {
+      0% { opacity: 0; transform: translateY(-16px); }
+      18% { opacity: 1; }
+      76% { opacity: 1; transform: translateY(1.5px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes cart-box-settle {
+      0%, 100% { transform: translateY(0) scale(1); }
+      38% { transform: translateY(1px) scale(1.025,.97); }
+      72% { transform: translateY(-.5px) scale(.99,1.015); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .products, .parcel { animation: none; }
+    }
+  </style>
+  <g class="parcel" stroke="#392C32" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <g id="box-back">
+      <path d="M13 31 7 23 26 15 32 23Z" fill="#FFF7F8"/>
+      <path d="M32 23 38 15 57 23 51 31Z" fill="#FFF7F8"/>
+      <path d="M13 31 32 23 51 31 32 40Z" fill="#F4E3E7"/>
+    </g>
+    <g id="products" class="products">
+      <g id="snack" transform="rotate(-10 23 25)">
+        <path d="M17 10 20 11 23 10 26 11 29 10V38H17Z" fill="#EDA6B7"/>
+        <path d="M18 15H28" stroke="#9C4F63"/>
+        <circle cx="23" cy="24" r="4.5" fill="#FFF7E8" stroke="none"/>
+        <path d="M21 23 25 25M21 25 25 23" stroke="#9C4F63" stroke-width="1.5"/>
+      </g>
+      <g id="drink" transform="rotate(9 41 28)">
+        <path d="M36 17H44L47 22V39H35V22Z" fill="#FFF3DA"/>
+        <path d="M36 17 40 22H47M35 22H40V38"/>
+        <circle cx="43.5" cy="29" r="2.4" fill="#C96B83" stroke="none"/>
+        <path d="M42 34H45" stroke="#9C4F63" stroke-width="1.5"/>
+      </g>
+    </g>
+    <g id="box-front">
+      <path d="M13 31V50L32 58 51 50V31L32 39Z" fill="#FFF7F8"/>
+      <path d="M32 39V58"/>
+      <path d="M13 31 32 39 26 46 6 37Z" fill="#FFFFFF"/>
+      <path d="M32 39 51 31 58 37 38 46Z" fill="#FFFFFF"/>
+    </g>
+  </g>
+</svg>

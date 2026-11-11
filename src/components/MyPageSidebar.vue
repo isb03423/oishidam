@@ -4,7 +4,7 @@ import { RouterLink } from 'vue-router'
 const shoppingMenus = [
   { id: 'orders', label: '주문/배송 조회', route: 'MyPageOrders' },
   { id: 'wishlist', label: '찜한 상품', route: 'MyPageWishlist' },
-  { id: 'cart', label: '장바구니' },
+  { id: 'cart', label: '장바구니', route: 'MyPageCart' },
 ]
 
 const accountMenus = [

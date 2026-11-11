@@ -36,6 +36,11 @@ const routes = [
     component: () => import('../views/OrderDetailView.vue')
   },
   {
+    path: '/mypage/cart',
+    name: 'MyPageCart',
+    component: () => import('../views/CartView.vue')
+  },
+  {
     path: '/mypage/wishlist',
     name: 'MyPageWishlist',
     component: () => import('../views/WishlistView.vue')

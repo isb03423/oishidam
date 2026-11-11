@@ -82,10 +82,11 @@
               :aria-label="session.member ? '장바구니' : '로그인 후 이용 가능한 장바구니'"
               :aria-disabled="!session.member"
               :title="session.member ? '장바구니' : '로그인 후 이용할 수 있습니다.'"
-              @click="requireLogin"
+              @click="requireLogin({ name: 'MyPageCart' })"
             >
               <img
-                :src="cartIcon"
+                :key="cartIconSource"
+                :src="cartIconSource"
                 class="cart-icon"
                 alt=""
               />
@@ -149,15 +150,33 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import logo from '../../assets/images/oishidam_logo.png'
-import cartIcon from '../../assets/icons/cart-box-empty.svg'
-import { session } from '../../stores/session.js'
+import emptyCartIcon from '../../assets/icons/cart-box-empty.svg'
+import filledCartIcon from '../../assets/icons/cart-box-filled.svg'
+import animatedCartIcon from '../../assets/icons/cart-box-add-animated.svg?no-inline'
+import { session, shoppingOwner } from '../../stores/session.js'
 import { cartCount } from '../../stores/cart.js'
 import { logout } from '../../services/auth.js'
 
 const router = useRouter()
+const cartAnimationRun = ref(0)
+const isCartAnimationShown = ref(false)
+const cartIconSource = computed(() => {
+  if (!cartCount.value) return emptyCartIcon
+  if (!isCartAnimationShown.value) return filledCartIcon
+  return `${animatedCartIcon}${animatedCartIcon.includes('?') ? '&' : '?'}run=${cartAnimationRun.value}`
+})
+
+watch([cartCount, shoppingOwner], ([count, owner], [previousCount, previousOwner]) => {
+  if (owner !== previousOwner || count === 0) {
+    isCartAnimationShown.value = false
+  } else if (count > previousCount) {
+    cartAnimationRun.value++
+    isCartAnimationShown.value = true
+  }
+})
 const loggingOut = ref(false)
 const logoutError = ref('')
 

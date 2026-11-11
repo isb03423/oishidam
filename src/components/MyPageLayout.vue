@@ -10,7 +10,7 @@ defineProps({
 
 <template>
   <main class="mypage-page">
-    <div class="mypage-container" :class="{ 'mypage-container--with-below': $slots.below }">
+    <div class="mypage-container" :class="{ 'mypage-container--with-below': $slots.below, 'mypage-container--with-side': $slots.side }">
       <MyPageSidebar />
       <section
         class="mypage-content"
@@ -25,6 +25,7 @@ defineProps({
         </header>
         <slot />
       </section>
+      <slot name="side" />
       <div v-if="$slots.below" class="mypage-below">
         <slot name="below" />
       </div>
@@ -66,6 +67,22 @@ defineProps({
 
   .mypage-below {
     grid-column: 2;
+  }
+
+  .mypage-container--with-side {
+    display: grid;
+    grid-template-columns: 220px minmax(0, 1.2fr) minmax(0, 1fr);
+    grid-template-rows: max-content minmax(0, 1fr);
+    row-gap: 0;
+  }
+
+  .mypage-container--with-side :deep(.mypage-sidebar) {
+    width: 100%;
+  }
+
+  .mypage-container--with-side .mypage-content {
+    grid-column: 2;
+    grid-row: 1 / span 2;
   }
 
   .mypage-content--stretch {

@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>오이시담 테스트 결제</title>
+  <script src="https://js.tosspayments.com/v2/standard"></script>
+  <style>
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    body { margin: 0; background: #f8f6f8; color: #29232b; font-family: system-ui, sans-serif; }
+    main { max-width: 620px; margin: 36px auto; padding: 28px; background: white; border-radius: 18px; }
+    .label { color: #76617e; font-weight: 700; font-size: 14px; }
+    h1 { font-size: 24px; margin: 10px 0; }
+    p { line-height: 1.6; color: #625b64; }
+    .amount { display: flex; justify-content: space-between; padding: 20px 0; border-bottom: 1px solid #eee; }
+    button, a.button { display: block; width: 100%; background: #76617e; color: white; text-align: center; border: 0; border-radius: 10px; padding: 16px; font-size: 16px; font-weight: 700; cursor: pointer; text-decoration: none; }
+    button:disabled { opacity: .5; cursor: wait; }
+    #status { white-space: pre-wrap; overflow-wrap: anywhere; }
+    @media (max-width: 650px) { main { margin: 0; min-height: 100vh; border-radius: 0; padding: 22px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="label">OISHIDAM · TEST</div>
+    <h1>토스페이먼츠 테스트 결제</h1>
+    <p>테스트 키로 실행하는 연동 확인 화면입니다. 실제 상품 주문은 생성되지 않습니다.</p>
+    <section id="checkout">
+      <div class="amount"><span>테스트 상품</span><strong>5,000원</strong></div>
+      <div id="payment-methods"></div>
+      <div id="agreement"></div>
+      <button id="pay" disabled>결제 화면 준비 중</button>
+    </section>
+    <p id="status" role="status" aria-live="polite"></p>
+    <a id="retry" class="button" href="/payment-test" hidden>다시 테스트하기</a>
+  </main>
+  <script>
+    const status = document.querySelector('#status');
+    const checkout = document.querySelector('#checkout');
+    const pay = document.querySelector('#pay');
+    const retry = document.querySelector('#retry');
+    const params = new URLSearchParams(location.search);
+    const root = location.origin + '/payment-test';
+
+    async function api(path, options) {
+      const response = await fetch(root + path, options);
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.message || '요청에 실패했습니다.');
+      return result.data;
+    }
+
+    async function showResult() {
+      checkout.hidden = true;
+      retry.hidden = false;
+      if (location.pathname.endsWith('/fail')) {
+        status.textContent = '결제 요청 실패 또는 취소\n' + (params.get('message') || '결제가 완료되지 않았습니다.');
+        return;
+      }
+      const paymentKey = params.get('paymentKey');
+      const orderId = params.get('orderId');
+      const amount = Number(params.get('amount'));
+      history.replaceState(null, '', location.pathname);
+      if (!paymentKey || !orderId || !Number.isSafeInteger(amount) || amount <= 0) {
+        status.textContent = '결제 결과가 올바르지 않습니다. 다시 테스트해 주세요.';
+        return;
+      }
+      status.textContent = '테스트 결제를 승인하고 있습니다.';
+      try {
+        const result = await api('/confirm', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ paymentKey, orderId, amount })
+        });
+        status.textContent = '토스 승인 응답\n상태: ' + result.status + '\n주문번호: ' + result.orderId + '\n금액: ' + Number(result.totalAmount).toLocaleString() + '원\n결제수단: ' + (result.method || '-');
+      } catch (error) {
+        status.textContent = error.message;
+      }
+    }
+
+    async function setup() {
+      try {
+        const config = await api('/config');
+        const toss = TossPayments(config.clientKey);
+        const widgets = toss.widgets({ customerKey: crypto.randomUUID() });
+        await widgets.setAmount({ currency: 'KRW', value: config.amount });
+        await Promise.all([
+          widgets.renderPaymentMethods({ selector: '#payment-methods' }),
+          widgets.renderAgreement({ selector: '#agreement' })
+        ]);
+        pay.disabled = false;
+        pay.textContent = '5,000원 테스트 결제하기';
+        pay.addEventListener('click', async () => {
+          pay.disabled = true;
+          status.textContent = '';
+          try {
+            const order = await api('/order', { method: 'POST' });
+            await widgets.requestPayment({
+              orderId: order.orderId, orderName: '오이시담 테스트 상품',
+              successUrl: root + '/success', failUrl: root + '/fail'
+            });
+          } catch (error) {
+            status.textContent = error.message || '결제 요청에 실패했습니다.';
+            pay.disabled = false;
+          }
+        });
+      } catch (error) {
+        status.textContent = error.message || '결제 화면을 불러오지 못했습니다.';
+        pay.textContent = '결제 화면을 사용할 수 없습니다';
+      }
+    }
+
+    if (location.pathname.endsWith('/success') || location.pathname.endsWith('/fail')) showResult();
+    else setup();
+  </script>
+</body>
+</html>

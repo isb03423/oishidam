@@ -1,0 +1,68 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: oishidam
+
+  config:
+    import: "optional:file:./.env[.properties]"
+
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 11MB
+
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://localhost:5432/oishidam
+    username: postgres
+    password: 1004
+    hikari:
+      maximum-pool-size: 10
+
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:sql/schema.sql
+      separator: "^^^"
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+        default_batch_fetch_size: 100
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+    show-sql: false
+
+oishidam:
+  ai:
+    base-url: ${AI_SERVICE_URL:http://localhost:8000}
+    timeout-seconds: 60
+  front:
+    success-redirect: ${SUCCESS_REDIRECT:http://localhost:5173/oauth/callback}
+  cors:
+    allowed-origins: ${FRONTEND_URL:http://localhost:5173}
+  jwt:
+    secret: ${JWT_SECRET}
+    issuer: oishidam
+    audience: oishidam-api
+    access-token-validity-seconds: 3600
+    refresh-token-validity-seconds: 1209600
+  social:
+    kakao:
+      enabled: ${KAKAO_LOGIN_ENABLED:false}
+      client-id: ${KAKAO_CLIENT_ID}
+      client-secret: ${KAKAO_CLIENT_SECRET}
+  imagekit:
+    private-key: ${IMAGEKIT_PRIVATE_KEY}
+  toss:
+    test-client-key: ${TOSS_TEST_CLIENT_KEY}
+    test-secret-key: ${TOSS_TEST_SECRET_KEY}
+
+logging:
+  level:
+    com.gtmall: debug

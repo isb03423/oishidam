@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none" role="img" aria-labelledby="empty-title empty-desc">
+  <title id="empty-title">빈 장바구니 박스</title>
+  <desc id="empty-desc">네 개의 날개가 열린 빈 택배 박스입니다.</desc>
+  <g stroke="#392C32" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <g id="box-back">
+      <path d="M13 31 7 23 26 15 32 23Z" fill="#FFF7F8"/>
+      <path d="M32 23 38 15 57 23 51 31Z" fill="#FFF7F8"/>
+      <path d="M13 31 32 23 51 31 32 40Z" fill="#F4E3E7"/>
+    </g>
+    <g id="box-front">
+      <path d="M13 31V50L32 58 51 50V31L32 39Z" fill="#FFF7F8"/>
+      <path d="M32 39V58"/>
+      <path d="M13 31 32 39 26 46 6 37Z" fill="#FFFFFF"/>
+      <path d="M32 39 51 31 58 37 38 46Z" fill="#FFFFFF"/>
+    </g>
+  </g>
+</svg>

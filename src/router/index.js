@@ -1,5 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/home/HomeView.vue'
+import { session } from '../stores/session.js'
+import { hasPasswordProof } from '../services/account.js'
 
 const routes = [
   // 사용자 메인
@@ -34,6 +36,18 @@ const routes = [
     path: '/mypage/orders/:orderId',
     name: 'MyPageOrderDetail',
     component: () => import('../views/OrderDetailView.vue')
+  },
+  {
+    path: '/mypage/profile',
+    name: 'MyPageProfile',
+    beforeEnter: () => session.member ? true : { name: 'Login' },
+    component: () => import('../views/ProfileView.vue')
+  },
+  {
+    path: '/mypage/profile/password',
+    name: 'MyPagePassword',
+    beforeEnter: () => hasPasswordProof() ? true : { name: 'MyPageProfile' },
+    component: () => import('../views/PasswordChangeView.vue')
   },
   {
     path: '/mypage/cart',

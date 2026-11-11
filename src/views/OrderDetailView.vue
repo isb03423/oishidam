@@ -23,7 +23,7 @@ const won = (price) => `${currency.format(price)}원`
 </script>
 
 <template>
-  <MyPageLayout title="주문 상세보기" stretch-content>
+  <MyPageLayout icon="receipt" title="주문 상세보기" stretch-content>
     <template #description>
       <RouterLink class="back-to-orders" :to="{ name: 'MyPageOrders' }">
         <span aria-hidden="true">‹</span>

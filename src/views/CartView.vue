@@ -1,9 +1,11 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
+import DeleteConfirmationDialog from '../components/DeleteConfirmationDialog.vue'
 import MyPageLayout from '../components/MyPageLayout.vue'
 import { cartItems, changeCartQuantity, removeCartItems } from '../stores/cart.js'
 
 const selection = ref([])
+const deleteDialog = ref(null)
 const checkoutMessage = ref('')
 const selectedItems = computed(() => cartItems.value.filter((item) => selection.value.includes(item.variant_id)))
 const subtotal = computed(() => selectedItems.value.reduce((sum, item) => sum + item.price * item.quantity, 0))
@@ -22,12 +24,7 @@ watch(cartItems, (items) => {
 </script>
 
 <template>
-  <MyPageLayout title="장바구니" description="담아둔 상품을 확인하고 주문해보세요.">
-    <template #title-icon>
-      <svg class="cart-title-icon" viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M3 4h2l2.2 10h10.6l2-7H7.2M9 20a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3ZM17 20a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z" />
-      </svg>
-    </template>
+  <MyPageLayout icon="cart" title="장바구니" description="담아둔 상품을 확인하고 주문해보세요.">
     <div class="cart-toolbar">
       <label class="cart-select-all">
         <input
@@ -39,7 +36,7 @@ watch(cartItems, (items) => {
         />
         전체 선택 ({{ cartItems.length }})
       </label>
-      <button type="button" :disabled="!selection.length" @click="removeCartItems(selection)">
+      <button type="button" :disabled="!selection.length" @click="deleteDialog.open(selection)">
         선택 상품 삭제
       </button>
     </div>
@@ -62,7 +59,7 @@ watch(cartItems, (items) => {
             <button type="button" :disabled="item.quantity >= (item.stock ?? 1)" :aria-label="`${item.name} 수량 늘리기`" @click="changeCartQuantity(item.variant_id, 1)">+</button>
           </div>
           <strong class="cart-line-total">{{ won(item.price * item.quantity) }}</strong>
-          <button class="cart-remove" type="button" :aria-label="`${item.name} 삭제`" @click="removeCartItems([item.variant_id])">×</button>
+          <button class="cart-remove" type="button" :aria-label="`${item.name} 삭제`" @click="deleteDialog.open([item.variant_id])">×</button>
         </li>
       </ul>
 
@@ -82,23 +79,11 @@ watch(cartItems, (items) => {
       </section>
     </template>
     <p v-else class="cart-empty" role="status">장바구니에 담긴 상품이 없어요.</p>
+    <DeleteConfirmationDialog ref="deleteDialog" description="선택한 상품이 장바구니에서 삭제됩니다." @confirm="removeCartItems" />
   </MyPageLayout>
 </template>
 
 <style scoped>
-.cart-title-icon {
-  align-self: flex-end;
-  transform: translateY(2px);
-  width: 22px;
-  height: 22px;
-  flex: 0 0 22px;
-  fill: none;
-  stroke: var(--color-primary);
-  stroke-width: 1.6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
 .cart-toolbar,
 .cart-items,
 .cart-empty {

@@ -8,7 +8,7 @@ const shoppingMenus = [
 ]
 
 const accountMenus = [
-  { id: 'profile', label: '내 정보 관리' },
+  { id: 'profile', label: '내 정보 관리', route: 'MyPageProfile' },
   { id: 'address', label: '배송지 관리' },
   { id: 'withdraw', label: '회원 탈퇴' },
 ]
@@ -60,12 +60,12 @@ const accountMenus = [
         <h2 id="account-menu-title" class="sidebar-section-title">나의 정보</h2>
         <ul class="sidebar-menu-list">
           <li v-for="item in accountMenus" :key="item.id">
-            <button type="button" class="sidebar-menu-button">
+            <component :is="item.route ? RouterLink : 'button'" :to="item.route ? { name: item.route } : undefined" :type="item.route ? undefined : 'button'" class="sidebar-menu-button">
               <svg v-if="item.id === 'profile'" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4.5 21a7.5 7.5 0 0 1 15 0" /></svg>
               <svg v-else-if="item.id === 'address'" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z" /><circle cx="12" cy="10" r="2.5" /></svg>
               <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H5v18h9M10 12h11M18 8l4 4-4 4" /></svg>
               <span>{{ item.label }}</span>
-            </button>
+            </component>
           </li>
         </ul>
       </section>

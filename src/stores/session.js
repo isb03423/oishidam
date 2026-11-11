@@ -34,6 +34,10 @@ export function setSession(member, { mock = false, remember = false, tokens = nu
     member_id: member.member_id,
     name: member.name,
     email: member.email ?? null,
+    phone: member.phone ?? '',
+    birth_date: member.birth_date ?? '',
+    gender: member.gender ?? '',
+    joined_at: member.joined_at ?? '',
     role: member.role,
     status: member.status,
     cart_count: Number.isInteger(member.cart_count) && member.cart_count > 0 ? member.cart_count : 0,
@@ -60,3 +64,16 @@ if (import.meta.env.DEV && development.mockEnabled) {
 
 // Mock 프로필을 실제 서버 인증으로 착각하지 않도록 모드 전환 시 초기화.
 watch(() => development.mockEnabled, clearSession, { flush: 'sync' })
+
+export function updateMockProfile({ name, phone, birth_date, gender, joined_at }) {
+  if (state.source !== 'mock' || !state.member) return
+  Object.assign(state.member, { name, phone, birth_date, gender, joined_at })
+  for (const storage of ['localStorage', 'sessionStorage']) {
+    try {
+      const saved = JSON.parse(window[storage].getItem(storageKey) || 'null')
+      if (saved?.member?.member_id === state.member.member_id) {
+        window[storage].setItem(storageKey, JSON.stringify({ ...saved, member: state.member }))
+      }
+    } catch { /* 저장소 사용 불가 */ }
+  }
+}

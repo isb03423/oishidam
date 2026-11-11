@@ -23,7 +23,7 @@ onBeforeUnmount(() => controller?.abort())
 </script>
 
 <template>
-  <MyPageLayout
+  <MyPageLayout icon="member"
     class="mypage-overview"
     title="마이페이지"
     description="나의 쇼핑 정보를 한눈에 확인하세요."

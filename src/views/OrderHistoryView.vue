@@ -50,7 +50,7 @@ async function showOrder(order, repurchase = false) {
 </script>
 
 <template>
-  <MyPageLayout
+  <MyPageLayout icon="delivery"
     title="주문/배송 조회"
     description="주문한 상품의 배송 현황을 확인할 수 있습니다."
     stretch-content

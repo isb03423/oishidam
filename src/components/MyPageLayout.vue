@@ -3,9 +3,19 @@ import MyPageSidebar from './MyPageSidebar.vue'
 
 defineProps({
   title: { type: String, required: true },
+  icon: { type: String, default: '' },
   description: { type: String, default: '' },
   stretchContent: { type: Boolean, default: false },
 })
+
+const titleIcons = {
+  member: 'M16 8a4 4 0 1 1-8 0 4 4 0 0 1 8 0ZM4.5 21a7.5 7.5 0 0 1 15 0',
+  delivery: 'M3 6h11v11H3zM14 10h4l3 4v3h-7M8 18a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM20 18a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z',
+  receipt: 'M6 3h8l4 4v14H6zM14 3v5h4M9 12h6m-6 4h6',
+  lock: 'M5 10h14v11H5zM8 10V7a4 4 0 0 1 8 0v3',
+  cart: 'M3 4h2l2.2 10h10.6l2-7H7.2M9 20a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3ZM17 20a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z',
+  heart: 'M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z',
+}
 </script>
 
 <template>
@@ -18,7 +28,12 @@ defineProps({
         aria-labelledby="mypage-title"
       >
         <header class="mypage-heading">
-          <h1 id="mypage-title"><slot name="title-icon" />{{ title }}</h1>
+          <h1 id="mypage-title">
+            <svg v-if="titleIcons[icon]" class="mypage-title-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path :d="titleIcons[icon]" />
+            </svg>
+            {{ title }}
+          </h1>
           <slot name="description">
             <p v-if="description">{{ description }}</p>
           </slot>
@@ -109,6 +124,19 @@ defineProps({
   font-weight: 500;
   line-height: 1.2;
   transform: translateX(3px);
+}
+
+.mypage-title-icon {
+  align-self: flex-end;
+  transform: translateY(2px);
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  fill: none;
+  stroke: var(--color-primary);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .mypage-heading p {

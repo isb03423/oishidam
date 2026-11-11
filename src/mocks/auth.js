@@ -2,7 +2,7 @@
 export const demoCredentials = { email: 'demo@oishidam.test', password: 'Oishi1234!' }
 
 const registeredMembers = new Map([
-  [demoCredentials.email, { member_id: 'demo-customer', email: demoCredentials.email, name: '오이', role: 'CUSTOMER', status: 'ACTIVE', cart_count: 0 }],
+  [demoCredentials.email, { member_id: 'demo-customer', email: demoCredentials.email, phone: '010-1234-5678', birth_date: '1995-04-12', gender: 'FEMALE', joined_at: '2026-11-01', name: '오이', role: 'CUSTOMER', status: 'ACTIVE', cart_count: 0 }],
 ])
 
 // 화면 개발용 로그인 검증 데이터입니다. 회원 응답에는 비밀번호를 포함하지 않습니다.
@@ -31,7 +31,7 @@ export function handleAuthRequest(path, data = {}) {
     if (data.gender && !['FEMALE', 'MALE', 'NONE'].includes(data.gender)) fail(400, 'INVALID_GENDER', '성별 선택값을 확인해주세요.')
     if (!data.terms_agreed || !data.privacy_agreed) fail(400, 'REQUIRED_AGREEMENT_MISSING', '필수 약관에 동의해주세요.')
     if (registeredMembers.has(email)) fail(409, 'EMAIL_ALREADY_EXISTS', '이미 사용 중인 이메일입니다.')
-    const member = { member_id: `mock-member-${Date.now()}`, email, name: String(data.name).trim(), role: 'CUSTOMER', status: 'ACTIVE' }
+    const member = { member_id: `mock-member-${Date.now()}`, email, name: String(data.name).trim(), phone: data.phone || '', birth_date: data.birth_date || '', gender: data.gender || '', joined_at: new Date().toISOString().slice(0, 10), role: 'CUSTOMER', status: 'ACTIVE' }
     registeredMembers.set(email, member)
     registeredPasswords.set(email, String(data.password))
     return { member }
@@ -43,4 +43,20 @@ export function handleAuthRequest(path, data = {}) {
     throw error
   }
   return { member: registeredMembers.get(email) }
+}
+
+export function changeMockPassword(email, currentPassword, newPassword, confirmation) {
+  handleAuthRequest('/auth/login', { email, password: currentPassword })
+  if (newPassword.length < 8) fail(400, 'INVALID_PASSWORD', '새 비밀번호는 8자 이상 입력해주세요.')
+  if (newPassword !== confirmation) fail(400, 'PASSWORD_MISMATCH', '새 비밀번호 확인이 일치하지 않습니다.')
+  if (currentPassword === newPassword) fail(400, 'SAME_PASSWORD', '현재 비밀번호와 다른 비밀번호를 입력해주세요.')
+  registeredPasswords.set(email, newPassword)
+}
+
+export function updateMockMember(email, { name, phone, birth_date, gender }) {
+  const member = registeredMembers.get(email)
+  if (!member) fail(404, 'MEMBER_NOT_FOUND', '회원 정보를 찾을 수 없습니다.')
+  if (!name.trim()) fail(400, 'INVALID_NAME', '이름을 입력해주세요.')
+  Object.assign(member, { name: name.trim(), phone: phone.trim(), birth_date, gender })
+  return member
 }

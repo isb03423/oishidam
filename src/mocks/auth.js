@@ -1,3 +1,5 @@
+import { getPasswordError } from '../services/passwordPolicy.js'
+
 // 화면 개발 전용 계정. 실제 회원 비밀번호나 JWT를 사용하지 않습니다.
 export const demoCredentials = { email: 'demo@oishidam.test', password: 'Oishi1234!' }
 
@@ -25,8 +27,10 @@ export function handleAuthRequest(path, data = {}) {
   const email = String(data.email || '').trim().toLowerCase()
   if (path === '/auth/signup') {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) fail(400, 'INVALID_EMAIL', '이메일 형식을 확인해주세요.')
-    if (String(data.password || '').length < 8) fail(400, 'INVALID_PASSWORD', '비밀번호는 8자 이상 입력해주세요.')
-    if (!String(data.name || '').trim()) fail(400, 'INVALID_NAME', '이름을 입력해주세요.')
+    if (email.length > 254) fail(400, 'INVALID_EMAIL', '이메일은 254자 이내로 입력해주세요.')
+    validateNewPassword(String(data.password || ''), '비밀번호')
+    if (data.password !== data.passwordConfirm) fail(400, 'PASSWORD_MISMATCH', '비밀번호가 일치하지 않습니다.')
+    validateMemberFields(String(data.name || ''), String(data.phone || ''))
     if (data.birth_date && !/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(String(data.birth_date))) fail(400, 'INVALID_BIRTH_DATE', '생년월일 형식을 확인해주세요.')
     if (data.gender && !['FEMALE', 'MALE', 'NONE'].includes(data.gender)) fail(400, 'INVALID_GENDER', '성별 선택값을 확인해주세요.')
     if (!data.terms_agreed || !data.privacy_agreed) fail(400, 'REQUIRED_AGREEMENT_MISSING', '필수 약관에 동의해주세요.')
@@ -45,18 +49,31 @@ export function handleAuthRequest(path, data = {}) {
   return { member: registeredMembers.get(email) }
 }
 
-export function changeMockPassword(email, currentPassword, newPassword, confirmation) {
-  handleAuthRequest('/auth/login', { email, password: currentPassword })
-  if (newPassword.length < 8) fail(400, 'INVALID_PASSWORD', '새 비밀번호는 8자 이상 입력해주세요.')
+function validateNewPassword(password, label) {
+  const error = getPasswordError(password, label)
+  if (error) fail(400, 'INVALID_PASSWORD', error)
+}
+
+function validateMemberFields(name, phone) {
+  if (!name.trim()) fail(400, 'INVALID_NAME', '이름을 입력해주세요.')
+  if (name.trim().length > 100) fail(400, 'INVALID_NAME', '이름은 100자 이내로 입력해주세요.')
+  if (phone.trim().length > 30) fail(400, 'INVALID_PHONE', '휴대폰 번호는 30자 이내로 입력해주세요.')
+}
+
+export function changeMockPassword(email, newPassword, confirmation) {
+  validateNewPassword(newPassword, '새 비밀번호')
   if (newPassword !== confirmation) fail(400, 'PASSWORD_MISMATCH', '새 비밀번호 확인이 일치하지 않습니다.')
-  if (currentPassword === newPassword) fail(400, 'SAME_PASSWORD', '현재 비밀번호와 다른 비밀번호를 입력해주세요.')
+  if (registeredPasswords.get(email) === newPassword) fail(400, 'SAME_PASSWORD', '현재 비밀번호와 다른 비밀번호를 입력해주세요.')
   registeredPasswords.set(email, newPassword)
 }
 
 export function updateMockMember(email, { name, phone, birth_date, gender }) {
   const member = registeredMembers.get(email)
   if (!member) fail(404, 'MEMBER_NOT_FOUND', '회원 정보를 찾을 수 없습니다.')
-  if (!name.trim()) fail(400, 'INVALID_NAME', '이름을 입력해주세요.')
+  validateMemberFields(name, phone)
+  if (birth_date && !/^(?:19\d{2}|20\d{2}|2100)-\d{2}-\d{2}$/.test(birth_date)) {
+    fail(400, 'INVALID_BIRTH_DATE', '생년월일은 1900년부터 2100년까지 입력해주세요.')
+  }
   Object.assign(member, { name: name.trim(), phone: phone.trim(), birth_date, gender })
   return member
 }

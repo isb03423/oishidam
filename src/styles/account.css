@@ -123,6 +123,9 @@
 
 .password-card { max-width: 420px; display: grid; gap: 14px; }
 .password-card label { display: grid; gap: 5px; font-weight: 500; }
+.password-card .password-mismatch { margin: 0; text-align: left; }
+.password-card .password-requirements { color: #71666b; text-align: left; }
+.password-card input[aria-invalid="true"] { border-color: var(--color-primary); }
 
 @media (max-width: 600px) {
   .account-card { padding: 16px; }

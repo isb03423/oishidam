@@ -26,6 +26,26 @@ export function clearSession() {
   removeSavedSession()
 }
 
+export function normalizeMember(member = {}) {
+  return {
+    member_id: member.memberId,
+    name: member.name,
+    email: member.email,
+    phone: member.phone,
+    birth_year: member.birthYear,
+    gender: { M: 'MALE', F: 'FEMALE' }[member.gender] || 'NONE',
+    role: member.role,
+    status: member.isActive === false ? 'INACTIVE' : 'ACTIVE',
+  }
+}
+
+export function updateApiMember(member) {
+  const updated = normalizeMember(member)
+  if (state.source === 'api' && state.member?.member_id === updated.member_id) {
+    Object.assign(state.member, updated, { phone: updated.phone ?? '', email: updated.email ?? null })
+  }
+}
+
 export function setSession(member, { mock = false, remember = false, tokens = null } = {}) {
   if (!member?.member_id || !member.name || (mock && member.status !== 'ACTIVE')) throw new Error('로그인 응답을 확인해주세요.')
   removeSavedSession()
@@ -36,6 +56,7 @@ export function setSession(member, { mock = false, remember = false, tokens = nu
     email: member.email ?? null,
     phone: member.phone ?? '',
     birth_date: member.birth_date ?? '',
+    birth_year: member.birth_year ?? null,
     gender: member.gender ?? '',
     joined_at: member.joined_at ?? '',
     role: member.role,

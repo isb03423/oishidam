@@ -22,7 +22,7 @@ export function handleMockRequest({ method = 'GET', path, params = {}, data, sce
   }
   if (method.toUpperCase() !== 'GET') fail(501, 'MOCK_NOT_IMPLEMENTED', '아직 구현하지 않은 mock API입니다.')
   if (path === '/categories') return { items: scenario === 'empty' ? [] : structuredClone(categories) }
-  if (path === '/recommendations') {
+  if (path === '/recommendations/products') {
     const items = recommendedProductIds
       .map((id) => products.find((product) => product.product_id === id))
       .filter((product) => product && !product.deleted_at && product.sale_status === 'ON_SALE')
@@ -32,17 +32,17 @@ export function handleMockRequest({ method = 'GET', path, params = {}, data, sce
   if (path === '/products') {
     const keyword = String(params.keyword ?? '').trim().toLocaleLowerCase('ko-KR')
     let items = products.filter((product) => !product.deleted_at && product.sale_status === 'ON_SALE')
-      .filter((product) => !params.category_id || product.category_id === String(params.category_id))
+      .filter((product) => !params.categoryId || product.category_id === String(params.categoryId))
       .filter((product) => `${product.name} ${product.brand} ${product.description}`.toLocaleLowerCase('ko-KR').includes(keyword))
       .map(summarize)
     if (scenario === 'empty') items = []
     const sort = params.sort ?? 'new'
     if (!['new', 'price_asc', 'price_desc'].includes(sort)) fail(400, 'INVALID_SORT', '지원하지 않는 정렬입니다. 베스트 기준은 아직 미정입니다.')
     items.sort(sort === 'new' ? (a, b) => b.published_at.localeCompare(a.published_at) : sort === 'price_asc' ? (a, b) => a.min_price - b.min_price : (a, b) => b.min_price - a.min_price)
-    const page = Number(params.page ?? 1)
+    const page = Number(params.page ?? 0)
     const size = Number(params.size ?? 12)
-    if (!Number.isSafeInteger(page) || page < 1 || !Number.isSafeInteger(size) || size < 1 || size > 100) fail(400, 'INVALID_PAGINATION', '페이지와 크기는 양의 정수여야 하며 크기는 100 이하여야 합니다.')
-    return structuredClone({ items: items.slice((page - 1) * size, page * size), total: items.length, page, size })
+    if (!Number.isSafeInteger(page) || page < 0 || !Number.isSafeInteger(size) || size < 1 || size > 100) fail(400, 'INVALID_PAGINATION', '페이지는 0 이상, 크기는 1~100이어야 합니다.')
+    return structuredClone({ items: items.slice(page * size, (page + 1) * size), total: items.length, page, size })
   }
   const match = path.match(/^\/products\/([^/]+)$/)
   if (match) {

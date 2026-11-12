@@ -1,10 +1,11 @@
 import axios from 'axios'
 import { development } from '../config/development.js'
+import { getAuthTokens } from '../stores/session.js'
 
-// API 명세 확정 전의 임시 연결 규약.
-const baseURL = (import.meta.env.VITE_API_BASE_URL || '').trim()
+const apiHost = (import.meta.env.VITE_API_BASE_URL || '').trim().replace(/\/+$/, '')
+const baseURL = apiHost && (apiHost.endsWith('/api') ? apiHost : apiHost + '/api')
 const liveClient = axios.create({ baseURL, timeout: 10000 })
-export async function apiRequest({ method = 'GET', path, params, data, signal, headers, mock = development.mockEnabled }) {
+export async function apiRequest({ method = 'GET', path, params, data, signal, headers, authenticated = false, paginated = false, mock = development.mockEnabled }) {
   if (import.meta.env.DEV && mock) {
     const scenario = development.scenario
     const { handleMockRequest } = await import('../mocks/handleRequest.js')
@@ -17,8 +18,27 @@ export async function apiRequest({ method = 'GET', path, params, data, signal, h
     error.code = 'API_BASE_URL_MISSING'
     throw error
   }
-  const response = await liveClient.request({ method, url: path, params, data, signal, headers })
-  if (response.data?.success === false) throw new Error(response.data.message || '요청에 실패했습니다.')
-  if (response.data?.success === true && 'data' in response.data) return response.data.data
-  return response.data
+  const token = authenticated ? getAuthTokens()?.accessToken : null
+  if (authenticated && !token) throw new Error('다시 로그인해주세요.')
+
+  try {
+    const response = await liveClient.request({
+      method, url: path, params, data, signal,
+      headers: token ? { ...headers, Authorization: 'Bearer ' + token } : headers,
+    })
+    if (response.status === 204) return null
+    const body = response.data
+    if (!body || typeof body !== 'object' || !Object.hasOwn(body, 'data')) {
+      throw new Error('API 응답 형식을 확인해주세요.')
+    }
+    return paginated ? { data: body.data, page: body.page } : body.data
+  } catch (failure) {
+    const { response } = failure
+    if (!response) throw failure
+    const error = new Error(response.data?.message || '요청에 실패했습니다.', { cause: failure })
+    error.status = response.status
+    error.code = response.data?.code
+    error.details = response.data?.details
+    throw error
+  }
 }

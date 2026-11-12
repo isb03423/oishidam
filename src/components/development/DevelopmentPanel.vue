@@ -36,19 +36,19 @@ async function checkProducts() {
       <strong>개발용 데이터 설정</strong>
       <label class="dev-row">
         <input type="checkbox" :checked="development.mockEnabled" @change="setMockEnabled($event.target.checked)" />
-        Mock 인증 사용
+        Mock 사용
       </label>
-      <p>{{ development.mockEnabled ? '가상 인증을 사용합니다.' : '인증은 백엔드로 요청합니다.' }} 상품은 개발용 데이터를 표시합니다.</p>
+      <p>{{ development.mockEnabled ? '개발용 데이터를 사용합니다.' : '백엔드 API를 사용합니다.' }}</p>
       <label class="dev-row">
         응답 상황
-        <select :value="development.scenario" @change="setMockScenario($event.target.value)">
+        <select :disabled="!development.mockEnabled" :value="development.scenario" @change="setMockScenario($event.target.value)">
           <option value="normal">정상</option>
           <option value="empty">빈 목록</option>
           <option value="error">서버 오류</option>
         </select>
       </label>
       <button type="button" class="dev-check" :disabled="busy" @click="checkProducts">
-        {{ busy ? '요청 중…' : '가상 상품 응답 확인' }}
+        {{ busy ? '요청 중…' : '상품 응답 확인' }}
       </button>
       <p>전환 후 화면을 새로고침하거나 데이터를 다시 조회하세요.</p>
       <pre v-if="result" aria-live="polite">{{ result }}</pre>

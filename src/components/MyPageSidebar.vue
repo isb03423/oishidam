@@ -9,7 +9,7 @@ const shoppingMenus = [
 
 const accountMenus = [
   { id: 'profile', label: '내 정보 관리', route: 'MyPageProfile' },
-  { id: 'address', label: '배송지 관리' },
+  { id: 'address', label: '배송지 관리', route: 'MyPageAddress' },
   { id: 'withdraw', label: '회원 탈퇴' },
 ]
 </script>

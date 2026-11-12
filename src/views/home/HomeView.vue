@@ -44,8 +44,8 @@ async function loadProducts() {
     }
   }
   await Promise.all([
-    loadSection(recommended, () => getRecommendations({ signal })),
-    loadSection(arrivals, () => getProducts({ sort: 'new', size: 3 }, { signal })),
+    loadSection(recommended, () => getRecommendations({ signal, limit: 3 })),
+    loadSection(arrivals, () => getProducts({ sort: development.mockEnabled ? 'new' : undefined, size: 3 }, { signal })),
   ])
 }
 watch(() => [development.mockEnabled, development.scenario], loadProducts, { immediate: true })

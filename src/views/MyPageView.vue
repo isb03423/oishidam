@@ -12,7 +12,7 @@ let controller
 onMounted(async () => {
   controller = new AbortController()
   try {
-    const response = await getRecommendations({ signal: controller.signal })
+    const response = await getRecommendations({ signal: controller.signal, limit: 3 })
     recommended.items = Array.isArray(response?.items) ? response.items.slice(0, 3) : []
   } catch {
     recommended.items = []
@@ -106,10 +106,10 @@ onBeforeUnmount(() => controller?.abort())
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.2 10h10.6l2-7H7.2M9 20a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3ZM17 20a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z" /></svg>
         장바구니 (N건)
       </button>
-      <button type="button">
+      <RouterLink :to="{ name: 'MyPageAddress' }">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z" /><circle cx="12" cy="10" r="2.5" /></svg>
         배송지 관리
-      </button>
+      </RouterLink>
       <button type="button">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v12H9l-4 4V4Z" /><path d="M10 9a2 2 0 1 1 3.7 1c-.7.6-1.7 1-1.7 2M12 14h.01" /></svg>
         1:1 문의 내역
@@ -537,7 +537,7 @@ onBeforeUnmount(() => controller?.abort())
   font-weight: 500;
 }
 
-.activity-bar button {
+.activity-bar :is(button, a) {
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -550,7 +550,7 @@ onBeforeUnmount(() => controller?.abort())
   cursor: pointer;
 }
 
-.activity-bar button + button {
+.activity-bar :is(button, a) + :is(button, a) {
   margin-left: 0;
 }
 
@@ -565,7 +565,7 @@ onBeforeUnmount(() => controller?.abort())
   stroke-linejoin: round;
 }
 
-.activity-bar button:hover {
+.activity-bar :is(button, a):hover {
   color: var(--color-primary);
 }
 
@@ -597,7 +597,7 @@ onBeforeUnmount(() => controller?.abort())
     margin-right: 0;
   }
 
-  .activity-bar button + button {
+  .activity-bar :is(button, a) + :is(button, a) {
     margin-left: 0;
   }
 }

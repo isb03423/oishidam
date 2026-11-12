@@ -1,8 +1,10 @@
 <script setup>
-import { onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { getPasswordError, passwordRequirements } from '../services/passwordPolicy.js'
+import PhoneInput from '../components/common/PhoneInput.vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import MyPageLayout from '../components/MyPageLayout.vue'
-import { canManageAccount, changePassword, clearPasswordProof, hasPasswordProof, saveProfile, verifyCurrentPassword } from '../services/account.js'
+import { canChangePassword, canManageAccount, changePassword, clearPasswordProof, hasPasswordProof, loadProfile, saveProfile, verifyCurrentPassword } from '../services/account.js'
 import { session } from '../stores/session.js'
 
 const router = useRouter()
@@ -10,7 +12,24 @@ const fields = reactive({})
 const securityStep = ref('summary')
 const newPassword = ref('')
 const confirmation = ref('')
-onBeforeUnmount(clearPasswordProof)
+const passwordMismatch = computed(() => Boolean(confirmation.value) && newPassword.value !== confirmation.value)
+const profileRequest = new AbortController()
+onMounted(async () => {
+  if (session.source !== 'api') return
+  busy.value = true
+  try {
+    await loadProfile(profileRequest.signal)
+    if (!profileRequest.signal.aborted) reset()
+  } catch (error) {
+    if (!profileRequest.signal.aborted) profileMessage.value = error.message
+  } finally {
+    busy.value = false
+  }
+})
+onBeforeUnmount(() => {
+  profileRequest.abort()
+  clearPasswordProof()
+})
 
 const password = ref('')
 const showPassword = ref(false)
@@ -25,6 +44,7 @@ function reset() {
     name: member?.name ?? '',
     phone: member?.phone ?? '',
     birth_date: member?.birth_date ?? '',
+    birth_year: member?.birth_year ?? '',
     gender: member?.gender || 'NONE',
   })
   profileMessage.value = ''
@@ -37,6 +57,10 @@ watch(() => session.member, (member) => {
 
 async function submitProfile() {
   if (busy.value) return
+  if (fields.phone && fields.phone !== session.member?.phone && !/^\d{3}-\d{4}-\d{4}$/.test(fields.phone)) {
+    profileMessage.value = '휴대폰 번호 11자리를 입력해주세요.'
+    return
+  }
   busy.value = true
   try {
     await saveProfile(fields)
@@ -75,14 +99,17 @@ async function confirmIdentity() {
 }
 
 async function submitPassword() {
-  if (verifying.value) return
+  if (verifying.value || passwordMismatch.value) return
+  passwordError.value = getPasswordError(newPassword.value, '새 비밀번호')
+  if (passwordError.value) return
   verifying.value = true
-  passwordError.value = ''
   try {
-    await changePassword(password.value, newPassword.value, confirmation.value)
-    resetSecurity('complete')
+    const live = session.source === 'api'
+    await changePassword(newPassword.value, confirmation.value, live ? password.value : undefined)
+    if (live) await router.replace({ name: 'Login', query: { password: 'changed' } })
+    else resetSecurity('complete')
   } catch (error) {
-    if (!hasPasswordProof()) resetSecurity('verify')
+    if (session.source === 'mock' && !hasPasswordProof()) resetSecurity('verify')
     passwordError.value = error.message
   } finally {
     password.value = ''
@@ -111,20 +138,21 @@ async function submitPassword() {
             </div>
             <div class="profile-row">
               <label for="profile-name">이름</label>
-              <input id="profile-name" v-model="fields.name" autocomplete="name" required :readonly="!canManageAccount" />
+              <input id="profile-name" v-model="fields.name" maxlength="100" autocomplete="name" required :readonly="!canManageAccount" />
             </div>
             <div class="profile-row">
               <label for="profile-phone">휴대폰 번호</label>
-              <input id="profile-phone" v-model="fields.phone" type="tel" autocomplete="tel" :readonly="!canManageAccount" />
+              <PhoneInput id="profile-phone" v-model="fields.phone" :readonly="!canManageAccount" />
             </div>
             <div class="profile-row">
-              <label for="profile-birth">생년월일</label>
-              <input id="profile-birth" v-model="fields.birth_date" type="date" autocomplete="bday" :readonly="!canManageAccount" />
+              <label for="profile-birth">{{ session.source === 'api' ? '출생연도' : '생년월일' }}</label>
+              <input v-if="session.source === 'api'" id="profile-birth" v-model.number="fields.birth_year" type="number" min="1900" max="2100" step="1" :required="session.member?.birth_year != null" />
+              <input v-else id="profile-birth" v-model="fields.birth_date" type="date" min="1900-01-01" max="2100-12-31" autocomplete="bday" :readonly="!canManageAccount" />
             </div>
             <div class="profile-row">
               <label for="profile-gender">성별</label>
               <select id="profile-gender" v-model="fields.gender" :disabled="!canManageAccount">
-                <option value="NONE">선택 안 함</option>
+                <option value="NONE" :disabled="session.source === 'api' && session.member?.gender !== 'NONE'">선택 안 함</option>
                 <option value="FEMALE">여성</option>
                 <option value="MALE">남성</option>
               </select>
@@ -164,9 +192,10 @@ async function submitPassword() {
             </div>
             <div class="profile-password-copy">
               <h3>비밀번호 변경</h3>
+            <label v-if="session.source === 'api'">현재 비밀번호<input v-model="password" type="password" autocomplete="current-password" required /></label>
               <p>주기적인 비밀번호 변경으로<br />내 계정을 안전하게 보호하세요.</p>
             </div>
-            <button class="account-primary profile-password-button" type="button" :disabled="!canManageAccount" @click="resetSecurity('verify')">
+            <button class="account-primary profile-password-button" type="button" :disabled="!canChangePassword" @click="resetSecurity(session.source === 'api' ? 'change' : 'verify')">
               비밀번호 변경
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
             </button>
@@ -191,13 +220,15 @@ async function submitPassword() {
       </form>
           <form v-else-if="securityStep === 'change'" class="profile-security-form password-card" @submit.prevent="submitPassword">
             <h3>비밀번호 변경</h3>
-            <label>현재 비밀번호<input v-model="password" type="password" autocomplete="current-password" required /></label>
-            <label>새 비밀번호<input v-model="newPassword" type="password" autocomplete="new-password" minlength="8" required /></label>
-            <label>새 비밀번호 확인<input v-model="confirmation" type="password" autocomplete="new-password" minlength="8" required /></label>
+            <label v-if="session.source === 'api'">현재 비밀번호<input v-model="password" type="password" autocomplete="current-password" required /></label>
+            <label>새 비밀번호<input v-model="newPassword" type="password" autocomplete="new-password" minlength="8" aria-describedby="profile-password-requirements" required /></label>
+            <label>새 비밀번호 확인<input v-model="confirmation" type="password" autocomplete="new-password" minlength="8" required :aria-invalid="passwordMismatch || undefined" :aria-describedby="passwordMismatch ? 'profile-password-mismatch' : undefined" /></label>
+            <p v-if="passwordMismatch" id="profile-password-mismatch" class="account-message password-mismatch" aria-live="polite">새 비밀번호가 일치하지 않습니다.</p>
+            <small id="profile-password-requirements" class="password-requirements">{{ passwordRequirements }}</small>
             <p v-if="passwordError" class="account-message" role="alert">{{ passwordError }}</p>
             <div class="account-actions">
               <button type="button" :disabled="verifying" @click="resetSecurity()">취소</button>
-              <button class="account-primary" type="submit" :disabled="verifying">변경</button>
+              <button class="account-primary" type="submit" :disabled="verifying || passwordMismatch">변경</button>
             </div>
           </form>
           <div v-else class="profile-security-content">

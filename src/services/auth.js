@@ -1,6 +1,7 @@
 import { apiRequest } from './api.js'
+import { phoneDigits } from './phone.js'
 import { development } from '../config/development.js'
-import { clearSession, getAuthTokens, session, setSession } from '../stores/session.js'
+import { clearSession, getAuthTokens, normalizeMember, session, setSession } from '../stores/session.js'
 
 export async function login({ email, password, remember = false, signal }) {
   const mock = import.meta.env.DEV && development.mockEnabled
@@ -13,19 +14,11 @@ export async function login({ email, password, remember = false, signal }) {
     return response.member
   }
 
-  const accessToken = response?.accessToken ?? response?.access_token
-  const refreshToken = response?.refreshToken ?? response?.refresh_token
+  const { accessToken, refreshToken } = response ?? {}
   if (typeof accessToken !== 'string' || !accessToken.trim() || typeof refreshToken !== 'string' || !refreshToken.trim()) {
     throw new Error('로그인 응답에 필요한 인증 토큰이 없습니다.')
   }
-  const profile = response.member ?? response
-  const member = {
-    member_id: profile.memberId ?? profile.member_id ?? profile.id ?? normalizedEmail,
-    name: profile.name ?? normalizedEmail,
-    email: profile.email ?? normalizedEmail,
-    role: profile.role,
-    status: profile.status,
-  }
+  const member = normalizeMember(response.member)
   setSession(member, { tokens: { accessToken: accessToken.trim(), refreshToken: refreshToken.trim() } })
   return member
 }
@@ -44,17 +37,19 @@ const signupGenders = { MALE: 'M', FEMALE: 'F' }
 
 export async function signup({ email, password, passwordConfirm, name, phone = '', birthDate = '', birthYear, gender = '', termsAgreed, privacyAgreed, signal }) {
   const mock = import.meta.env.DEV && development.mockEnabled
-  const data = { email: email.trim().toLowerCase(), password, passwordConfirm, name: name.trim() }
+  const data = { email: email.trim().toLowerCase(), password, name: name.trim() }
+  const normalizedPhone = phoneDigits(phone)
   if (mock) {
     Object.assign(data, {
-      phone: phone.trim(),
+      passwordConfirm,
+      phone: normalizedPhone,
       birth_date: birthDate,
       gender,
       terms_agreed: Boolean(termsAgreed),
       privacy_agreed: Boolean(privacyAgreed),
     })
   } else {
-    if (phone.trim()) data.phone = phone.replace(/[ -]/g, '')
+    if (normalizedPhone) data.phone = normalizedPhone
     if (birthYear) data.birthYear = Number(birthYear)
     if (signupGenders[gender]) data.gender = signupGenders[gender]
   }
@@ -71,8 +66,7 @@ export async function signup({ email, password, passwordConfirm, name, phone = '
 export async function logout() {
   const member = session.member
   const tokens = getAuthTokens()
-  const headers = tokens ? { Authorization: `Bearer ${tokens.accessToken}` } : undefined
   const data = tokens ? { refreshToken: tokens.refreshToken } : undefined
-  await apiRequest({ method: 'POST', path: '/auth/logout', headers, data })
+  await apiRequest({ method: 'POST', path: '/auth/logout', authenticated: session.source === 'api', data })
   if (session.member === member) clearSession()
 }

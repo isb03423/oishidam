@@ -10,6 +10,7 @@ defineProps({
 
 const titleIcons = {
   member: 'M16 8a4 4 0 1 1-8 0 4 4 0 0 1 8 0ZM4.5 21a7.5 7.5 0 0 1 15 0',
+  address: 'M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0ZM14.5 10a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0Z',
   delivery: 'M3 6h11v11H3zM14 10h4l3 4v3h-7M8 18a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM20 18a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z',
   receipt: 'M6 3h8l4 4v14H6zM14 3v5h4M9 12h6m-6 4h6',
   lock: 'M5 10h14v11H5zM8 10V7a4 4 0 0 1 8 0v3',
@@ -37,6 +38,7 @@ const titleIcons = {
           <slot name="description">
             <p v-if="description">{{ description }}</p>
           </slot>
+          <slot name="actions" />
         </header>
         <slot />
       </section>

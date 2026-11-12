@@ -38,6 +38,12 @@ const routes = [
     component: () => import('../views/OrderDetailView.vue')
   },
   {
+    path: '/mypage/address',
+    name: 'MyPageAddress',
+    beforeEnter: () => session.member ? true : { name: 'Login' },
+    component: () => import('../views/AddressView.vue')
+  },
+  {
     path: '/mypage/profile',
     name: 'MyPageProfile',
     beforeEnter: () => session.member ? true : { name: 'Login' },

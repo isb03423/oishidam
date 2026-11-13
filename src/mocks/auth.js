@@ -12,6 +12,12 @@ const registeredPasswords = new Map([
   [demoCredentials.email, demoCredentials.password],
 ])
 
+const withdrawnMembers = new Set()
+
+export function withdrawMockMember(memberId) {
+  withdrawnMembers.add(memberId)
+}
+
 function fail(status, code, message) {
   const error = new Error(message)
   error.status = status
@@ -22,6 +28,7 @@ function fail(status, code, message) {
 export function handleAuthRequest(path, data = {}) {
   if (path === '/auth/logout') return { success: true }
   if (path === '/auth/kakao') {
+    if (withdrawnMembers.has('demo-kakao')) fail(401, 'INVALID_CREDENTIALS', '탈퇴한 계정입니다.')
     return { member: { member_id: 'demo-kakao', email: null, name: '카카오회원', role: 'CUSTOMER', status: 'ACTIVE', cart_count: 0 } }
   }
   const email = String(data.email || '').trim().toLowerCase()
@@ -46,7 +53,9 @@ export function handleAuthRequest(path, data = {}) {
     error.code = 'INVALID_CREDENTIALS'
     throw error
   }
-  return { member: registeredMembers.get(email) }
+  const member = registeredMembers.get(email)
+  if (withdrawnMembers.has(member.member_id)) fail(401, 'INVALID_CREDENTIALS', '탈퇴한 계정입니다.')
+  return { member }
 }
 
 function validateNewPassword(password, label) {

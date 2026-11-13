@@ -4,6 +4,7 @@ import { toggleWish, wishedIds } from '../../stores/wishlist.js'
 
 const props = defineProps({
   product: { type: Object, required: true },
+  badge: { type: String, default: '' },
 })
 const wished = computed(() => wishedIds.value.includes(props.product.product_id))
 const imageFailed = ref(false)
@@ -22,6 +23,7 @@ const formatPrice = (value) => new Intl.NumberFormat('ko-KR').format(value)
       :aria-label="`${product.name} 상품 상세보기`"
     />
     <div class="product-image-area">
+      <span v-if="badge" class="product-badge">{{ badge }}</span>
       <img
         v-if="imageSource && !imageFailed"
         class="product-image"
@@ -166,6 +168,19 @@ const formatPrice = (value) => new Intl.NumberFormat('ko-KR').format(value)
 .product-wish:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
+}
+
+.product-badge {
+  position: absolute;
+  z-index: 1;
+  inset: 8px auto auto 8px;
+  padding: 3px 7px;
+  border-radius: 4px;
+  background: var(--color-primary);
+  color: var(--color-white);
+  font-size: 11px;
+  font-weight: 700;
+  pointer-events: none;
 }
 
 .product-sold-out {

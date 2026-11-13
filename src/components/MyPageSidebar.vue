@@ -10,7 +10,7 @@ const shoppingMenus = [
 const accountMenus = [
   { id: 'profile', label: '내 정보 관리', route: 'MyPageProfile' },
   { id: 'address', label: '배송지 관리', route: 'MyPageAddress' },
-  { id: 'withdraw', label: '회원 탈퇴' },
+  { id: 'withdraw', label: '회원 탈퇴', route: 'MyPageWithdraw' },
 ]
 </script>
 
@@ -42,16 +42,16 @@ const accountMenus = [
         <h2 id="activity-menu-title" class="sidebar-section-title">나의 활동</h2>
         <ul class="sidebar-menu-list">
           <li>
-            <button type="button" class="sidebar-menu-button">
+            <RouterLink :to="{ name: 'MyPageReviews' }" class="sidebar-menu-button">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v12H9l-4 4V4ZM8 8h8m-8 4h6" /></svg>
               <span>마이 후기</span>
-            </button>
+            </RouterLink>
           </li>
           <li>
-            <button type="button" class="sidebar-menu-button">
+            <RouterLink :to="{ name: 'MyPageInquiries' }" class="sidebar-menu-button">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 1-8 8 8.5 8.5 0 0 1-3.5-.8L4 20l1.4-4A8 8 0 1 1 20 11Z" /></svg>
               <span>문의 내역</span>
-            </button>
+            </RouterLink>
           </li>
         </ul>
       </section>
@@ -73,101 +73,4 @@ const accountMenus = [
   </aside>
 </template>
 
-<style scoped>
-.mypage-sidebar {
-  align-self: flex-start;
-  width: 200px;
-  flex: 0 0 220px;
-  padding: 24px 20px;
-  border: 1px solid var(--color-border);
-  border-radius: 14px;
-  background: #fff;
-  box-sizing: border-box;
-}
-
-.sidebar-title {
-  margin: 0 0 14px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid #eee5e8;
-  color: var(--color-text);
-  font-size: 16px;
-  font-weight: 500;
-  line-height: 1.2;
-}
-
-.sidebar-section + .sidebar-section {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid #eee5e8;
-}
-
-.sidebar-section-title {
-  margin: 0 0 5px;
-  color: var(--color-primary);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.sidebar-menu-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.sidebar-menu-button {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  min-height: 32px;
-  gap: 12px;
-  padding: 4px 0;
-  border: 0;
-  background: transparent;
-  color: var(--color-text);
-  font: inherit;
-  font-size: 14px;
-  font-weight: 500;
-  text-align: left;
-  cursor: pointer;
-}
-
-.sidebar-menu-button:hover,
-.sidebar-menu-button.router-link-exact-active,
-.sidebar-menu-button:focus-visible {
-  color: var(--color-primary);
-}
-
-.sidebar-menu-button.router-link-exact-active {
-  background: var(--color-background);
-  border-radius: 6px;
-}
-
-.sidebar-menu-button:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
-  border-radius: 4px;
-}
-
-.sidebar-menu-button svg {
-  width: 18px;
-  height: 18px;
-  flex: 0 0 18px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.7;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-@media (max-width: 860px) {
-  .mypage-sidebar {
-    flex-basis: auto;
-  }
-}
-
-@media (max-width: 720px) {
-  .mypage-sidebar {
-    width: 100%;
-  }
-}
-</style>
+<style scoped src="../styles/sidebar.css"></style>

@@ -43,12 +43,12 @@ export async function getRecommendations({ signal, limit } = {}) {
   return mock ? data : { items: data.products.map(productForView), source: data.recommendationType }
 }
 
-export async function getProducts({ keyword, categoryId, sort, page = 0, size = 20 } = {}, options = {}) {
+export async function getProducts({ keyword, categoryId, sort, previewBest, page = 0, size = 20 } = {}, options = {}) {
   const mock = import.meta.env.DEV && development.mockEnabled
   const result = await apiRequest({
     ...options,
     path: '/products',
-    params: { keyword, categoryId, sort, page, size },
+    params: { keyword, categoryId, sort, page, size, ...(mock && previewBest && { previewBest }) },
     mock,
     paginated: true,
   })

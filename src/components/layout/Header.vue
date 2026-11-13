@@ -103,16 +103,23 @@
     </div>
 
     <!-- 하단 내비게이션 -->
-    <nav class="header-nav" aria-label="주요 메뉴">
+    <nav ref="navigation" class="header-nav" aria-label="주요 메뉴" @keydown.esc="dismissCategories">
       <div class="header-container nav-inner">
 
         <!-- 전체 카테고리 -->
-        <RouterLink to="/products" class="nav-category">
+        <button
+          ref="categoryButton"
+          type="button"
+          class="nav-category"
+          :aria-expanded="categoriesOpen"
+          :aria-controls="categoriesOpen ? 'site-category-menu' : undefined"
+          @click="toggleCategories"
+        >
           <svg class="hamburger" viewBox="0 0 22 14" aria-hidden="true">
             <path d="M0 1H22 M0 7H22 M0 13H22" />
           </svg>
           전체 카테고리
-        </RouterLink>
+        </button>
 
         <RouterLink
           v-if="session.member"
@@ -140,18 +147,22 @@
           베스트
         </RouterLink>
 
-        <RouterLink to="/inquiries" class="nav-link">
+        <RouterLink :to="{ name: 'MyPageInquiries' }" class="nav-link">
           1:1 문의
         </RouterLink>
 
+      </div>
+      <div v-if="categoriesOpen" ref="categoryPanel" class="header-container category-panel">
+        <CategoryMenu @select="categoriesOpen = false" />
       </div>
     </nav>
   </header>
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import CategoryMenu from './CategoryMenu.vue'
 import logo from '../../assets/images/oishidam_logo.png'
 import emptyCartIcon from '../../assets/icons/cart-box-empty.svg'
 import filledCartIcon from '../../assets/icons/cart-box-filled.svg'
@@ -161,6 +172,32 @@ import { cartCount } from '../../stores/cart.js'
 import { logout } from '../../services/auth.js'
 
 const router = useRouter()
+const route = useRoute()
+const categoriesOpen = ref(false)
+const navigation = ref(null)
+const categoryButton = ref(null)
+const categoryPanel = ref(null)
+
+async function toggleCategories() {
+  categoriesOpen.value = !categoriesOpen.value
+  if (!categoriesOpen.value) return
+  await nextTick()
+  categoryPanel.value?.querySelector('button')?.focus()
+}
+
+function dismissCategories() {
+  if (!categoriesOpen.value) return
+  categoriesOpen.value = false
+  categoryButton.value?.focus()
+}
+
+function closeOnOutsideClick(event) {
+  if (!navigation.value?.contains(event.target)) categoriesOpen.value = false
+}
+
+onMounted(() => document.addEventListener('click', closeOnOutsideClick))
+onUnmounted(() => document.removeEventListener('click', closeOnOutsideClick))
+watch(() => route.fullPath, () => { categoriesOpen.value = false })
 const cartAnimationRun = ref(0)
 const isCartAnimationShown = ref(false)
 const cartIconSource = computed(() => {
@@ -487,7 +524,14 @@ function requireLogin(memberRoute) {
 }
 
 /* 하단 메뉴 */
+.category-panel {
+  position: absolute;
+  z-index: 5;
+  inset: 100% 0 auto;
+}
+
 .header-nav {
+  position: relative;
   border-bottom: 1px solid #eee8eb;
 }
 
@@ -535,8 +579,22 @@ function requireLogin(memberRoute) {
 }
 
 .nav-category {
+  min-height: 44px;
   gap: 14px;
-  margin-right: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.nav-category[aria-expanded="true"],
+.nav-category:hover {
+  color: var(--color-primary);
+}
+
+.nav-category:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
 }
 
 .hamburger {
@@ -546,7 +604,7 @@ function requireLogin(memberRoute) {
   flex-shrink: 0;
   transform: translateY(1px);
   fill: none;
-  stroke: var(--color-text, #392C32);
+  stroke: currentColor;
   stroke-width: 2;
 }
 

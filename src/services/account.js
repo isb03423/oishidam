@@ -84,3 +84,18 @@ export async function saveProfile(fields) {
   const { member, mock } = await mockAccount()
   updateMockProfile(mock.updateMockMember(member.email, { ...fields, phone: phoneDigits(fields.phone) }))
 }
+export async function withdrawMember() {
+  const member = session.member
+  if (!member || !canManageAccount.value) throw new Error('다시 로그인해주세요.')
+  if (session.source === 'api') {
+    await apiRequest({ method: 'DELETE', path: '/members/me', authenticated: true, mock: false })
+  } else {
+    const mock = await import('../mocks/auth.js')
+    if (session.member !== member) throw new Error('다시 로그인해주세요.')
+    mock.withdrawMockMember(member.member_id)
+  }
+  if (session.member !== member) return false
+  clearPasswordProof()
+  clearSession()
+  return true
+}

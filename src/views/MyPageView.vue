@@ -4,9 +4,16 @@ import MyPageLayout from '../components/MyPageLayout.vue'
 import ProductCard from '../components/product/ProductCard.vue'
 import { getRecommendations } from '../services/catalog.js'
 import { session } from '../stores/session.js'
+import { wishedProducts } from '../stores/wishlist.js'
 
 const memberName = computed(() => session.member?.name || '오이시담')
 const recommended = reactive({ items: [] })
+const failedImages = reactive(new Set())
+const wishlistPreview = computed(() => wishedProducts.value.slice(0, 6).map((product) => {
+  const image = product.images?.find((item) => item.is_primary && item.url)
+    ?? product.images?.find((item) => item.url)
+  return { id: product.product_id, name: product.name, url: image?.url }
+}))
 let controller
 
 onMounted(async () => {
@@ -85,23 +92,28 @@ onBeforeUnmount(() => controller?.abort())
 
       <RouterLink :to="{ name: 'MyPageWishlist' }" class="dashboard-card wishlist-card">
         <h2>찜한 상품</h2>
-        <div class="wishlist-items" aria-label="찜한 상품 예시">
-          <div class="wishlist-item tone-cream"></div>
-          <div class="wishlist-item tone-rose"></div>
-          <div class="wishlist-item tone-beige"></div>
-          <div class="wishlist-item tone-mint"></div>
-          <div class="wishlist-item tone-rose"></div>
-          <div class="wishlist-item tone-cream"></div>
-        </div>
+        <ul v-if="wishlistPreview.length" class="wishlist-items" aria-label="찜한 상품 미리보기">
+          <li v-for="product in wishlistPreview" :key="product.id" class="wishlist-item">
+            <img
+              v-if="product.url && !failedImages.has(product.url)"
+              :src="product.url"
+              :alt="product.name"
+              loading="lazy"
+              @error="failedImages.add(product.url)"
+            />
+            <span v-else>{{ product.name }}</span>
+          </li>
+        </ul>
+        <p v-else class="wishlist-empty">찜한 상품이 없습니다.</p>
       </RouterLink>
     </div>
 
     <section class="activity-bar" aria-label="회원 활동 바로가기">
       <strong>활동 내역</strong>
-      <button type="button">
+      <RouterLink :to="{ name: 'MyPageReviews' }">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v12H8l-3 3V4Z" /><path d="M8 8h8M8 12h5" /></svg>
-        후기 작성 가능 (N건)
-      </button>
+        후기 작성하기
+      </RouterLink>
       <button type="button">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.2 10h10.6l2-7H7.2M9 20a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3ZM17 20a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z" /></svg>
         장바구니 (N건)
@@ -110,10 +122,10 @@ onBeforeUnmount(() => controller?.abort())
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z" /><circle cx="12" cy="10" r="2.5" /></svg>
         배송지 관리
       </RouterLink>
-      <button type="button">
+      <RouterLink :to="{ name: 'MyPageInquiries' }">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v12H9l-4 4V4Z" /><path d="M10 9a2 2 0 1 1 3.7 1c-.7.6-1.7 1-1.7 2M12 14h.01" /></svg>
         1:1 문의 내역
-      </button>
+      </RouterLink>
     </section>
   </MyPageLayout>
 </template>
@@ -486,17 +498,15 @@ onBeforeUnmount(() => controller?.abort())
   background: rgba(255, 255, 255, .8);
 }
 
-.tone-cream { background: #e8dfcf; }
-.tone-rose { background: #e9d3d4; }
-.tone-mint { background: #dce7df; }
-.tone-beige { background: #e8ded5; }
-
 .wishlist-items {
   display: grid;
   flex: 1;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   grid-template-rows: repeat(2, minmax(0, 1fr));
   gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .wishlist-card {
@@ -505,18 +515,41 @@ onBeforeUnmount(() => controller?.abort())
 }
 
 .wishlist-item {
+  position: relative;
+  display: grid;
   min-height: 0;
+  min-width: 0;
+  place-items: center;
+  overflow: hidden;
   border-radius: 5px;
+  background: #f7f3f4;
 }
 
-.wishlist-item::after {
-  content: '';
-  display: block;
-  width: 60%;
-  height: 70%;
-  margin: 8px auto 0;
-  border: 1px solid rgba(57, 44, 50, .25);
-  border-radius: 50% 50% 8px 8px;
+.wishlist-item img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.wishlist-item span {
+  width: 100%;
+  padding-inline: 4px;
+  overflow: hidden;
+  color: #71666b;
+  font-size: 11px;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wishlist-empty {
+  display: grid;
+  flex: 1;
+  place-items: center;
+  color: #71666b;
+  font-size: 13px;
 }
 
 .activity-bar {

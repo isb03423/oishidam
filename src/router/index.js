@@ -3,12 +3,20 @@ import HomeView from '../views/home/HomeView.vue'
 import { session } from '../stores/session.js'
 import { hasPasswordProof } from '../services/account.js'
 
+const requireInquiryLogin = () => session.member ? true : { name: 'Login' }
+const inquiryView = () => import('../views/InquiryHistoryView.vue')
+
 const routes = [
   // 사용자 메인
   {
     path: '/',
     name: 'Home',
     component: HomeView
+  },
+  {
+    path: '/products',
+    name: 'Products',
+    component: () => import('../views/ProductsView.vue')
   },
   {
     path: '/login',
@@ -38,6 +46,28 @@ const routes = [
     component: () => import('../views/OrderDetailView.vue')
   },
   {
+    path: '/mypage/reviews',
+    name: 'MyPageReviews',
+    component: () => import('../views/ReviewHistoryView.vue')
+  },
+  {
+    path: '/mypage/inquiries',
+    name: 'MyPageInquiries',
+    beforeEnter: requireInquiryLogin,
+    component: inquiryView
+  },
+  {
+    path: '/mypage/inquiries/new',
+    name: 'MyPageInquiryWrite',
+    beforeEnter: requireInquiryLogin,
+    component: inquiryView
+  },
+  {
+    path: '/mypage/inquiries/:inquiryId',
+    name: 'MyPageInquiryDetail',
+    redirect: (to) => ({ name: 'MyPageInquiries', query: { inquiryId: to.params.inquiryId } })
+  },
+  {
     path: '/mypage/address',
     name: 'MyPageAddress',
     beforeEnter: () => session.member ? true : { name: 'Login' },
@@ -48,6 +78,12 @@ const routes = [
     name: 'MyPageProfile',
     beforeEnter: () => session.member ? true : { name: 'Login' },
     component: () => import('../views/ProfileView.vue')
+  },
+  {
+    path: '/mypage/withdraw',
+    name: 'MyPageWithdraw',
+    beforeEnter: () => session.member ? true : { name: 'Login' },
+    component: () => import('../views/WithdrawView.vue')
   },
   {
     path: '/mypage/profile/password',

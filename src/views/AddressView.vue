@@ -383,7 +383,7 @@ async function removeAddress(address) {
 <style scoped src="../styles/account.css"></style>
 <style scoped>
 .address-toolbar { margin-inline-start: auto; padding: 0; border: 0; }
-.address-toolbar button { padding-inline: 14px; white-space: nowrap; }
+.address-toolbar button { padding-inline: 10px; white-space: nowrap; }
 
 .address-panel { display: grid; gap: 14px; padding: 16px; }
 .address-card,

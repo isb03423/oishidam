@@ -1,4 +1,5 @@
 <script setup>
+import { loadPostcode } from '../services/postcode.js'
 import PhoneInput from '../components/common/PhoneInput.vue'
 import { deleteAddress, getAddresses, saveAddress as saveRemoteAddress, setDefaultAddress } from '../services/addresses.js'
 import { formatPhone, phoneDigits } from '../services/phone.js'
@@ -23,7 +24,6 @@ const detailInput = ref(null)
 const showPostcode = ref(false)
 const loadingPostcode = ref(false)
 const postcodeError = ref('')
-let postcodeScript
 const fields = [
   { key: 'name', label: '배송지명', maxLength: 50, placeholder: '예: 우리집, 회사' },
   { key: 'recipient', label: '받는 사람', maxLength: 100, autocomplete: 'shipping name', placeholder: '이름을 입력하세요.' },
@@ -101,22 +101,6 @@ function resetPostcode() {
   showPostcode.value = false
   loadingPostcode.value = false
   postcodeError.value = ''
-}
-
-function loadPostcode() {
-  if (window.kakao?.Postcode) return Promise.resolve()
-  postcodeScript ??= new Promise((resolve, reject) => {
-    const script = document.createElement('script')
-    script.src = 'https://t1.kakaocdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js'
-    script.onload = resolve
-    script.onerror = () => {
-      script.remove()
-      postcodeScript = undefined
-      reject(new Error('우편번호 검색을 불러오지 못했습니다.'))
-    }
-    document.head.append(script)
-  })
-  return postcodeScript
 }
 
 async function searchPostcode() {

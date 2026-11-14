@@ -16,12 +16,14 @@ const error = ref('')
 const notice = ref('')
 const mockEnabled = computed(() => import.meta.env.DEV && development.mockEnabled)
 const demoHint = ref('')
+const adminDemoHint = ref('')
 if (route.query.signup === 'complete') notice.value = '회원가입이 완료되었습니다. 로그인해주세요.'
 watch(() => route.query.password, (status) => {
   if (status === 'changed') notice.value = '비밀번호가 변경되었습니다. 다시 로그인해주세요.'
 }, { immediate: true })
 if (import.meta.env.DEV) {
-  import('../../mocks/auth.js').then(({ demoCredentials }) => {
+  import('../../mocks/auth.js').then(({ demoCredentials, demoAdminCredentials }) => {
+    adminDemoHint.value = `관리자 계정: ${demoAdminCredentials.email} / ${demoAdminCredentials.password}`
     demoHint.value = `테스트 계정: ${demoCredentials.email} / ${demoCredentials.password}`
   })
 }
@@ -40,11 +42,12 @@ async function submit(provider = 'email') {
   controller = new AbortController()
   pending.value = provider
   try {
-    if (provider === 'kakao') await loginWithKakao({ remember: remember.value, signal: controller.signal })
-    else await login({ email: email.value, password: password.value, remember: remember.value, signal: controller.signal })
+    const member = provider === 'kakao'
+      ? await loginWithKakao({ remember: remember.value, signal: controller.signal })
+      : await login({ email: email.value, password: password.value, remember: remember.value, signal: controller.signal })
     if (version === revision) {
       password.value = ''
-      await router.replace({ name: 'Home' })
+      await router.replace({ name: member.role === 'ADMIN' ? 'AdminDashboard' : 'Home' })
     }
   } catch (failure) {
     if (version === revision && !controller.signal.aborted) {
@@ -112,6 +115,7 @@ onBeforeUnmount(() => {
 
       <p class="login-signup">아직 회원이 아니신가요? <RouterLink class="login-text-button signup-button" to="/signup">회원가입 <span aria-hidden="true">›</span></RouterLink></p>
       <p v-if="mockEnabled" class="login-demo-note">개발용 로그인 · 실제 카카오 인증이 아닙니다.<br />{{ demoHint }}</p>
+        <p v-if="mockEnabled && adminDemoHint" class="login-notice">{{ adminDemoHint }}</p>
     </section>
   </main>
 </template>

@@ -37,13 +37,12 @@ function formatSlideNumber(index) {
           class="banner-image"
           :src="currentSlide.image"
           :alt="currentSlide.imageAlt || ''"
-          width="2172"
-          height="724"
+          width="1720"
+          height="916"
           fetchpriority="high"
         />
         <div class="banner-shade" aria-hidden="true"></div>
         <div class="banner-content">
-          <p class="banner-eyebrow">{{ currentSlide.eyebrow }}</p>
           <h1 class="banner-title">{{ currentSlide.title }}</h1>
           <p class="banner-description">{{ currentSlide.description }}</p>
           <span class="banner-cta">
@@ -85,18 +84,18 @@ function formatSlideNumber(index) {
 </template>
 
 <style scoped>
-/* 배너 기본 영역 · 말차 테마 색상 */
+/* 배너 기본 영역 */
 .main-banner {
-  --matcha-ink: #34452f;
-  --matcha-muted: #5b6650;
+  --banner-ink: var(--color-text);
+  --banner-muted: var(--color-secondary);
   --banner-navigation-width: 162px;
   position: relative;
   isolation: isolate;
   width: 100%;
   height: clamp(420px, 28vw, 620px); 
   overflow: hidden;
-  background: #f0e5d6;
-  color: var(--matcha-ink);
+  background: var(--color-background);
+  color: var(--banner-ink);
 }
 
 /* 배경 이미지와 가독성 오버레이 */
@@ -128,7 +127,7 @@ function formatSlideNumber(index) {
 }
 
 .banner-shade {
-  background: linear-gradient(90deg, rgb(250 244 235 / 40%), transparent 58%);
+  background: linear-gradient(90deg, rgb(255 247 248 / 48%), transparent 58%);
 }
 
 /* 문구 배치 */
@@ -144,13 +143,6 @@ function formatSlideNumber(index) {
   padding: 44px 0 60px;
 }
 
-.banner-eyebrow {
-  margin: 0 0 16px;
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: .12em;
-}
-
 .banner-title {
   margin: 0;
   font-size: clamp(34px, 3.15vw, 54px);
@@ -163,7 +155,7 @@ function formatSlideNumber(index) {
 
 .banner-description {
   margin: 18px 0 24px;
-  color: var(--matcha-muted);
+  color: var(--banner-muted);
   font-size: clamp(14px, 1.1vw, 17px);
   line-height: 1.7;
   word-break: keep-all;
@@ -178,7 +170,7 @@ function formatSlideNumber(index) {
   min-height: 40px;
   padding: 7px 18px;
   border-radius: 7px;
-  background: var(--matcha-ink);
+  background: var(--banner-ink);
   color: #fff;
   font-size: 14px;
   font-weight: 500;
@@ -186,7 +178,7 @@ function formatSlideNumber(index) {
 }
 
 .banner-cta:hover {
-  background: #253520;
+  background: var(--color-primary);
   color: #fff;
 }
 
@@ -240,7 +232,7 @@ function formatSlideNumber(index) {
   border: 1px solid rgb(52 69 47 / 45%);
   border-radius: 999px;
   background: rgb(255 255 255 / 36%);
-  color: var(--matcha-ink);
+  color: var(--banner-ink);
   cursor: pointer;
   transition: background .18s ease;
 }
@@ -336,18 +328,13 @@ function formatSlideNumber(index) {
   }
 
   .banner-shade {
-    background: linear-gradient(180deg, #f3e9db 0%, #f3e9db 40%, rgb(243 233 219 / 70%) 49%, transparent 64%);
+    background: linear-gradient(180deg, #fff2f4 0%, #fff2f4 40%, rgb(255 242 244 / 70%) 49%, transparent 64%);
   }
 
   .banner-content {
     width: calc(100% - 48px);
     justify-content: flex-start;
     padding: 68px 0 0;
-  }
-
-  .banner-eyebrow {
-    margin-bottom: 10px;
-    font-size: 10px;
   }
 
   .banner-title {

@@ -1,3 +1,4 @@
+import { productDetails, productReviews } from './productDetails.js'
 import { categories, products, recommendedProductIds } from './catalog.js'
 import { handleAuthRequest } from './auth.js'
 
@@ -59,7 +60,7 @@ export function handleMockRequest({ method = 'GET', path, params = {}, data, sce
   if (match) {
     const product = products.find((item) => item.product_id === match[1] && !item.deleted_at && item.sale_status === 'ON_SALE')
     if (!product) fail(404, 'PRODUCT_NOT_FOUND', '상품을 찾을 수 없습니다.')
-    return structuredClone(summarize(product))
+    return structuredClone({ ...summarize(product), ...productDetails[product.product_id], reviews: productReviews[product.product_id] ?? [] })
   }
   fail(501, 'MOCK_NOT_IMPLEMENTED', `아직 구현하지 않은 mock API입니다: ${method} ${path}`)
 }

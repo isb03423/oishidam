@@ -19,6 +19,26 @@ const routes = [
     component: () => import('../views/ProductsView.vue')
   },
   {
+    path: '/products/:productId',
+    name: 'ProductDetail',
+    component: () => import('../views/ProductDetailView.vue')
+  },
+  {
+    path: '/checkout',
+    name: 'Checkout',
+    component: () => import('../views/CheckoutView.vue'),
+  },
+  {
+    path: '/admin',
+    name: 'AdminDashboard',
+    meta: { hideLayout: true },
+    beforeEnter: () => {
+      if (!session.member) return { name: 'Login' }
+      return session.member.role === 'ADMIN' ? true : { name: 'Home' }
+    },
+    component: () => import('../views/AdminDashboardView.vue'),
+  },
+  {
     path: '/login',
     name: 'Login',
     meta: { hideLayout: true },

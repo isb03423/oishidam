@@ -1,19 +1,23 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { shippingFee, startCheckout } from '../stores/checkout.js'
 import DeleteConfirmationDialog from '../components/DeleteConfirmationDialog.vue'
 import MyPageLayout from '../components/MyPageLayout.vue'
 import { cartItems, changeCartQuantity, removeCartItems } from '../stores/cart.js'
 
 const selection = ref([])
 const deleteDialog = ref(null)
-const checkoutMessage = ref('')
+const router = useRouter()
 const selectedItems = computed(() => cartItems.value.filter((item) => selection.value.includes(item.variant_id)))
 const subtotal = computed(() => selectedItems.value.reduce((sum, item) => sum + item.price * item.quantity, 0))
-const shippingFee = 3000
 const formatter = new Intl.NumberFormat('ko-KR')
 const won = (value) => Number.isFinite(value) ? `${formatter.format(value)}원` : '가격 확인 필요'
 
-watch(selectedItems, () => { checkoutMessage.value = '' })
+function checkoutSelected() {
+  startCheckout(selectedItems.value, true)
+  router.push({ name: 'Checkout' })
+}
 const allSelected = computed(() =>
   cartItems.value.length > 0 && selection.value.length === cartItems.value.length,
 )
@@ -72,10 +76,9 @@ watch(cartItems, (items) => {
             <div class="cart-total"><dt>총 결제 예정 금액</dt><dd>{{ won(subtotal + shippingFee) }}</dd></div>
           </dl>
         </div>
-        <button class="cart-checkout" type="button" :disabled="!selectedItems.length || !Number.isFinite(subtotal)" @click="checkoutMessage = '주문 기능을 준비 중입니다.'">
+        <button class="cart-checkout" type="button" :disabled="!selectedItems.length || !Number.isFinite(subtotal)" @click="checkoutSelected">
           {{ selectedItems.length ? `${selectedItems.length}개 상품 주문하기` : '선택 상품 주문하기' }}
         </button>
-        <p v-if="checkoutMessage" class="cart-checkout-message" role="status">{{ checkoutMessage }}</p>
       </section>
     </template>
     <p v-else class="cart-empty" role="status">장바구니에 담긴 상품이 없어요.</p>
@@ -241,7 +244,6 @@ input[type='checkbox'] {
   cursor: pointer;
 }
 
-.cart-checkout-message { margin: 8px 0 0; text-align: center; font-size: 12px; }
 
 @media (max-width: 1000px) {
   .cart-items .cart-row { grid-template-columns: auto 60px minmax(0, 1fr) auto; gap: 8px; }

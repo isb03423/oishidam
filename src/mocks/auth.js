@@ -3,16 +3,26 @@ import { getPasswordError } from '../services/passwordPolicy.js'
 // 화면 개발 전용 계정. 실제 회원 비밀번호나 JWT를 사용하지 않습니다.
 export const demoCredentials = { email: 'demo@oishidam.test', password: 'Oishi1234!' }
 
+export const demoAdminCredentials = { email: 'admin@oishidam.test', password: 'OishiAdmin123!' }
+
 const registeredMembers = new Map([
+  [demoAdminCredentials.email, { member_id: 'demo-admin', email: demoAdminCredentials.email, name: '관리자', role: 'ADMIN', status: 'ACTIVE' }],
   [demoCredentials.email, { member_id: 'demo-customer', email: demoCredentials.email, phone: '010-1234-5678', birth_date: '1995-04-12', gender: 'FEMALE', joined_at: '2026-11-01', name: '오이', role: 'CUSTOMER', status: 'ACTIVE', cart_count: 0 }],
 ])
 
 // 화면 개발용 로그인 검증 데이터입니다. 회원 응답에는 비밀번호를 포함하지 않습니다.
 const registeredPasswords = new Map([
+  [demoAdminCredentials.email, demoAdminCredentials.password],
   [demoCredentials.email, demoCredentials.password],
 ])
 
 const withdrawnMembers = new Set()
+
+export function getMockCustomerJoinDates() {
+  return [...registeredMembers.values()]
+    .filter((member) => member.role === 'CUSTOMER' && !withdrawnMembers.has(member.member_id))
+    .map((member) => member.joined_at)
+}
 
 export function withdrawMockMember(memberId) {
   withdrawnMembers.add(memberId)

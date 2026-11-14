@@ -2,21 +2,40 @@
 import { onBeforeUnmount, reactive, watch } from 'vue'
 import MainBanner from '../../components/home/MainBanner.vue'
 import ProductSection from '../../components/product/ProductSection.vue'
-import matchaImage from '../../assets/images/banners/matcha-collection-safe-oishidam.png'
+import snacksImage from '../../assets/images/banners/snacks.png'
+import drinksImage from '../../assets/images/banners/drinks.png'
+import sweetsImage from '../../assets/images/banners/sweets.png'
 import { getProducts, getRecommendations } from '../../services/catalog.js'
 import { development } from '../../config/development.js'
 
 // 추가 배너는 같은 형식으로 등록하면 슬라이드 버튼과 페이지 수에 반영됩니다.
 const banners = [
   {
-    id: 'matcha-collection',
-    eyebrow: 'MATCHA COLLECTION',
-    title: '말차의 매력에\n푹 빠지는 시간',
-    description: '쌉싸름하고 달콤한 말차 간식만 모았어요.',
-    buttonLabel: '말차 간식 보기',
-    image: matchaImage,
-    imageAlt: '말차 롤케이크와 초콜릿, 도라야키와 말차가 놓인 접시',
-    to: { path: '/products', query: { keyword: '말차' } },
+    id: 'snacks',
+    title: "일본 과자와 함께\n달콤한 간식 시간",
+    description: '바삭한 버터 쿠키부터 폭신한 도라야키까지.',
+    buttonLabel: '스낵·과자 보기',
+    image: snacksImage,
+    imageAlt: '버터 쿠키와 단팥 도라야키',
+    to: { name: 'Products', query: { categoryId: '76' } },
+  },
+  {
+    id: 'drinks',
+    title: "톡 쏘는 한 모금,\n향긋한 복숭아",
+    description: '복숭아 탄산음료와 함께 일본 음료를 만나보세요.',
+    buttonLabel: '음료 보기',
+    image: drinksImage,
+    imageAlt: '얼음과 복숭아 조각을 넣은 탄산음료',
+    to: { name: 'Products', query: { categoryId: '81' } },
+  },
+  {
+    id: 'sweets',
+    title: "한입에 즐기는\n일본의 달콤한 맛",
+    description: '상큼한 딸기 초콜릿과 고소한 호지차 초콜릿.',
+    buttonLabel: '젤리·사탕·초콜릿 보기',
+    image: sweetsImage,
+    imageAlt: '딸기와 호지차 초콜릿 조각',
+    to: { name: 'Products', query: { categoryId: '85' } },
   },
 ]
 

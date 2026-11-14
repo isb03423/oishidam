@@ -5,6 +5,37 @@ const carts = reactive(new Map())
 export const cartItems = computed(() => carts.get(shoppingOwner.value) ?? [])
 export const cartCount = computed(() => (session.member?.cart_count ?? 0) + cartItems.value.length)
 
+export function cartLine(product, variant, quantity) {
+  const image = product.images?.find((item) => item.is_primary) ?? product.images?.[0]
+  return {
+    product_id: product.product_id,
+    name: product.name,
+    variant_id: variant.variant_id,
+    option: variant.variant_name,
+    price: variant.price,
+    stock: variant.stock_quantity,
+    image: image?.url,
+    quantity,
+  }
+}
+
+export function addVariantToCart(product, variantId, quantity) {
+  if (!product || product.is_sold_out || !Number.isSafeInteger(quantity) || quantity < 1) return false
+  const variant = product.variants?.find((item) => item.variant_id === variantId && item.is_active)
+  if (!variant || !Number.isFinite(variant.price) || !(variant.stock_quantity >= quantity)) return false
+
+  const nextItems = [...cartItems.value]
+  const index = nextItems.findIndex((item) => item.variant_id === variantId)
+  const totalQuantity = (nextItems[index]?.quantity ?? 0) + quantity
+  if (totalQuantity > variant.stock_quantity) return false
+
+  const line = cartLine(product, variant, totalQuantity)
+  if (index === -1) nextItems.push(line)
+  else nextItems[index] = line
+  carts.set(shoppingOwner.value, nextItems)
+  return true
+}
+
 export function addProductsToCart(products) {
   const nextItems = [...cartItems.value]
   const result = { added: 0, existing: 0, unavailable: 0, needsOption: 0 }
@@ -19,17 +50,7 @@ export function addProductsToCart(products) {
       result.existing++
     } else {
       const [variant] = variants
-      const image = product.images?.find((item) => item.is_primary) ?? product.images?.[0]
-      nextItems.push({
-        product_id: product.product_id,
-        name: product.name,
-        variant_id: variant.variant_id,
-        option: variant.variant_name,
-        price: variant.price,
-        stock: variant.stock_quantity,
-        image: image?.url,
-        quantity: 1,
-      })
+      nextItems.push(cartLine(product, variant, 1))
       result.added++
     }
   }

@@ -4,6 +4,7 @@ import com.oishidam.auth.dto.LoginRequest;
 import com.oishidam.auth.dto.LoginResponse;
 import com.oishidam.auth.dto.SignupRequest;
 import com.oishidam.auth.dto.SignupResponse;
+import com.oishidam.auth.validation.PasswordPolicy;
 import com.oishidam.common.exception.ApiException;
 import com.oishidam.member.entity.Member;
 import com.oishidam.member.repository.MemberRepository;
@@ -14,40 +15,45 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
 public class AuthService {
     private final MemberRepository memberRepository;
+
     private final PasswordEncoder passwordEncoder;
+
     private final JwtTokenService jwtTokenService;
+
     private final RefreshTokenService refreshTokenService;
 
+    // 회원 가입
     @Transactional
     public SignupResponse signup(SignupRequest request) {
         String email = request.email().trim().toLowerCase(Locale.ROOT);
 
+        // 1. 비밀번호 확인 및 정책 검증
         if (!request.password().equals(request.passwordConfirm())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "PASSWORD_MISMATCH", "비밀번호가 일치하지 않습니다.");
         }
 
-        if (request.password().getBytes(StandardCharsets.UTF_8).length > 72) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_PASSWORD", "비밀번호는 UTF-8 기준 72바이트 이하여야 합니다.");
-        }
+        PasswordPolicy.validate(request.password());
 
+        // 2. 이메일 중복 확인
         if (memberRepository.existsByEmail(email)) {
             throw new ApiException(HttpStatus.CONFLICT, "EMAIL_ALREADY_EXISTS", "이미 사용 중인 이메일입니다.");
         }
 
-        Member member = new Member(email, passwordEncoder.encode(
-                request.password()),
-                request.name(),
-                request.phone(),
-                request.birthYear(),
-                request.gender()
-        );
+        // 3. 회원 생성 및 저장
+        Member member = Member.builder()
+                .email(email)
+                .password(passwordEncoder.encode(request.password()))
+                .name(request.name())
+                .phone(request.phone())
+                .birthYear(request.birthYear())
+                .gender(request.gender())
+                .build();
 
         try {
             memberRepository.saveAndFlush(member);
@@ -58,20 +64,31 @@ public class AuthService {
         return new SignupResponse(member.getId(), member.getEmail(), member.getName(), member.getRole());
     }
 
+    // 로그인
     @Transactional
     public LoginResponse login(LoginRequest request) {
         String email = request.email().trim().toLowerCase(Locale.ROOT);
-        Member member = memberRepository.findByEmailForUpdate(email)
-                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS",
-                        "이메일 또는 비밀번호가 올바르지 않습니다."));
 
+        // 1. 이메일로 회원 조회
+        Member member = memberRepository.findByEmailForUpdate(email)
+                .orElseThrow(() -> new ApiException(
+                        HttpStatus.UNAUTHORIZED,
+                        "INVALID_CREDENTIALS",
+                        "이메일 또는 비밀번호가 올바르지 않습니다."
+                ));
+
+        // 2. 계정 상태와 비밀번호 확인
         if (!member.isActive() || member.getPassword() == null
                 || !passwordEncoder.matches(request.password(), member.getPassword())) {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", "이메일 또는 비밀번호가 올바르지 않습니다.");
         }
 
+        // 3. 로그인 토큰 발급
         String accessToken = jwtTokenService.issueAccessToken(
-                member.getId(), member.getRole().name(), member.getTokenVersion());
+                member.getId(),
+                member.getRole().name(),
+                member.getTokenVersion()
+        );
         String refreshToken = refreshTokenService.issueAndSave(member.getId()).token();
         LoginResponse.MemberInfo memberInfo = new LoginResponse.MemberInfo(
                 member.getId(),

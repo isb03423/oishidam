@@ -1,9 +1,7 @@
 package com.oishidam.auth.entity;
 
 import jakarta.persistence.*;
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
@@ -14,6 +12,8 @@ import java.time.LocalDateTime;
 @Table(name = "auth_refresh_token")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+@Builder
 public class AuthRefreshToken {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -35,12 +35,6 @@ public class AuthRefreshToken {
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
-
-    public AuthRefreshToken(Long memberId, String tokenHash, LocalDateTime expiresAt) {
-        this.memberId = memberId;
-        this.tokenHash = tokenHash;
-        this.expiresAt = expiresAt;
-    }
 
     public void revoke(LocalDateTime now) {
         if (this.revokedAt == null) {

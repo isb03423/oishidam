@@ -3,14 +3,14 @@ package com.oishidam.member.entity;
 import com.oishidam.common.entity.BaseEntity;
 import com.oishidam.member.dto.AddressRequest;
 import jakarta.persistence.*;
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 @Entity
 @Table(name = "addresses")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+@Builder
 public class Address extends BaseEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -42,11 +42,6 @@ public class Address extends BaseEntity {
     @Column(name = "is_default", nullable = false)
     private boolean isDefault;
 
-    public Address(Member member, AddressRequest request) {
-        this.member = member;
-        update(request);
-    }
-
     public void update(AddressRequest request) {
         this.label = request.label().trim();
         this.recipientName = request.recipientName().trim();
@@ -59,5 +54,9 @@ public class Address extends BaseEntity {
 
     public void clearDefault() {
         this.isDefault = false;
+    }
+
+    public void setDefault() {
+        this.isDefault = true;
     }
 }

@@ -1,47 +1,53 @@
 package com.oishidam.auth.controller;
 
+import com.oishidam.auth.dto.RefreshedTokens;
 import com.oishidam.auth.dto.*;
 import com.oishidam.auth.service.AuthService;
 import com.oishidam.auth.service.RefreshTokenService;
 import com.oishidam.common.dto.ApiResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
+@Tag(name = "인증", description = "회원가입, 로그인 및 토큰 관리")
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
 public class AuthController {
     private final AuthService authService;
+
     private final RefreshTokenService refreshTokenService;
 
+    @Operation(summary = "회원가입")
     @PostMapping("/signup")
-    public ResponseEntity<ApiResponse<SignupResponse>> signup(@Valid @RequestBody SignupRequest request) {
+    @ResponseStatus(HttpStatus.CREATED)
+    public ApiResponse<SignupResponse> signup(@Valid @RequestBody SignupRequest request) {
         SignupResponse result = authService.signup(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(result));
+        return ApiResponse.ok(result);
     }
 
+    @Operation(summary = "로그인")
     @PostMapping("/login")
     public ApiResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
         LoginResponse result = authService.login(request);
         return ApiResponse.ok(result);
     }
 
+    @Operation(summary = "토큰 재발급")
     @PostMapping("/refresh")
     public ApiResponse<RefreshResponse> refresh(@Valid @RequestBody RefreshRequest request) {
-        RefreshTokenService.RefreshedTokens tokens = refreshTokenService.refresh(request.refreshToken());
+        RefreshedTokens tokens = refreshTokenService.refresh(request.refreshToken());
 
         RefreshResponse result = new RefreshResponse(tokens.accessToken(), tokens.refreshToken());
         return ApiResponse.ok(result);
     }
 
+    @Operation(summary = "로그아웃")
     @PostMapping("/logout")
     public ApiResponse<Void> logout(
             @AuthenticationPrincipal Jwt jwt,

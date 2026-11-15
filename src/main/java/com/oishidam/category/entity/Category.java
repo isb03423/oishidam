@@ -2,14 +2,14 @@ package com.oishidam.category.entity;
 
 import com.oishidam.common.entity.BaseEntity;
 import jakarta.persistence.*;
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 @Entity
 @Table(name = "categories")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+@Builder
 public class Category extends BaseEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -30,13 +30,6 @@ public class Category extends BaseEntity {
     private boolean isActive;
 
     public void update(Category parent, String name, int sortOrder, boolean isActive) {
-        this.parent = parent;
-        this.name = name;
-        this.sortOrder = sortOrder;
-        this.isActive = isActive;
-    }
-
-    public Category(Category parent, String name, int sortOrder, boolean isActive) {
         this.parent = parent;
         this.name = name;
         this.sortOrder = sortOrder;

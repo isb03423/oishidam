@@ -17,6 +17,10 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<ProductVariant> findByIdAndProductId(Long id, Long productId);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("SELECT v FROM ProductVariant v WHERE v.id = :id")
+    Optional<ProductVariant> findByIdForUpdate(@org.springframework.data.repository.query.Param("id") Long id);
+
     long countByProductIdAndIsActiveTrue(Long productId);
 
     List<ProductVariant> findByProductIdOrderByIdAsc(Long productId);

@@ -1,9 +1,7 @@
 package com.oishidam.product.entity;
 
 import jakarta.persistence.*;
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
@@ -14,6 +12,8 @@ import java.time.LocalDateTime;
 @Table(name = "product_images")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+@Builder
 public class ProductImage {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -49,13 +49,5 @@ public class ProductImage {
 
     public void clearPrimary() {
         this.isPrimary = false;
-    }
-
-    public ProductImage(Product product, String storageKey, String altText, int sortOrder, boolean isPrimary) {
-        this.product = product;
-        this.storageKey = storageKey;
-        this.altText = altText;
-        this.sortOrder = sortOrder;
-        this.isPrimary = isPrimary;
     }
 }

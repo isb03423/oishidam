@@ -4,9 +4,7 @@ import com.oishidam.category.entity.Category;
 import com.oishidam.common.entity.BaseEntity;
 import com.oishidam.product.enums.SaleStatus;
 import jakarta.persistence.*;
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.time.LocalDateTime;
 
@@ -14,6 +12,8 @@ import java.time.LocalDateTime;
 @Table(name = "products")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+@Builder
 public class Product extends BaseEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -58,15 +58,5 @@ public class Product extends BaseEntity {
     public void delete(LocalDateTime now) {
         this.deletedAt = now;
         this.saleStatus = SaleStatus.STOPPED;
-    }
-
-    public Product(Category category, String name, String description, String brand, SaleStatus saleStatus,
-            LocalDateTime publishedAt) {
-        this.category = category;
-        this.name = name;
-        this.description = description;
-        this.brand = brand;
-        this.saleStatus = saleStatus;
-        this.publishedAt = publishedAt;
     }
 }

@@ -2,9 +2,7 @@ package com.oishidam.product.entity;
 
 import com.oishidam.common.entity.BaseEntity;
 import jakarta.persistence.*;
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -15,6 +13,8 @@ import java.util.Map;
 @Table(name = "product_variants", uniqueConstraints = @UniqueConstraint(columnNames = {"product_id", "variant_name"}))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+@Builder
 public class ProductVariant extends BaseEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -44,19 +44,22 @@ public class ProductVariant extends BaseEntity {
     @Column(name = "is_active", nullable = false)
     private boolean isActive;
 
-    public ProductVariant(Product product, String skuCode, String variantName, Map<String, Object> optionValues,
-                          BigDecimal price, int stockQuantity, boolean isActive) {
-        this.product = product;
-        this.skuCode = skuCode;
-        this.variantName = variantName;
-        this.optionValues = optionValues;
-        this.price = price;
-        this.stockQuantity = stockQuantity;
-        this.isActive = isActive;
+    public void restoreStock(int quantity) {
+        this.stockQuantity = Math.addExact(this.stockQuantity, quantity);
     }
 
-    public void update(String skuCode, String variantName, Map<String, Object> optionValues,
-                       BigDecimal price, int stockQuantity, boolean isActive) {
+    public void deductStock(int quantity) {
+        this.stockQuantity -= quantity;
+    }
+
+    public void update(
+            String skuCode,
+            String variantName,
+            Map<String, Object> optionValues,
+            BigDecimal price,
+            int stockQuantity,
+            boolean isActive
+    ) {
         this.skuCode = skuCode;
         this.variantName = variantName;
         this.optionValues = optionValues;

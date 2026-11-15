@@ -1,5 +1,6 @@
 package com.oishidam.auth.service;
 
+import com.oishidam.auth.dto.GeneratedRefreshToken;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwsHeader;
@@ -22,11 +23,17 @@ import java.util.UUID;
 @Service
 public class JwtTokenService {
     private final JwtEncoder jwtEncoder;
+
     private final Clock clock;
+
     private final String issuer;
+
     private final String audience;
+
     private final long accessTokenValiditySeconds;
+
     private final long refreshTokenValiditySeconds;
+
     private final SecureRandom secureRandom = new SecureRandom();
 
     public JwtTokenService(
@@ -45,10 +52,16 @@ public class JwtTokenService {
         this.refreshTokenValiditySeconds = refreshTokenValiditySeconds;
     }
 
-    public String issueAccessToken(Long memberId, String role, long tokenVersion) {
+    // 액세스 토큰 발급
+    public String issueAccessToken(
+            Long memberId,
+            String role,
+            long tokenVersion
+    ) {
         LocalDateTime now = LocalDateTime.now(clock);
         LocalDateTime expiresAt = now.plusSeconds(accessTokenValiditySeconds);
 
+        // 토큰에 담을 회원 정보와 만료 시간 설정
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .issuer(issuer)
                 .audience(List.of(audience))
@@ -65,7 +78,9 @@ public class JwtTokenService {
         return jwtEncoder.encode(JwtEncoderParameters.from(jwsHeader, claims)).getTokenValue();
     }
 
+    // 리프레시 토큰 생성
     public GeneratedRefreshToken issueRefreshToken() {
+        // 무작위 토큰 생성 및 저장용 해시 계산
         byte[] randomBytes = new byte[32];
         secureRandom.nextBytes(randomBytes);
 
@@ -76,6 +91,7 @@ public class JwtTokenService {
         return new GeneratedRefreshToken(token, tokenHash, expiresAt);
     }
 
+    // 리프레시 토큰 해시
     public String hashRefreshToken(String token) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
@@ -87,6 +103,4 @@ public class JwtTokenService {
         }
     }
 
-    public record GeneratedRefreshToken(String token, String tokenHash, LocalDateTime expiresAt) {
-    }
 }

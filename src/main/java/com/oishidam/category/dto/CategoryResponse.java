@@ -13,6 +13,7 @@ public record CategoryResponse(
                 category.getId(),
                 category.getParent() == null ? null : category.getParent().getId(),
                 category.getName(),
-                category.getSortOrder());
+                category.getSortOrder()
+        );
     }
 }

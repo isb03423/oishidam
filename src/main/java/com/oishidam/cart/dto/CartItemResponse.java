@@ -32,6 +32,7 @@ public record CartItemResponse(
                 variant.getPrice(),
                 item.getQuantity(),
                 variant.getStockQuantity(),
-                available);
+                available
+        );
     }
 }

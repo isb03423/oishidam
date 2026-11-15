@@ -13,11 +13,11 @@ import java.util.Optional;
 @Repository
 public interface MemberRepository extends JpaRepository<Member, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select m from Member m where m.email = :email")
+    @Query("SELECT m FROM Member m WHERE m.email = :email")
     Optional<Member> findByEmailForUpdate(@Param("email") String email);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select m from Member m where m.id = :id")
+    @Query("SELECT m FROM Member m WHERE m.id = :id")
     Optional<Member> findByIdForUpdate(@Param("id") Long id);
 
     boolean existsByEmail(String email);

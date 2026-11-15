@@ -18,6 +18,7 @@ import java.util.Optional;
 
 @Repository
 public interface ProductRepository extends JpaRepository<Product, Long> {
+    boolean existsByCategoryId(Long categoryId);
     boolean existsByIdAndDeletedAtIsNull(Long id);
 
     @EntityGraph(attributePaths = "category")

@@ -45,7 +45,7 @@ public class RecommendationService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_RECOMMENDATION_TYPE", "지원하지 않는 추천 유형입니다.");
         }
         if (memberId == null) {
-            return best(limit, "DEFAULT");
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "AUTHENTICATION_REQUIRED", "로그인이 필요합니다.");
         }
 
         List<WishItem> history = wishes.findByMemberIdAndProductDeletedAtIsNullOrderByIdDesc(memberId);

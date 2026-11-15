@@ -64,4 +64,11 @@ public class Member extends BaseEntity {
     public void deactivate() {
         this.isActive = false;
     }
+
+    public boolean changeActive(boolean active) {
+        if (this.isActive == active) return false;
+        this.isActive = active;
+        this.tokenVersion++;
+        return true;
+    }
 }

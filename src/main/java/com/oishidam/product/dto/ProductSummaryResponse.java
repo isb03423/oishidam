@@ -10,11 +10,13 @@ public record ProductSummaryResponse(
         String brand,
         BigDecimal minimumPrice,
         ImageResponse primaryImage,
-        LocalDateTime publishedAt
+        LocalDateTime publishedAt,
+        boolean isSoldOut
 ) {
     public record ImageResponse(
             String storageKey,
-            String altText
+            String altText,
+            String imageUrl
     ) {
     }
 }

@@ -5,7 +5,9 @@ import com.oishidam.admin.category.dto.AdminCategoryResponse;
 import com.oishidam.category.entity.Category;
 import com.oishidam.category.repository.CategoryRepository;
 import com.oishidam.common.exception.ApiException;
+import com.oishidam.product.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,6 +20,7 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class AdminCategoryService {
     private final CategoryRepository categoryRepository;
+    private final ProductRepository productRepository;
 
     // 관리자: 카테고리 목록
     @Transactional(readOnly = true)
@@ -57,6 +60,23 @@ public class AdminCategoryService {
         }
         category.update(parent, request.name().trim(), request.sortOrder(), request.isActive());
         return AdminCategoryResponse.from(category);
+    }
+
+    // 하위 분류나 연결된 상품이 없는 카테고리만 삭제한다.
+    @Transactional
+    public void delete(Long categoryId) {
+        List<Category> categories = categoryRepository.findAllForUpdate();
+        Category category = findRequired(categories, categoryId);
+        if (categories.stream().anyMatch(c -> c.getParent() != null && c.getParent().getId().equals(categoryId))
+                || productRepository.existsByCategoryId(categoryId)) {
+            throw new ApiException(HttpStatus.CONFLICT, "CATEGORY_IN_USE", "하위 카테고리 또는 연결된 상품이 있습니다.");
+        }
+        try {
+            categoryRepository.delete(category);
+            categoryRepository.flush();
+        } catch (DataIntegrityViolationException e) {
+            throw new ApiException(HttpStatus.CONFLICT, "CATEGORY_IN_USE", "하위 카테고리 또는 연결된 상품이 있습니다.");
+        }
     }
 
     // 상위 카테고리 조회

@@ -44,4 +44,10 @@ public class AdminCategoryController {
         AdminCategoryResponse result = categoryService.update(categoryId, request);
         return ApiResponse.ok(result);
     }
+    @Operation(summary = "카테고리 삭제")
+    @DeleteMapping("/{categoryId}")
+    public ApiResponse<Void> delete(@PathVariable Long categoryId) {
+        categoryService.delete(categoryId);
+        return ApiResponse.ok(null);
+    }
 }

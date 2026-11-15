@@ -13,14 +13,16 @@ public record ProductDetailResponse(
         String brand,
         LocalDateTime publishedAt,
         List<ImageResponse> images,
-        List<VariantResponse> variants
+        List<VariantResponse> variants,
+        boolean isSoldOut
 ) {
     public record ImageResponse(
             Long imageId,
             String storageKey,
             String altText,
             int sortOrder,
-            boolean isPrimary
+            boolean isPrimary,
+            String imageUrl
     ) {
     }
 

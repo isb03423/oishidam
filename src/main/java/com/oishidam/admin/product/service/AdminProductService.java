@@ -188,7 +188,7 @@ public class AdminProductService {
                 ProductImage.builder()
                         .product(product)
                         .storageKey(request.storageKey().trim())
-                        .altText(request.altText().trim())
+                        .altText(request.altText() == null ? null : request.altText().trim())
                         .sortOrder(request.sortOrder())
                         .isPrimary(request.isPrimary())
                         .build()

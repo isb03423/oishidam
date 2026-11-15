@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.net.URI;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -80,7 +81,7 @@ public class ProductService {
                 : productRepository.searchByKeyword(SaleStatus.ON_SALE, now, categoryIds, search, pageable);
         List<Long> productIds = products.getContent().stream().map(Product::getId).toList();
         if (productIds.isEmpty()) {
-            return products.map(product -> toSummary(product, Map.of(), Map.of()));
+            return products.map(product -> toSummary(product, Map.of(), Map.of(), Map.of()));
         }
 
         // 대표 이미지와 옵션 최저가 조회
@@ -91,14 +92,16 @@ public class ProductService {
                         Function.identity(),
                         (first, second) -> first
                 ));
-        Map<Long, BigDecimal> prices = variantRepository.findByProductIdInAndIsActiveTrueOrderByIdAsc(productIds)
-                .stream()
+        List<ProductVariant> variants = variantRepository.findByProductIdInAndIsActiveTrueOrderByIdAsc(productIds);
+        Map<Long, BigDecimal> prices = variants.stream()
                 .collect(Collectors.toMap(
                         variant -> variant.getProduct().getId(),
                         ProductVariant::getPrice,
                         BigDecimal::min
                 ));
-        return products.map(product -> toSummary(product, images, prices));
+        Map<Long, Boolean> inStock = variants.stream().collect(Collectors.toMap(
+                variant -> variant.getProduct().getId(), variant -> variant.getStockQuantity() > 0, Boolean::logicalOr));
+        return products.map(product -> toSummary(product, images, prices, inStock));
     }
 
     // 상품 상세
@@ -127,7 +130,8 @@ public class ProductService {
                         image.getStorageKey(),
                         image.getAltText(),
                         image.getSortOrder(),
-                        image.isPrimary()
+                        image.isPrimary(),
+                        imageUrl(image.getStorageKey())
                 ))
                 .toList();
         List<ProductDetailResponse.VariantResponse> variants = variantRepository
@@ -148,7 +152,8 @@ public class ProductService {
                 product.getBrand(),
                 product.getPublishedAt(),
                 images,
-                variants
+                variants,
+                variants.stream().noneMatch(variant -> variant.stockQuantity() > 0)
         );
     }
 
@@ -156,11 +161,12 @@ public class ProductService {
     private ProductSummaryResponse toSummary(
             Product product,
             Map<Long, ProductImage> images,
-            Map<Long, BigDecimal> prices
+            Map<Long, BigDecimal> prices,
+            Map<Long, Boolean> inStock
     ) {
         ProductImage image = images.get(product.getId());
         ProductSummaryResponse.ImageResponse primaryImage = image == null ? null
-                : new ProductSummaryResponse.ImageResponse(image.getStorageKey(), image.getAltText());
+                : new ProductSummaryResponse.ImageResponse(image.getStorageKey(), image.getAltText(), imageUrl(image.getStorageKey()));
         return new ProductSummaryResponse(
                 product.getId(),
                 product.getCategory().getId(),
@@ -168,8 +174,19 @@ public class ProductService {
                 product.getBrand(),
                 prices.get(product.getId()),
                 primaryImage,
-                product.getPublishedAt()
+                product.getPublishedAt(),
+                !inStock.getOrDefault(product.getId(), false)
         );
+    }
+
+    private String imageUrl(String key) {
+        try {
+            URI uri = URI.create(key);
+            return "https".equalsIgnoreCase(uri.getScheme()) && uri.getHost() != null && uri.getUserInfo() == null
+                    ? key : null;
+        } catch (IllegalArgumentException | NullPointerException e) {
+            return null;
+        }
     }
 
     // 검색어의 LIKE 특수문자 이스케이프

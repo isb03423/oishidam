@@ -18,6 +18,15 @@ const registeredPasswords = new Map([
 
 const withdrawnMembers = new Set()
 
+export function getMockCustomers() {
+  return [...registeredMembers.values()]
+    .filter((member) => member.role === 'CUSTOMER')
+    .map(({ member_id, name, email, joined_at }) => ({
+      id: member_id, name, email, joined_at,
+      status: withdrawnMembers.has(member_id) ? 'WITHDRAWN' : 'ACTIVE',
+    }))
+}
+
 export function getMockCustomerJoinDates() {
   return [...registeredMembers.values()]
     .filter((member) => member.role === 'CUSTOMER' && !withdrawnMembers.has(member.member_id))

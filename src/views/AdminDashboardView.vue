@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref, shallowRef, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import AdminManagement from './AdminManagement.vue'
 import logo from '../assets/images/oishidam_logo.png'
 import { logout } from '../services/auth.js'
 import { session } from '../stores/session.js'
@@ -18,7 +19,9 @@ const statusLabels = [
   { name: '배송중', label: '배송 중', color: '#9f83a7' },
   { name: '배송완료', label: '배송 완료', color: '#a44f68' },
 ]
-const navigation = ['대시보드', '상품 관리', '카테고리 관리', '재고 관리', '주문 관리', '회원 관리', '문의 관리', '리뷰 관리', '공지사항', 'FAQ 관리', '고객 분석 (AI)']
+const navigation = [["","대시보드"],["products","상품 관리"],["categories","카테고리 관리"],["inventory","재고 관리"],["orders","주문 관리"],["members","회원 관리"],["inquiries","문의 관리"],["reviews","리뷰 관리"],["analytics","고객 분석 (AI)"]]
+const route = useRoute()
+const activeSection = computed(() => navigation.find(([id]) => id === route.params.section) ?? navigation[0])
 const formatter = new Intl.NumberFormat('ko-KR')
 const won = (amount) => formatter.format(amount) + '원'
 const dateFormat = new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', dateStyle: 'short', timeStyle: 'short' })
@@ -93,9 +96,8 @@ async function signOut() {
       <img :src="logo" alt="오이시담" class="admin-logo">
       <nav aria-label="관리자 메뉴">
         <ul>
-          <li v-for="(label, index) in navigation" :key="label">
-            <RouterLink v-if="index === 0" :to="{ name: 'AdminDashboard' }">{{ label }}</RouterLink>
-            <span v-else aria-disabled="true">{{ label }}</span>
+          <li v-for="[id, label] in navigation" :key="id">
+            <RouterLink :to="{ name: 'AdminDashboard', params: { section: id } }">{{ label }}</RouterLink>
           </li>
         </ul>
       </nav>
@@ -107,13 +109,14 @@ async function signOut() {
         <button type="button" @click="signOut">로그아웃</button>
         <p v-if="logoutError" role="alert">{{ logoutError }}</p>
       </header>
-      <main class="dashboard">
+      <AdminManagement v-if="activeSection[0]" :section="activeSection[0]" :title="activeSection[1]" />
+      <main v-else class="dashboard">
         <header class="page-heading">
           <div>
             <h1>대시보드</h1>
             <p>{{ demo ? '오이시담 운영 현황 · 모의 데이터' : '오이시담 운영 현황' }}</p>
           </div>
-          <select v-model="days" aria-label="집계 기간" :disabled="!report">
+          <select v-model="days" class="dashboard-period" aria-label="집계 기간" :disabled="!report">
             <option :value="7">최근 7일</option>
             <option :value="14">최근 14일</option>
             <option :value="30">최근 30일</option>
@@ -192,19 +195,21 @@ async function signOut() {
 </template>
 
 <style scoped>
+.admin-body { min-width: 0; }
 .admin-shell { display: grid; grid-template-columns: 210px minmax(0, 1fr); background: var(--color-background); min-height: 100dvh; }
 .sidebar { background: linear-gradient(165deg, #75394b, #915268); color: var(--color-white); padding: 24px 12px; }
 .admin-logo { display: block; width: 145px; margin: 0 auto 28px; padding: 8px 10px; border-radius: 10px; background: var(--color-white); }
 .sidebar ul { display: grid; gap: 4px; }
-.sidebar a, .sidebar li > span { display: block; padding: 10px 14px; border-radius: 8px; }
-.sidebar a { background: rgb(255 255 255 / 22%); color: inherit; font-weight: 700; }
-.sidebar [aria-disabled] { color: #f1dce4; }
-.topbar { display: flex; justify-content: flex-end; align-items: center; gap: 12px; min-height: 58px; padding: 10px 24px; border-bottom: 1px solid var(--color-border); background: var(--color-white); }
-.topbar button, select { border: 1px solid var(--color-border); border-radius: 8px; padding: 7px 10px; background: var(--color-white); color: var(--color-text); font: inherit; }
+.sidebar a { display: block; padding: 10px 14px; border-radius: 8px; }
+.sidebar a.router-link-exact-active { background: rgb(255 255 255 / 22%); color: inherit; font-weight: 700; }
+.sidebar a { color: inherit; }
+.topbar { display: flex; justify-content: flex-end; align-items: center; gap: 12px; min-height: 58px; padding: 10px clamp(16px, 2vw, 28px); background: var(--color-background); }
+.topbar button, .dashboard-period { border: 1px solid var(--color-border); border-radius: 8px; padding: 7px 10px; background: var(--color-white); color: var(--color-text); font: inherit; }
 .topbar button { cursor: pointer; }
 .dashboard { display: grid; gap: 16px; padding: clamp(16px, 2vw, 28px); }
 .page-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; }
 h1 { font-size: 1.85rem; color: #592839; font-weight: 800; }
+.dashboard-period { margin-inline-start: auto; }
 .page-heading p, .empty, small { color: var(--color-secondary); }
 h2 { font-weight: 750; font-size: 1.07rem; color: #592839; }
 .metric-grid, .chart-grid, .bottom-grid { display: grid; align-items: stretch; gap: 14px; }

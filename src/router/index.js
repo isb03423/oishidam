@@ -29,7 +29,7 @@ const routes = [
     component: () => import('../views/CheckoutView.vue'),
   },
   {
-    path: '/admin',
+    path: '/admin/:section(products|categories|inventory|orders|members|inquiries|reviews|analytics)?',
     name: 'AdminDashboard',
     meta: { hideLayout: true },
     beforeEnter: () => {

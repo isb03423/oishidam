@@ -119,6 +119,7 @@ const routes = [
   {
     path: '/mypage/wishlist',
     name: 'MyPageWishlist',
+    beforeEnter: () => session.member ? true : { name: 'Login' },
     component: () => import('../views/WishlistView.vue')
   }
 

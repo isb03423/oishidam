@@ -78,9 +78,15 @@ async function showOrder(order, repurchase = false) {
         </header>
         <div class="order-body">
           <div class="order-product">
-            <div class="order-thumbnails" aria-hidden="true">
-              <span v-for="item in order.items.slice(0, 2)" :key="item.name" :class="item.tone">{{ item.brand }}</span>
-            </div>
+            <RouterLink
+              class="order-thumbnail product-thumbnail-zoom"
+              :class="order.items[0].tone"
+              :to="{ name: 'ProductDetail', params: { productId: order.items[0].product_id } }"
+              :aria-label="order.items[0].name + ' 상품 상세보기'"
+            >
+              <img v-if="order.items[0].imageUrl" :src="order.items[0].imageUrl" alt="" loading="lazy" />
+              <span v-else>{{ order.items[0].brand }}</span>
+            </RouterLink>
             <div>
               <h2>{{ order.items[0].name }}<template v-if="order.items.length > 1"> 외 {{ order.items.length - 1 }}건</template></h2>
               <p>총 {{ order.quantity }}개 <span>{{ won(order.total) }}</span></p>
@@ -285,20 +291,11 @@ svg {
   font-weight: 700;
 }
 
-.order-thumbnails {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  width: 84px;
-  flex: 0 0 84px;
-}
-
-.order-thumbnails span {
+.order-thumbnail {
   display: grid;
   place-items: center;
-  width: 39px;
-  height: 45px;
+  flex: 0 0 47px;
+  height: 53px;
   border-radius: 4px;
   color: #fff;
   font-size: 9px;

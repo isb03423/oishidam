@@ -49,10 +49,14 @@ watch(cartItems, (items) => {
       <ul class="cart-items">
         <li v-for="item in cartItems" :key="item.variant_id" class="cart-row">
           <input v-model="selection" type="checkbox" :value="item.variant_id" :aria-label="`${item.name} 선택`" />
-          <div class="cart-thumbnail">
+          <RouterLink
+            class="cart-thumbnail product-thumbnail-zoom"
+            :to="{ name: 'ProductDetail', params: { productId: item.product_id } }"
+            :aria-label="item.name + ' 상품 상세보기'"
+          >
             <img v-if="item.image" :src="item.image" alt="" loading="lazy" @error="$event.target.hidden = true" />
             <span v-else>이미지 준비 중</span>
-          </div>
+          </RouterLink>
           <div class="cart-product">
             <strong>{{ item.name || item.product_id }}</strong>
             <b>{{ won(item.price) }}</b>

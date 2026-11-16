@@ -2,7 +2,6 @@
 import { categoryGroups } from '../../data/categories.js'
 
 defineProps({
-  sort: { type: String, default: undefined },
   activeGroupId: { type: String, default: '' },
 })
 </script>
@@ -14,14 +13,14 @@ defineProps({
       <ul class="sidebar-menu-list">
         <li v-for="group in categoryGroups" :key="group.category_id">
           <RouterLink
-            :to="{ name: 'Products', query: { categoryId: group.category_id, sort } }"
+            :to="{ name: 'Products', query: { categoryId: group.category_id } }"
             class="sidebar-menu-button"
             :class="{ 'router-link-exact-active': activeGroupId === group.category_id }"
             exact-active-class="catalog-route-match"
             :aria-current="activeGroupId === group.category_id ? 'true' : null"
           >
             <span>{{ group.name }}</span>
-            <span aria-hidden="true">›</span>
+            <span v-if="group.children.length" aria-hidden="true">›</span>
           </RouterLink>
         </li>
       </ul>

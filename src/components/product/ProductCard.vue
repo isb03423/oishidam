@@ -1,18 +1,40 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { session } from '../../stores/session.js'
 import { toggleWish, wishedIds } from '../../stores/wishlist.js'
 
 const props = defineProps({
   product: { type: Object, required: true },
   badge: { type: String, default: '' },
 })
-const wished = computed(() => wishedIds.value.includes(props.product.product_id))
+const router = useRouter()
+const wished = computed(() => Boolean(session.member) && wishedIds.value.includes(props.product.product_id))
 const imageFailed = ref(false)
 const image = computed(() => props.product.images?.find((item) => item.is_primary) || props.product.images?.[0])
 const imageSource = computed(() => image.value?.url || '')
 watch(imageSource, () => { imageFailed.value = false })
 const price = computed(() => props.product.min_price)
+const stockLabel = computed(() => {
+  const product = props.product
+  if (product.is_sold_out) return '품절'
+
+  let remaining = product.stock_quantity
+  if (!Number.isFinite(remaining)) {
+    const activeVariants = product.variants?.filter((variant) => variant.is_active) ?? []
+    remaining = activeVariants.reduce((total, variant) => total + (variant.stock_quantity ?? NaN), 0)
+  }
+  return remaining > 0 && remaining < 5 ? '품절 임박' : ''
+})
 const formatPrice = (value) => new Intl.NumberFormat('ko-KR').format(value)
+
+function toggleProductWish() {
+  if (!session.member) {
+    router.push({ name: 'Login' })
+    return
+  }
+  toggleWish(props.product)
+}
 </script>
 
 <template>
@@ -47,13 +69,13 @@ const formatPrice = (value) => new Intl.NumberFormat('ko-KR').format(value)
         :class="{ 'is-wished': wished }"
         :aria-label="`${product.name} ${wished ? '찜 해제' : '찜하기'}`"
         :aria-pressed="wished"
-        @click="toggleWish(product)"
+        @click="toggleProductWish"
       >
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z" />
         </svg>
       </button>
-      <span v-if="product.is_sold_out" class="product-sold-out">품절</span>
+      <span v-if="stockLabel" class="product-stock-label" :class="{ 'is-low-stock': !product.is_sold_out }">{{ stockLabel }}</span>
     </div>
 
     <div class="product-info">
@@ -183,7 +205,7 @@ const formatPrice = (value) => new Intl.NumberFormat('ko-KR').format(value)
   pointer-events: none;
 }
 
-.product-sold-out {
+.product-stock-label {
   position: absolute;
   bottom: 10px;
   left: 10px;
@@ -192,6 +214,11 @@ const formatPrice = (value) => new Intl.NumberFormat('ko-KR').format(value)
   background: rgb(57 44 50 / 80%);
   color: #fff;
   font-size: 11px;
+}
+
+.product-stock-label.is-low-stock {
+  background: #8b354e;
+  font-weight: 700;
 }
 
 /* 상품명과 가격 · 긴 이름은 두 줄까지 표시 */

@@ -53,7 +53,15 @@ const won = (price) => `${currency.format(price)}원`
 
         <ul class="receipt-product-list">
           <li v-for="item in visibleItems" :key="item.name">
-            <span class="receipt-product-mark" :class="item.tone">{{ item.brand }}</span>
+            <RouterLink
+              class="receipt-product-mark product-thumbnail-zoom"
+              :class="item.tone"
+              :to="{ name: 'ProductDetail', params: { productId: item.product_id } }"
+              :aria-label="item.name + ' 상품 상세보기'"
+            >
+              <img v-if="item.imageUrl" :src="item.imageUrl" alt="" loading="lazy" />
+              <span v-else>{{ item.brand }}</span>
+            </RouterLink>
             <div>
               <strong>{{ item.name }}</strong>
               <span>수량 {{ item.quantity }}개</span>

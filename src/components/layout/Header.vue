@@ -61,7 +61,6 @@
               class="icon-button"
               :class="{ 'is-guest': !session.member }"
               :aria-label="session.member ? '찜한 상품' : '로그인 후 이용 가능한 찜한 상품'"
-              :aria-disabled="!session.member"
               :title="session.member ? '찜한 상품' : '로그인 후 이용할 수 있습니다.'"
               @click="requireLogin({ name: 'MyPageWishlist' })"
             >
@@ -317,6 +316,9 @@ function requireLogin(memberRoute) {
 
 /* 로고 */
 .header-logo {
+  position: relative;
+  left: -6px;
+  justify-self: start;
   display: flex;
   align-items: center;
   flex-shrink: 0;
@@ -326,7 +328,6 @@ function requireLogin(memberRoute) {
   width: 135px;
   height: auto;
   display: block;
-  transform: translateX(-6px);
 }
 
 /* 검색 */

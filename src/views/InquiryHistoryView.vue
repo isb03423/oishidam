@@ -94,15 +94,14 @@ function submit() {
             <div v-show="expandedId === item.id" :id="`inquiry-panel-${item.id}`" class="inquiry-expanded">
               <article class="activity-panel inquiry-detail">
                 <header class="inquiry-detail-meta">
-                  <span class="activity-badge" :class="{ 'is-complete': item.answer }">{{ item.answer ? '답변 완료' : '답변 대기' }}</span>
+                  <h2 class="activity-badge">문의 내용</h2>
                   <span class="activity-meta">{{ item.date }}</span>
                 </header>
-                <h2>{{ item.title }}</h2>
                 <p class="activity-copy">{{ item.content }}</p>
               </article>
-              <section class="activity-panel inquiry-answer" :aria-labelledby="`inquiry-answer-${item.id}`">
-                <h2 :id="`inquiry-answer-${item.id}`">관리자 답변</h2>
-                <p class="activity-copy">{{ item.answer || '아직 등록된 답변이 없습니다.' }}</p>
+              <section v-if="item.answer" class="activity-panel inquiry-answer" :aria-labelledby="`inquiry-answer-${item.id}`">
+                <h2 class="activity-badge" :id="`inquiry-answer-${item.id}`">관리자 답변</h2>
+                <p class="activity-copy">{{ item.answer }}</p>
               </section>
             </div>
           </li>
@@ -186,10 +185,9 @@ function submit() {
 }
 
 .inquiry-row:hover,
-.inquiry-row:focus-visible { background: var(--color-background); }
+.inquiry-row:focus-visible { background: var(--color-white); }
 .inquiry-row:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
-.inquiry-title,
-.inquiry-detail h2 { overflow-wrap: anywhere; }
+.inquiry-title { overflow-wrap: anywhere; }
 .inquiry-date { white-space: nowrap; }
 .inquiry-chevron { color: var(--color-primary); font-size: 20px; line-height: 1; }
 .inquiry-row[aria-expanded="true"] .inquiry-chevron { transform: rotate(90deg); }
@@ -208,10 +206,11 @@ function submit() {
 .activity-badge.is-complete { background: #efe6f0; color: var(--color-secondary); }
 .inquiry-detail,
 .inquiry-answer { display: grid; gap: 10px; }
-.inquiry-detail h2,
-.inquiry-answer h2 { font-size: 16px; font-weight: 700; }
 .inquiry-detail-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.inquiry-answer { border-color: transparent; background: var(--color-background); }
+.inquiry-detail { border-color: #dde2f1; background: #f2f2fa; }
+.inquiry-detail .activity-badge { background: #cfd8ea; color: #284368; }
+.inquiry-answer { border-color: #dce7de; background: #f1f5f1; }
+.inquiry-answer .activity-badge { background: #c5ddc8; color: #2e5238; }
 
 @media (max-width: 600px) {
   .inquiry-row { grid-template-columns: auto minmax(0, 1fr) 10px; gap: 4px 8px; padding-inline: 10px; }

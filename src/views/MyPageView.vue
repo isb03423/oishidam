@@ -2,14 +2,16 @@
 import { computed, onBeforeUnmount, onMounted, reactive } from 'vue'
 import MyPageLayout from '../components/MyPageLayout.vue'
 import ProductCard from '../components/product/ProductCard.vue'
+import { getExampleOrders } from '../mocks/orders.js'
 import { getRecommendations } from '../services/catalog.js'
 import { session } from '../stores/session.js'
 import { wishedProducts } from '../stores/wishlist.js'
 
 const memberName = computed(() => session.member?.name || '오이시담')
+const deliveryOrder = getExampleOrders(new Date()).find((order) => order.status === '배송중')
 const recommended = reactive({ items: [] })
 const failedImages = reactive(new Set())
-const wishlistPreview = computed(() => wishedProducts.value.slice(0, 6).map((product) => {
+const wishlistPreview = computed(() => wishedProducts.value.slice(0, 4).map((product) => {
   const image = product.images?.find((item) => item.is_primary && item.url)
     ?? product.images?.find((item) => item.url)
   return { id: product.product_id, name: product.name, url: image?.url }
@@ -70,7 +72,17 @@ onBeforeUnmount(() => controller?.abort())
             <span>배송 완료</span>
           </div>
         </div>
-        <p>주문번호: 12345678<br />상품명: [예시] 맛있는 유기농 오이 외 2건</p>
+        <RouterLink
+          v-if="deliveryOrder"
+          class="delivery-order-link"
+          :to="{ name: 'MyPageOrderDetail', params: { orderId: deliveryOrder.id } }"
+        >
+          <span class="delivery-order-header">
+            <span>주문번호: {{ deliveryOrder.id }}</span>
+            <span class="delivery-order-detail">상세보기 &gt;</span>
+          </span>
+          <span>상품명: {{ deliveryOrder.items[0].name }}<template v-if="deliveryOrder.items.length > 1"> 외 {{ deliveryOrder.items.length - 1 }}건</template></span>
+        </RouterLink>
       </article>
 
       <article class="dashboard-card ai-card">
@@ -397,7 +409,31 @@ onBeforeUnmount(() => controller?.abort())
   background: var(--color-primary);
 }
 
-.delivery-card > p {
+.delivery-order-link:hover,
+.delivery-order-link:focus-visible {
+  border-color: var(--color-primary);
+  background: var(--color-background);
+}
+
+.delivery-order-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  column-gap: 8px;
+}
+
+.delivery-order-detail {
+  margin-left: auto;
+  color: var(--color-primary);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.delivery-order-link {
+  display: grid;
+  gap: 2px;
+  overflow-wrap: anywhere;
   margin: auto 0 0;
   padding: 9px 10px;
   border: 1px solid var(--color-border);
@@ -501,7 +537,7 @@ onBeforeUnmount(() => controller?.abort())
 .wishlist-items {
   display: grid;
   flex: 1;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-template-rows: repeat(2, minmax(0, 1fr));
   gap: 5px;
   margin: 0;

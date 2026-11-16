@@ -1,19 +1,18 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import ReviewProduct from '../components/ReviewProduct.vue'
 import placeholder from '../assets/images/favicon-mark.png'
 import { development } from '../config/development.js'
 import { categories } from '../data/categories.js'
 import { getProduct } from '../services/catalog.js'
 import { addVariantToCart, cartLine } from '../stores/cart.js'
 import { startCheckout } from '../stores/checkout.js'
+import { session } from '../stores/session.js'
 import { toggleWish, wishedIds } from '../stores/wishlist.js'
 
 const tabs = [
   { id: 'details', label: '상품 상세정보' },
   { id: 'reviews', label: '상품 리뷰' },
-  { id: 'inquiries', label: '상품 문의' },
   { id: 'customs', label: '통관 안내' },
 ]
 const route = useRoute()
@@ -27,7 +26,9 @@ const failedImages = ref(new Set())
 const variantId = ref(null)
 const quantity = ref(1)
 const notice = ref('')
-const cartAdded = ref(false)
+const cartDialog = ref(null)
+const reviewDialog = ref(null)
+const activeReview = ref(null)
 const optionSelect = ref(null)
 const formatter = new Intl.NumberFormat('ko-KR')
 const won = (price) => Number.isFinite(price) ? `${formatter.format(price)}원` : '가격 확인 필요'
@@ -40,18 +41,14 @@ const reviews = computed(() => development.mockEnabled ? product.value?.reviews 
 const averageRating = computed(() => reviews.value.length
   ? (reviews.value.reduce((sum, review) => sum + review.rating, 0) / reviews.value.length).toFixed(1)
   : null)
-const reviewProduct = computed(() => ({
-  name: product.value?.name,
-  brand: product.value?.brand,
-  imageUrl: primaryImage.value?.url,
-}))
 const variants = computed(() => (product.value?.variants ?? []).filter((variant) => variant.is_active))
 const inStock = (variant) => variant.stock_quantity > 0
 const soldOut = computed(() => product.value?.is_sold_out || (variants.value.length > 0 && !variants.value.some(inStock)))
 const selected = computed(() => variants.value.find((variant) => variant.variant_id === variantId.value))
 const maxQuantity = computed(() => soldOut.value ? 0 : selected.value?.stock_quantity ?? 0)
+const lowStock = computed(() => maxQuantity.value > 0 && maxQuantity.value < 5)
 const canOrder = computed(() => !soldOut.value && variants.value.some(inStock))
-const wished = computed(() => wishedIds.value.includes(product.value?.product_id))
+const wished = computed(() => Boolean(session.member) && wishedIds.value.includes(product.value?.product_id))
 
 watch(
   [() => route.params.productId, () => development.mockEnabled, () => development.scenario, retry],
@@ -86,7 +83,6 @@ watch(
 
 function clearNotice() {
   notice.value = ''
-  cartAdded.value = false
 }
 
 function changeOption() {
@@ -97,6 +93,11 @@ function changeOption() {
 function changeQuantity(delta) {
   quantity.value = Math.min(maxQuantity.value, Math.max(1, quantity.value + delta))
   clearNotice()
+}
+
+function openReview(review) {
+  activeReview.value = review
+  reviewDialog.value.showModal()
 }
 
 function selectTab(event, index) {
@@ -113,7 +114,20 @@ function selectTab(event, index) {
   event.currentTarget.parentElement.children[next].focus()
 }
 
+function toggleProductWish() {
+  if (!session.member) {
+    router.push({ name: 'Login' })
+    return
+  }
+  toggleWish(product.value)
+}
+
 function order(buyNow) {
+  if (!session.member) {
+    router.push({ name: 'Login' })
+    return
+  }
+
   clearNotice()
   if (!selected.value) {
     notice.value = '상품 옵션을 선택해주세요.'
@@ -126,8 +140,11 @@ function order(buyNow) {
     router.push({ name: 'Checkout' })
     return
   }
-  cartAdded.value = addVariantToCart(product.value, variantId.value, quantity.value)
-  notice.value = cartAdded.value ? '장바구니에 담았어요.' : '장바구니에 담을 수 있는 재고 수량을 확인해주세요.'
+  if (addVariantToCart(product.value, variantId.value, quantity.value)) {
+    cartDialog.value.showModal()
+    return
+  }
+  notice.value = '장바구니에 담을 수 있는 재고 수량을 확인해주세요.'
 }
 </script>
 
@@ -180,19 +197,11 @@ function order(buyNow) {
           <h1 id="product-title">{{ product.name }}</h1>
           <p class="price">{{ won(selected?.price ?? product.min_price) }}</p>
 
-          <dl class="stock">
-            <dt>재고 현황</dt>
-            <dd :class="{ 'sold-out': soldOut }">
-              <template v-if="soldOut">품절</template>
-              <template v-else-if="selected">재고 있음 ({{ maxQuantity }}개)</template>
-              <template v-else-if="canOrder">옵션별 재고 확인</template>
-              <template v-else>재고 정보 확인 필요</template>
-            </dd>
-          </dl>
+          <p v-if="soldOut" class="stock-badge" role="status">품절</p>
           <p v-if="product.summary" class="description">{{ product.summary }}</p>
 
           <div class="purchase-fields">
-            <div v-if="variants.length" class="field-row">
+            <div v-if="variants.length > 1" class="field-row">
               <label for="product-option">옵션</label>
               <select id="product-option" ref="optionSelect" v-model="variantId" :disabled="soldOut" @change="changeOption">
                 <option :value="null" disabled>옵션을 선택해주세요</option>
@@ -203,25 +212,43 @@ function order(buyNow) {
             </div>
             <div class="field-row">
               <span id="quantity-label">수량</span>
-              <div class="quantity" role="group" aria-labelledby="quantity-label">
-                <button type="button" aria-label="수량 줄이기" :disabled="!maxQuantity || quantity <= 1" @click="changeQuantity(-1)">−</button>
-                <output aria-live="polite">{{ quantity }}</output>
-                <button type="button" aria-label="수량 늘리기" :disabled="quantity >= maxQuantity" @click="changeQuantity(1)">+</button>
+              <div class="quantity-row">
+                <div class="quantity" role="group" aria-labelledby="quantity-label">
+                  <button type="button" aria-label="수량 줄이기" :disabled="!maxQuantity || quantity <= 1" @click="changeQuantity(-1)">−</button>
+                  <output aria-live="polite">{{ quantity }}</output>
+                  <button type="button" aria-label="수량 늘리기" :disabled="quantity >= maxQuantity" @click="changeQuantity(1)">+</button>
+                </div>
+                <span v-if="lowStock" class="stock-remaining">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3ZM4 7.5 12 12l8-4.5M12 12v9" />
+                  </svg>
+                  단 {{ maxQuantity }}개 남음
+                </span>
               </div>
             </div>
           </div>
           <div class="total"><span>선택 상품 총금액</span><strong>{{ selected ? won(selected.price * quantity) : '—' }}</strong></div>
+          <p v-if="lowStock" class="stock-notice" role="status">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3ZM4 7.5 12 12l8-4.5M12 12v9" />
+            </svg>
+            <span>품절 임박 · 구매 전 재고를 확인해 주세요</span>
+          </p>
           <div class="purchase-actions">
-            <button type="button" class="action outline wish" :aria-pressed="wished" @click="toggleWish(product)">
+            <button type="button" class="action outline wish" :aria-pressed="wished" @click="toggleProductWish">
               찜하기
             </button>
-            <button type="button" class="action outline" :disabled="!canOrder" @click="order(false)">장바구니 담기</button>
+            <button type="button" class="action outline" :disabled="!canOrder" :aria-haspopup="session.member ? 'dialog' : undefined" @click="order(false)">장바구니 담기</button>
             <button type="button" class="action primary" :disabled="!canOrder" @click="order(true)">바로 구매하기</button>
           </div>
-          <p v-if="notice" class="notice" role="status">
-            {{ notice }}
-            <RouterLink v-if="cartAdded" :to="{ name: 'MyPageCart' }">장바구니 보기</RouterLink>
-          </p>
+          <p v-if="notice" class="notice" role="status">{{ notice }}</p>
+          <dialog ref="cartDialog" class="cart-dialog" aria-labelledby="cart-dialog-title">
+            <h2 id="cart-dialog-title">장바구니에 담았어요.</h2>
+            <form method="dialog" class="cart-dialog-actions">
+              <button type="submit" class="action outline" autofocus>닫기</button>
+              <RouterLink class="action primary" :to="{ name: 'MyPageCart' }" @click="cartDialog.close()">장바구니 보기</RouterLink>
+            </form>
+          </dialog>
         </section>
       </div>
 
@@ -254,30 +281,59 @@ function order(buyNow) {
           </div>
 
           <div v-if="reviews.length" class="review-list">
-            <article v-for="review in reviews" :key="review.id" class="activity-panel review-card">
-              <ReviewProduct :item="reviewProduct">
-                <p>
-                  <span class="review-stars" :aria-label="`5점 만점에 ${review.rating}점`">
-                    <span aria-hidden="true">{{ '★'.repeat(review.rating) }}{{ '☆'.repeat(5 - review.rating) }}</span>
+            <article v-for="review in reviews" :key="review.id" class="activity-panel review-entry">
+              <button type="button" class="review-card" aria-haspopup="dialog" @click="openReview(review)">
+                <span class="review-main">
+                  <strong class="review-product-name">{{ product.name }}</strong>
+                  <span class="review-meta">
+                    <span class="review-stars" :aria-label="`5점 만점에 ${review.rating}점`">
+                      <span aria-hidden="true">{{ '★'.repeat(review.rating) }}{{ '☆'.repeat(5 - review.rating) }}</span>
+                    </span>
+                    <time :datetime="review.date">{{ review.date }}</time>
                   </span>
-                  <time :datetime="review.date">{{ review.date }}</time>
-                </p>
-                <p class="review-copy">{{ review.content }}</p>
-              </ReviewProduct>
-              <div v-if="review.reply" class="review-reply">
-                <strong>관리자 답변</strong>
-                <p>{{ review.reply }}</p>
-              </div>
+                  <span class="review-copy">{{ review.content }}</span>
+                </span>
+                <span v-if="review.images?.length" class="review-preview">
+                  <img :src="review.images[0].url" alt="" loading="lazy" />
+                  <span>첨부 {{ review.images.length }}장</span>
+                </span>
+                <span v-if="review.reply" class="review-reply">
+                  <strong>관리자 답변</strong>
+                  <span>{{ review.reply }}</span>
+                </span>
+              </button>
             </article>
           </div>
           <p v-else class="activity-empty">아직 등록된 리뷰가 없어요.</p>
+          <dialog ref="reviewDialog" class="review-dialog" aria-labelledby="review-dialog-title">
+            <header class="review-dialog-header">
+              <h2 id="review-dialog-title">상품 리뷰 상세</h2>
+              <form method="dialog">
+                <button type="submit" class="action outline" autofocus>닫기</button>
+              </form>
+            </header>
+            <div v-if="activeReview" class="review-main">
+              <strong class="review-product-name">{{ product.name }}</strong>
+              <p class="review-meta">
+                <span class="review-stars" :aria-label="`5점 만점에 ${activeReview.rating}점`">
+                  <span aria-hidden="true">{{ '★'.repeat(activeReview.rating) }}{{ '☆'.repeat(5 - activeReview.rating) }}</span>
+                </span>
+                <time :datetime="activeReview.date">{{ activeReview.date }}</time>
+              </p>
+              <p class="review-copy">{{ activeReview.content }}</p>
+              <ul v-if="activeReview.images?.length" class="review-gallery" aria-label="후기 첨부 이미지">
+                <li v-for="(image, index) in activeReview.images" :key="index">
+                  <img :src="image.url" :alt="image.altText || `후기 첨부 이미지 ${index + 1}`" loading="lazy" />
+                </li>
+              </ul>
+              <div v-if="activeReview.reply" class="review-reply">
+                <strong>관리자 답변</strong>
+                <p>{{ activeReview.reply }}</p>
+              </div>
+            </div>
+          </dialog>
         </template>
         <p v-else>상품 리뷰 조회와 작성 기능을 준비 중이에요.</p>
-      </section>
-      <section v-show="tab === 'inquiries'" id="panel-inquiries" class="detail-panel" role="tabpanel" aria-labelledby="tab-inquiries" tabindex="0">
-        <h2>상품 문의</h2>
-        <p>상품별 문의 조회와 작성 기능을 준비 중이에요.</p>
-        <button type="button" class="action outline" disabled>문의 작성</button>
       </section>
       <section v-show="tab === 'customs'" id="panel-customs" class="detail-panel" role="tabpanel" aria-labelledby="tab-customs" tabindex="0">
         <h2>해외배송 통관 안내</h2>
@@ -310,14 +366,87 @@ function order(buyNow) {
 .review-summary > div { display: flex; align-items: baseline; gap: 8px; }
 .review-summary strong { color: var(--color-primary); font-size: 1.25rem; }
 .review-list { display: grid; gap: 8px; }
-.review-card { padding: 12px 14px; }
+.review-entry { padding: 0; }
+.review-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px 16px;
+  width: 100%;
+  padding: 14px;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.review-card:hover { background: var(--color-background); }
+.review-card:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+.review-main { display: grid; gap: 6px; min-width: 0; }
+.review-card .review-main { align-content: start; }
+.review-product-name { font-weight: 700; overflow-wrap: anywhere; }
+.review-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; color: var(--color-secondary); font-size: 13px; }
 .review-stars { color: var(--color-primary); letter-spacing: .08em; }
-.review-card .review-copy { color: var(--color-text); font-size: 13px; white-space: pre-wrap; }
-.review-reply { margin-top: 10px; padding: 10px 12px; border-radius: 8px; background: var(--color-background); font-size: 13px; }
+.review-copy { color: var(--color-text); font-size: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.review-preview {
+  position: relative;
+  align-self: start;
+  width: clamp(76px, 18vw, 144px);
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--color-background);
+}
+.review-preview img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; }
+.review-preview > span {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  padding: 3px 7px;
+  border-radius: 6px 0 0;
+  background: rgb(32 24 28 / 80%);
+  color: #fff;
+  font-size: 12px;
+}
+.review-reply { display: grid; grid-column: 1 / -1; gap: 4px; padding: 10px 12px; border-radius: 8px; background: var(--color-background); font-size: 13px; overflow-wrap: anywhere; }
 .review-reply strong { color: var(--color-secondary); }
-.review-reply p { margin-top: 4px; }
+.review-dialog {
+  position: fixed;
+  inset: 0;
+  width: min(680px, calc(100% - 32px));
+  max-height: calc(100% - 32px);
+  margin: auto;
+  padding: clamp(16px, 4vw, 24px);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-white);
+  color: var(--color-text);
+  box-shadow: 0 16px 40px rgb(57 44 50 / 20%);
+}
+.review-dialog::backdrop { background: rgb(32 24 28 / 55%); }
+.review-dialog-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px; }
+.review-dialog .review-dialog-header h2 { margin: 0; }
+.review-dialog .review-dialog-header .action { margin: 0; }
+.review-gallery { display: grid; gap: 8px; margin: 8px 0; }
+.review-gallery img { display: block; width: 100%; max-height: 65vh; object-fit: contain; background: var(--color-background); border-radius: 8px; }
 .product-detail { padding: 26px 0 74px; }
-.notice a { text-decoration: underline; }
+.cart-dialog {
+  position: fixed;
+  inset: 0;
+  width: min(380px, calc(100% - 32px));
+  margin: auto;
+  padding: 24px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-white);
+  color: var(--color-text);
+  box-shadow: 0 16px 40px rgb(57 44 50 / 20%);
+  text-align: center;
+}
+.cart-dialog::backdrop { background: rgb(32 24 28 / 55%); }
+.cart-dialog h2 { font-size: 1.125rem; font-weight: 700; }
+.cart-dialog-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 20px; }
+.cart-dialog-actions > * { flex: 1 1 auto; }
 .product-overview { display: grid; grid-template-columns: 1.04fr 1fr; align-items: start; gap: clamp(24px, 4vw, 42px); }
 .gallery { display: grid; min-width: 0; gap: 14px; }
 .gallery.has-thumbnails { grid-template-columns: 62px minmax(0, 1fr); }
@@ -333,9 +462,16 @@ function order(buyNow) {
 .summary h1, .state-message h1 { margin: 8px 0 4px; color: var(--color-text); font-size: clamp(1.55rem, 3vw, 2rem); font-weight: 800; line-height: 1.3; overflow-wrap: anywhere; }
 .summary h1 { font-size: clamp(1.25rem, 2.5vw, 1.5rem); }
 .price { margin: 10px 0 15px; color: var(--color-primary); font-size: 1.25rem; font-weight: 700; }
-.stock { display: flex; gap: 24px; border-block: 1px solid var(--color-border); padding: 12px 0; font-size: .9rem; }
-.stock dd { color: var(--color-secondary); font-weight: 600; }
-.stock .sold-out { color: var(--color-primary); }
+.stock-badge {
+  display: inline-block;
+  padding: 4px 9px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-background);
+  color: var(--color-primary);
+  font-size: .8rem;
+  font-weight: 700;
+}
 .description { margin: 15px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; }
 .purchase-fields { display: grid; gap: 10px; margin: 22px 0 16px; }
 .field-row { display: grid; grid-template-columns: 48px minmax(0, 1fr); align-items: center; gap: 12px; font-size: .9rem; }
@@ -346,6 +482,41 @@ function order(buyNow) {
 .quantity output { align-self: center; font-weight: 600; }
 .total { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding-top: 14px; border-top: 1px solid var(--color-border); font-size: .9rem; }
 .total strong { color: var(--color-primary); font-size: 1.25rem; }
+.quantity-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.stock-remaining {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: #f7e7eb;
+  color: #8b354e;
+  font-size: .8rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.stock-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 14px 12px;
+  border-radius: 8px;
+  background: #f7e7eb;
+  color: #8b354e;
+  font-size: .875rem;
+}
+.stock-remaining svg,
+.stock-notice svg {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 .purchase-actions { display: grid; grid-template-columns: auto repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
 .action { display: inline-flex; align-items: center; justify-content: center; min-height: 46px; padding: 8px 12px; border: 1px solid var(--color-primary); border-radius: 8px; font: inherit; font-weight: 700; text-align: center; cursor: pointer; }
 .outline { background: var(--color-white); color: var(--color-primary); }

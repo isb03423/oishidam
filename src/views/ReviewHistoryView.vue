@@ -1,11 +1,11 @@
 
 <script setup>
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
 import ActivityFilters from '../components/ActivityFilters.vue'
 import DeleteConfirmationDialog from '../components/DeleteConfirmationDialog.vue'
 import MyPageLayout from '../components/MyPageLayout.vue'
 import ReviewProduct from '../components/ReviewProduct.vue'
-import { getExampleOrders } from '../mocks/orders.js'
+import { exampleOrderProduct, getExampleOrders } from '../mocks/orders.js'
 
 const formatter = new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' })
 const examples = getExampleOrders(new Date()).filter((order) => order.status === '배송완료').slice(0, 2)
@@ -17,13 +17,17 @@ const eligible = ref(examples.map((order) => {
   return { ...order.items[0], id: order.id, ordered: formatter.format(order.date), delivered: formatter.format(delivered), deadline: deadline.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' }) }
 }))
 const written = ref([
-  { id: 'sample-review-1', name: '부르봉 쿠키', content: '커피와 곁들이기 좋아요.' },
-  { id: 'sample-review-2', name: '가루비 자가리코', content: '바삭해서 간식으로 먹기 좋았어요.' },
-  { id: 'sample-review-3', name: '포키 딸기맛', content: '딸기 향이 은은해서 좋았어요.' },
+  { id: 'sample-review-1', ...exampleOrderProduct('bourbon'), content: '커피와 곁들이기 좋아요.' },
+  { id: 'sample-review-2', ...exampleOrderProduct('jagarico'), content: '바삭해서 간식으로 먹기 좋았어요.' },
+  { id: 'sample-review-3', ...exampleOrderProduct('pocky'), content: '딸기 향이 은은해서 좋았어요.' },
 ])
 const tab = ref('eligible')
 const editing = ref(null)
 const content = ref('')
+const draftImages = ref([])
+const imageInput = ref(null)
+const imageError = ref('')
+const dragging = ref(false)
 const dialog = ref(null)
 const deleteDialog = ref(null)
 const writtenHeading = ref(null)
@@ -33,7 +37,60 @@ const filters = computed(() => [
   { value: 'written', label: '작성한 후기', count: written.value.length },
 ])
 
+function addImages(files) {
+  const errors = new Set()
+  for (const file of files) {
+    if (!file.type.startsWith('image/') || !file.size) {
+      errors.add('이미지 파일만 첨부할 수 있어요.')
+      continue
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      errors.add('이미지는 한 장당 10MB까지 첨부할 수 있어요.')
+      continue
+    }
+    if (draftImages.value.some(({ file: attached }) =>
+      attached.name === file.name && attached.size === file.size && attached.lastModified === file.lastModified)) continue
+    if (draftImages.value.length >= 5) {
+      errors.add('이미지는 최대 5장까지 첨부할 수 있어요.')
+      break
+    }
+    draftImages.value.push({ file, url: URL.createObjectURL(file) })
+  }
+  imageError.value = [...errors].join(' ')
+}
+
+function selectImages(event) {
+  addImages(event.target.files)
+  event.target.value = ''
+}
+
+function dropImages(event) {
+  dragging.value = false
+  addImages(event.dataTransfer.files)
+}
+
+function leaveDropZone(event) {
+  if (!event.currentTarget.contains(event.relatedTarget)) dragging.value = false
+}
+
+function revokeImages(images, retained = []) {
+  for (const image of images) {
+    if (!retained.includes(image)) URL.revokeObjectURL(image.url)
+  }
+}
+
+function removeImage(index) {
+  revokeImages(draftImages.value.splice(index, 1), editing.value?.images)
+  imageError.value = ''
+}
+
+onBeforeUnmount(() => {
+  revokeImages(draftImages.value, editing.value?.images)
+  for (const item of written.value) revokeImages(item.images ?? [])
+})
+
 function startReview(item, isUpdate = false) {
+  draftImages.value = isUpdate ? [...(item.images ?? [])] : []
   editing.value = item
   updating.value = isUpdate
   content.value = isUpdate ? item.content : ''
@@ -42,6 +99,10 @@ function startReview(item, isUpdate = false) {
 
 function closeEditor() {
   dialog.value.close()
+  revokeImages(draftImages.value, editing.value?.images)
+  draftImages.value = []
+  imageError.value = ''
+  dragging.value = false
   editing.value = null
   content.value = ''
   updating.value = false
@@ -51,12 +112,16 @@ async function saveReview() {
   const text = content.value.trim()
   const item = editing.value
   if (!item || !text) return
+  const images = draftImages.value
+  draftImages.value = []
   if (updating.value) {
+    revokeImages(item.images ?? [], images)
+    item.images = images
     item.content = text
     closeEditor()
     return
   }
-  written.value.unshift({ ...item, content: text })
+  written.value.unshift({ ...item, content: text, images })
   eligible.value = eligible.value.filter((row) => row.id !== item.id)
   closeEditor()
   tab.value = 'written'
@@ -65,6 +130,9 @@ async function saveReview() {
 }
 
 function deleteReview(ids) {
+  for (const item of written.value) {
+    if (ids.includes(item.id)) revokeImages(item.images ?? [])
+  }
   written.value = written.value.filter((item) => !ids.includes(item.id))
 }
 </script>
@@ -90,6 +158,11 @@ function deleteReview(ids) {
         <article v-for="item in written" :key="item.id" class="activity-panel review-card">
           <ReviewProduct :item="item">
             <p class="activity-copy review-copy">{{ item.content }}</p>
+            <ul v-if="item.images?.length" class="review-images" aria-label="후기 첨부 이미지">
+              <li v-for="image in item.images" :key="image.url">
+                <img :src="image.url" :alt="image.file.name" loading="lazy" />
+              </li>
+            </ul>
           </ReviewProduct>
           <div class="review-actions review-actions--management">
             <button type="button" class="activity-button review-secondary-button" @click="startReview(item, true)">수정하기</button>
@@ -101,7 +174,7 @@ function deleteReview(ids) {
     </div>
   </MyPageLayout>
 
-  <dialog ref="dialog" class="review-dialog" aria-labelledby="review-dialog-title" @cancel.prevent="closeEditor">
+  <dialog ref="dialog" class="review-dialog" aria-labelledby="review-dialog-title" @cancel.self.prevent="closeEditor">
     <form class="activity-editor" @submit.prevent="saveReview">
       <header class="review-dialog-heading">
         <h2 id="review-dialog-title">{{ updating ? '후기 수정하기' : '후기 작성하기' }}</h2>
@@ -112,6 +185,28 @@ function deleteReview(ids) {
         후기 내용
         <textarea v-model="content" maxlength="5000" required placeholder="상품 후기를 입력해 주세요."></textarea>
       </label>
+      <fieldset class="review-attachments">
+        <legend>후기 이미지</legend>
+        <div
+          class="review-drop-zone"
+          :class="{ 'is-dragging': dragging }"
+          @dragover.prevent="dragging = true"
+          @dragleave="leaveDropZone"
+          @drop.prevent="dropImages"
+        >
+          <p>이미지를 여기로 끌어다 놓으세요.</p>
+          <button type="button" class="activity-button" aria-describedby="review-image-help" @click="imageInput.click()">파일 선택</button>
+          <input ref="imageInput" type="file" accept="image/*" multiple hidden @change="selectImages" />
+        </div>
+        <p id="review-image-help" class="review-image-help">최대 5장, 한 장당 10MB</p>
+        <p v-if="imageError" class="review-image-error" role="alert">{{ imageError }}</p>
+        <ul v-if="draftImages.length" class="review-images" aria-label="첨부할 이미지">
+          <li v-for="(image, index) in draftImages" :key="image.url">
+            <img :src="image.url" :alt="image.file.name" />
+            <button type="button" :aria-label="image.file.name + ' 첨부 제거'" @click="removeImage(index)">×</button>
+          </li>
+        </ul>
+      </fieldset>
       <div class="activity-actions">
         <button type="button" class="activity-button" @click="closeEditor">취소</button>
         <button type="submit" class="activity-button is-primary" :disabled="!content.trim()">{{ updating ? '저장하기' : '등록하기' }}</button>
@@ -157,6 +252,39 @@ function deleteReview(ids) {
 .review-close { border: 0; background: transparent; color: var(--color-primary); font-size: 24px; line-height: 1; cursor: pointer; }
 .review-dialog textarea { resize: none; }
 .review-dialog-product { padding: 10px; background: var(--color-background); }
+
+.review-attachments { min-width: 0; }
+.review-attachments legend { margin-bottom: 6px; font-weight: 700; }
+.review-drop-zone {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 14px;
+  border: 1px dashed var(--color-secondary);
+  border-radius: 8px;
+  text-align: center;
+}
+.review-drop-zone.is-dragging { border-color: var(--color-primary); background: var(--color-accent); }
+.review-image-help, .review-image-error { margin-top: 6px; font-size: 12px; }
+.review-image-help { color: var(--color-secondary); }
+.review-image-error { color: var(--color-primary); }
+.review-images { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 0; padding: 0; list-style: none; }
+.review-images li { position: relative; }
+.review-images img { display: block; width: 64px; height: 64px; border-radius: 8px; object-fit: cover; }
+.review-images button {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background: var(--color-white);
+  color: var(--color-text);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
 
 @media (max-width: 520px) {
   .review-card { grid-template-columns: minmax(0, 1fr); gap: 8px; }

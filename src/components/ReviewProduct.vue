@@ -5,10 +5,14 @@ defineProps({ item: { type: Object, required: true } })
 
 <template>
   <div class="review-product">
-    <div class="review-thumbnail">
+    <RouterLink
+      class="review-thumbnail product-thumbnail-zoom"
+      :to="{ name: 'ProductDetail', params: { productId: item.product_id } }"
+      :aria-label="item.name + ' 상품 상세보기'"
+    >
       <img v-if="item.imageUrl" :src="item.imageUrl" :alt="item.name" loading="lazy" />
       <span v-else>{{ item.brand || item.name }}</span>
-    </div>
+    </RouterLink>
     <div class="review-product-info">
       <h3>{{ item.name }}</h3>
       <p v-if="item.ordered || item.delivered">

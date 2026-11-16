@@ -1,4 +1,5 @@
 import { apiRequest } from './api.js'
+import { getExampleOrderProduct } from '../mocks/orders.js'
 import { development } from '../config/development.js'
 import { getAuthTokens } from '../stores/session.js'
 
@@ -9,6 +10,7 @@ function productForView(product) {
     category_id: product.categoryId,
     min_price: product.minPrice,
     is_sold_out: product.isSoldOut,
+    stock_quantity: product.stockQuantity,
     images: product.images?.map((image) => ({
       ...image,
       url: image.imageUrl ?? image.url,
@@ -63,6 +65,8 @@ export async function getProducts({ keyword, categoryId, sort, previewBest, page
 }
 
 export async function getProduct(productId, options = {}) {
+  const example = getExampleOrderProduct(productId)
+  if (example) return example
   const mock = import.meta.env.DEV && development.mockEnabled
   const data = await apiRequest({ ...options, path: '/products/' + encodeURIComponent(productId), mock })
   return mock ? data : productForView(data)

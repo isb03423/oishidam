@@ -24,35 +24,44 @@ function previewCategory(event, group) {
 </script>
 
 <template>
-  <section id="site-category-menu" class="category-menu" aria-label="전체 카테고리">
+  <section id="site-category-menu" class="category-menu" :class="{ 'has-children': selectedGroup.children.length }" aria-label="전체 카테고리">
     <div class="category-columns">
       <ul class="category-groups" aria-label="대분류">
-        <li v-for="group in categoryGroups" :key="group.category_id">
-          <button
+        <li
+          v-for="group in categoryGroups"
+          :key="group.category_id"
+          class="category-row"
+          :class="{ 'is-previewed': group === selectedGroup }"
+          @pointerenter="previewCategory($event, group)"
+        >
+          <RouterLink
             class="category-group"
+            draggable="false"
+            :to="productsIn(group)"
+            @click="$emit('select')"
+          >
+            {{ group.name }}
+          </RouterLink>
+          <button
+            v-if="group.children.length"
+            class="category-chevron"
             type="button"
-            :aria-pressed="group === selectedGroup"
-            aria-controls="category-subcategories"
-
-            @pointerenter="previewCategory($event, group)"
+            :aria-label="group.name + ' 하위 분류 보기'"
+            :aria-expanded="group === selectedGroup"
+            :aria-controls="group === selectedGroup ? 'category-subcategories' : undefined"
             @click="selectedId = group.category_id"
           >
-            <span>{{ group.name }}</span>
-            <span class="category-chevron" aria-hidden="true">›</span>
+            <span aria-hidden="true">›</span>
           </button>
         </li>
       </ul>
 
       <ul
+        v-if="selectedGroup.children.length"
         id="category-subcategories"
         class="category-children"
         :aria-label="selectedGroup.name + ' 카테고리'"
       >
-        <li>
-          <RouterLink draggable="false" class="category-parent-link" :to="productsIn(selectedGroup)" @click="$emit('select')">
-            {{ selectedGroup.name }} 전체
-          </RouterLink>
-        </li>
         <li v-for="child in selectedGroup.children" :key="child.category_id">
           <RouterLink draggable="false" :to="productsIn(child)" @click="$emit('select')">{{ child.name }}</RouterLink>
         </li>
@@ -63,7 +72,7 @@ function previewCategory(event, group) {
 
 <style scoped>
 .category-menu {
-  width: min(100%, 380px);
+  width: min(100%, 190px);
   border: 1px solid var(--color-border);
   border-radius: 0 0 10px 10px;
   overflow: hidden;
@@ -72,10 +81,15 @@ function previewCategory(event, group) {
   user-select: none;
 }
 
+.category-menu.has-children { width: min(100%, 380px); }
+
 .category-columns {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   max-height: 62vh;
+}
+
+.has-children .category-columns {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .category-groups,
@@ -101,34 +115,38 @@ function previewCategory(event, group) {
   word-break: keep-all;
 }
 
-.category-group {
-  justify-content: space-between;
-  width: 100%;
-  border: 0;
-  background: transparent;
-  text-align: left;
-  cursor: pointer;
+.category-row {
+  display: flex;
 }
 
-.category-group[aria-pressed="true"] {
+.category-group {
+  flex: 1;
+  min-width: 0;
+}
+
+.category-row.is-previewed,
+.category-row:hover {
   background: var(--color-background);
+}
+
+.category-row.is-previewed .category-group,
+.category-row:hover .category-group {
   color: var(--color-primary);
   font-weight: 700;
 }
 
 .category-chevron {
-  flex: none;
+  flex: 0 0 40px;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
   font-size: 17px;
+  cursor: pointer;
 }
 
 .category-children {
   border-left: 1px solid var(--color-border);
   background: #f8f6f7;
-}
-
-.category-children .category-parent-link {
-  color: var(--color-primary);
-  font-weight: 700;
 }
 
 .category-children a:hover {

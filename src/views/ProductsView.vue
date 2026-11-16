@@ -111,7 +111,6 @@ watch(
   <main class="site-container products-page">
     <CategorySidebar
       :active-group-id="activeGroup?.category_id"
-      :sort="listType"
     />
     <section class="products-content" aria-labelledby="products-title" :aria-busy="loading">
       <h1 id="products-title">{{ title }}</h1>

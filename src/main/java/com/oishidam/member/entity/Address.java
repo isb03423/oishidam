@@ -39,6 +39,9 @@ public class Address extends BaseEntity {
     @Column(name = "address_line2", length = 255)
     private String addressLine2;
 
+    @Column(name = "customs_code", length = 13)
+    private String customsCode;
+
     @Column(name = "is_default", nullable = false)
     private boolean isDefault;
 
@@ -49,6 +52,7 @@ public class Address extends BaseEntity {
         this.postalCode = request.postalCode().trim();
         this.addressLine1 = request.addressLine1().trim();
         this.addressLine2 = request.addressLine2();
+        this.customsCode = request.customsCode();
         this.isDefault = request.isDefault();
     }
 

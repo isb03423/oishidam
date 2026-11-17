@@ -57,7 +57,7 @@ public class AddressController {
     }
 
     @Operation(summary = "배송지 수정")
-    @PutMapping("/{addressId}")
+    @PatchMapping("/{addressId}")
     public ApiResponse<AddressResponse> update(
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable Long addressId,

@@ -39,12 +39,7 @@ public class AdminInquiryController {
     @PostMapping("/{inquiryId}/messages")
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<InquiryMessageResponse> message(@AuthenticationPrincipal Jwt jwt, @PathVariable Long inquiryId, @Valid @RequestBody InquiryMessageRequest request) {
-        return ApiResponse.ok(service.addMessage(inquiryId, Long.valueOf(jwt.getSubject()), true, request));
+        return ApiResponse.ok(service.answer(inquiryId, Long.valueOf(jwt.getSubject()), request));
     }
 
-    @Operation(summary = "문의 상태 변경")
-    @PatchMapping("/{inquiryId}/status")
-    public ApiResponse<InquirySummaryResponse> status(@PathVariable Long inquiryId, @Valid @RequestBody InquiryStatusRequest request) {
-        return ApiResponse.ok(service.changeStatus(inquiryId, request.status()));
-    }
 }

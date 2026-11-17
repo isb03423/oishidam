@@ -8,7 +8,8 @@ public record ProductSummaryResponse(
         Long categoryId,
         String name,
         String brand,
-        BigDecimal minimumPrice,
+        BigDecimal price,
+        int stockQuantity,
         ImageResponse primaryImage,
         LocalDateTime publishedAt,
         boolean isSoldOut

@@ -5,15 +5,16 @@ import com.oishidam.category.entity.Category;
 import com.oishidam.category.repository.CategoryRepository;
 import com.oishidam.category.service.CategoryService;
 import com.oishidam.common.exception.ApiException;
+import com.oishidam.member.entity.Member;
+import com.oishidam.member.repository.MemberRepository;
 import com.oishidam.product.entity.Product;
 import com.oishidam.product.entity.ProductImage;
-import com.oishidam.product.entity.ProductVariant;
 import com.oishidam.product.enums.SaleStatus;
 import com.oishidam.product.repository.ProductImageRepository;
 import com.oishidam.product.repository.ProductRepository;
-import com.oishidam.product.repository.ProductVariantRepository;
+import com.oishidam.product.repository.StockHistoryRepository;
+import com.oishidam.product.service.StockHistoryService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -25,13 +26,13 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class AdminProductService {
     private final ProductRepository productRepository;
-
-    private final ProductVariantRepository variantRepository;
 
     private final ProductImageRepository imageRepository;
 
@@ -41,9 +42,15 @@ public class AdminProductService {
 
     private final Clock clock;
 
+    private final StockHistoryRepository stockHistories;
+
+    private final StockHistoryService stockHistory;
+
+    private final MemberRepository members;
+
     // 관리자: 상품 목록
     @Transactional(readOnly = true)
-    public Page<AdminProductResponse> list(int page, int size) {
+    public Page<AdminProductResponse> list(int page, int size, String keyword) {
         if (page < 0 || size < 1 || size > 100) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_PAGINATION", "페이지 번호 또는 크기가 올바르지 않습니다.");
         }
@@ -51,7 +58,12 @@ public class AdminProductService {
         // 페이징 정보
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
 
-        return productRepository.findByDeletedAtIsNull(pageable).map(AdminProductResponse::from);
+        if (keyword != null && keyword.length() > 100) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_KEYWORD", "검색어는 100자 이하여야 합니다.");
+        }
+        String search = keyword == null ? "" : keyword.trim().toLowerCase(java.util.Locale.ROOT)
+                .replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+        return productRepository.findForAdmin(search, pageable).map(AdminProductResponse::from);
     }
 
     // 관리자: 상품 상세
@@ -60,22 +72,18 @@ public class AdminProductService {
         // 상품 조회
         Product product = productRepository.findByIdAndDeletedAtIsNull(productId).orElseThrow(this::productNotFound);
 
-        // 옵션 목록 조회
-        List<AdminVariantResponse> variants = variantRepository.findByProductIdOrderByIdAsc(productId)
-                .stream().map(AdminVariantResponse::from).toList();
-
         // 상품 이미지 조회
         List<AdminImageResponse> images = imageRepository.findByProductIdInOrderBySortOrderAscIdAsc(List.of(productId))
                 .stream().map(AdminImageResponse::from).toList();
 
-        return new AdminProductDetailResponse(AdminProductResponse.from(product), variants, images);
+        return new AdminProductDetailResponse(AdminProductResponse.from(product), images);
     }
 
     // 관리자: 상품 등록
     @Transactional
-    public AdminProductDetailResponse create(AdminProductCreateRequest request) {
+    public AdminProductDetailResponse create(AdminProductRequest request, Long actorId) {
         // 카테고리 확인 및 상품 정보 준비
-        AdminProductRequest info = request.product();
+        AdminProductRequest info = request;
         Category category = findCategory(info.categoryId());
 
         Product product = productRepository.save(
@@ -84,23 +92,20 @@ public class AdminProductService {
                         .name(info.name().trim())
                         .description(info.description().trim())
                         .brand(info.brand())
+                        .price(info.price())
+                        .stockQuantity(info.stockQuantity())
                         .saleStatus(SaleStatus.DRAFT)
                         .build()
         );
 
-        // 상품 옵션 생성 및 저장
-        ProductVariant variant = newVariant(product, request.variant());
-        saveVariant(variant);
-        return new AdminProductDetailResponse(
-                AdminProductResponse.from(product),
-                List.of(AdminVariantResponse.from(variant)),
-                List.of()
-        );
+        stockHistory.record(product, 0, "INITIAL", null, actorId);
+
+        return new AdminProductDetailResponse(AdminProductResponse.from(product), List.of());
     }
 
     // 관리자: 상품 수정
     @Transactional
-    public AdminProductResponse update(Long productId, AdminProductRequest request) {
+    public AdminProductResponse update(Long productId, AdminProductRequest request, Long actorId) {
         Product product = lockProduct(productId);
         Category category = findCategory(request.categoryId());
 
@@ -109,8 +114,53 @@ public class AdminProductService {
             categoryService.categoryIds(category.getId());
         }
 
-        product.update(category, request.name().trim(), request.description(), request.brand());
+        int previous = product.getStockQuantity();
+        if (request.expectedStockQuantity() == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "EXPECTED_STOCK_REQUIRED", "변경 전 재고 수량이 필요합니다.");
+        }
+        validateStockVersion(previous, request.expectedStockQuantity());
+        product.update(category, request.name().trim(), request.description(), request.brand(), request.price(), request.stockQuantity());
+        if (previous != product.getStockQuantity()) {
+            stockHistory.record(product, previous, "ADJUSTMENT", null, actorId);
+        }
         return AdminProductResponse.from(product);
+    }
+
+    // 관리자: 상품별 재고 이력 조회
+    @Transactional(readOnly = true)
+    public Page<StockHistoryResponse> stockHistory(Long productId, int page, int size) {
+        if (page < 0 || size < 1 || size > 100) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_PAGINATION", "페이지 번호 또는 크기가 올바르지 않습니다.");
+        }
+        if (!productRepository.existsById(productId)) {
+            throw productNotFound();
+        }
+        var result = stockHistories.findByProductIdOrderByIdDesc(productId, PageRequest.of(page, size));
+
+        // 현재 페이지의 처리자 이름을 한 번에 조회한다.
+        var actorIds = result.stream().map(history -> history.getActorId()).filter(Objects::nonNull).distinct().toList();
+        var names = members.findAllById(actorIds).stream().collect(Collectors.toMap(Member::getId, Member::getName));
+        return result.map(history -> StockHistoryResponse.from(history, names.get(history.getActorId())));
+    }
+
+    // 관리자: 상품 재고 수량 변경
+    @Transactional
+    public AdminProductResponse updateStock(Long productId, int quantity, int expectedQuantity, Long actorId) {
+        Product product = lockProduct(productId);
+        int previous = product.getStockQuantity();
+        validateStockVersion(previous, expectedQuantity);
+        product.changeStock(quantity);
+        if (previous != quantity) {
+            stockHistory.record(product, previous, "ADJUSTMENT", null, actorId);
+        }
+        return AdminProductResponse.from(product);
+    }
+
+    // 조회 후 재고가 변경됐으면 재확인을 요구한다.
+    private void validateStockVersion(int current, int expected) {
+        if (current != expected) {
+            throw new ApiException(HttpStatus.CONFLICT, "STOCK_CHANGED", "재고가 변경되었습니다. 다시 확인해 주세요.");
+        }
     }
 
     // 관리자: 상품 판매 상태 변경
@@ -122,9 +172,6 @@ public class AdminProductService {
         LocalDateTime publishedAt = product.getPublishedAt();
         if (status == SaleStatus.ON_SALE) {
             categoryService.categoryIds(product.getCategory().getId());
-            if (variantRepository.countByProductIdAndIsActiveTrue(productId) == 0) {
-                throw new ApiException(HttpStatus.BAD_REQUEST, "ACTIVE_VARIANT_REQUIRED", "판매하려면 활성 옵션이 하나 이상 필요합니다.");
-            }
             if (publishedAt == null) {
                 publishedAt = LocalDateTime.now(clock);
             }
@@ -137,41 +184,6 @@ public class AdminProductService {
     @Transactional
     public void delete(Long productId) {
         lockProduct(productId).delete(LocalDateTime.now(clock));
-    }
-
-    // 관리자: 상품 옵션 등록
-    @Transactional
-    public AdminVariantResponse createVariant(Long productId, AdminVariantRequest request) {
-        Product product = lockProduct(productId);
-        ProductVariant variant = newVariant(product, request);
-        saveVariant(variant);
-        return AdminVariantResponse.from(variant);
-    }
-
-    // 관리자: 상품 옵션 수정
-    @Transactional
-    public AdminVariantResponse updateVariant(
-            Long productId,
-            Long variantId,
-            AdminVariantRequest request
-    ) {
-        Product product = lockProduct(productId);
-        ProductVariant variant = variantRepository.findByIdAndProductId(variantId, productId)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "VARIANT_NOT_FOUND", "상품 옵션을 찾을 수 없습니다."));
-        if (product.getSaleStatus() == SaleStatus.ON_SALE && variant.isActive() && !request.isActive()
-                && variantRepository.countByProductIdAndIsActiveTrue(productId) <= 1) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "ACTIVE_VARIANT_REQUIRED", "판매 중인 상품에는 활성 옵션이 하나 이상 필요합니다.");
-        }
-        variant.update(
-                request.skuCode().trim(),
-                request.variantName().trim(),
-                request.optionValues(),
-                request.price(),
-                request.stockQuantity(),
-                request.isActive()
-        );
-        saveVariant(variant);
-        return AdminVariantResponse.from(variant);
     }
 
     // 관리자: 상품 이미지 등록
@@ -243,28 +255,6 @@ public class AdminProductService {
     // 상품 조회 및 잠금
     private Product lockProduct(Long productId) {
         return productRepository.findByIdForUpdate(productId).orElseThrow(this::productNotFound);
-    }
-
-    // 요청 정보로 상품 옵션 생성
-    private ProductVariant newVariant(Product product, AdminVariantRequest request) {
-        return ProductVariant.builder()
-                .product(product)
-                .skuCode(request.skuCode().trim())
-                .variantName(request.variantName().trim())
-                .optionValues(request.optionValues())
-                .price(request.price())
-                .stockQuantity(request.stockQuantity())
-                .isActive(request.isActive())
-                .build();
-    }
-
-    // 상품 옵션 저장 및 중복 오류 처리
-    private void saveVariant(ProductVariant variant) {
-        try {
-            variantRepository.saveAndFlush(variant);
-        } catch (DataIntegrityViolationException e) {
-            throw new ApiException(HttpStatus.CONFLICT, "DUPLICATE_VARIANT", "이미 사용 중인 SKU 코드 또는 옵션명입니다.");
-        }
     }
 
     // 상품을 찾을 수 없을 때 반환할 오류 생성

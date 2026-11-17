@@ -10,9 +10,21 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 public interface ReviewRepository extends JpaRepository<Review, Long> {
+    @EntityGraph(attributePaths = {"orderItem", "orderItem.order"})
+    @Query("""
+            SELECT r FROM Review r WHERE r.member.id = :memberId AND r.orderItem.order.member.id = :memberId
+            AND r.deletedAt IS NULL ORDER BY r.createdAt DESC, r.id DESC
+            """)
+    Page<Review> findWrittenByMemberId(@Param("memberId") Long memberId, Pageable pageable);
+
+    @Query("SELECT DISTINCT r FROM Review r LEFT JOIN FETCH r.imageUrls WHERE r.id IN :ids")
+    List<Review> findWithImagesByIdIn(@Param("ids") Collection<Long> ids);
+
     Optional<Review> findByOrderItemId(Long orderItemId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
@@ -22,18 +34,18 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
     Optional<Review> findByIdAndDeletedAtIsNull(Long id);
 
     @EntityGraph(attributePaths = {"orderItem"})
-    @Query("SELECT r FROM Review r WHERE r.deletedAt IS NULL AND r.orderItem.variantId IN " +
-            "(SELECT v.id FROM ProductVariant v WHERE v.product.id = :productId)")
+    @Query("SELECT r FROM Review r WHERE r.deletedAt IS NULL AND r.orderItem.productId = :productId")
     Page<Review> findPublicByProductId(@Param("productId") Long productId, Pageable pageable);
 
     @EntityGraph(attributePaths = {"orderItem", "member", "answeredBy"})
     @Query("SELECT r FROM Review r WHERE r.deletedAt IS NULL " +
-            "AND (:productId IS NULL OR r.orderItem.variantId IN " +
-            "(SELECT v.id FROM ProductVariant v WHERE v.product.id = :productId)) " +
+            "AND (:productId IS NULL OR r.orderItem.productId = :productId) " +
+            "AND (:answered IS NULL OR (:answered = TRUE AND r.answerContent IS NOT NULL) OR (:answered = FALSE AND r.answerContent IS NULL)) " +
             "AND LOWER(r.content) LIKE LOWER(CONCAT('%', :keyword, '%')) ESCAPE '\\'")
     Page<Review> findForAdmin(
             @Param("productId") Long productId,
             @Param("keyword") String keyword,
+            @Param("answered") Boolean answered,
             Pageable pageable
     );
 }

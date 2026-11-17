@@ -2,12 +2,12 @@ package com.oishidam.cart.entity;
 
 import com.oishidam.common.entity.BaseEntity;
 import com.oishidam.member.entity.Member;
-import com.oishidam.product.entity.ProductVariant;
+import com.oishidam.product.entity.Product;
 import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "cart_items", uniqueConstraints = @UniqueConstraint(columnNames = {"member_id", "variant_id"}))
+@Table(name = "cart_items", uniqueConstraints = @UniqueConstraint(columnNames = {"member_id", "product_id"}))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
@@ -23,8 +23,8 @@ public class CartItem extends BaseEntity {
     private Member member;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "variant_id", nullable = false)
-    private ProductVariant variant;
+    @JoinColumn(name = "product_id", nullable = false)
+    private Product product;
 
     @Column(nullable = false)
     private int quantity;

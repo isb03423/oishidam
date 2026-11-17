@@ -1,6 +1,7 @@
 package com.oishidam.member.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 public record AddressRequest(
@@ -10,6 +11,7 @@ public record AddressRequest(
         @NotBlank @Size(max = 20) String postalCode,
         @NotBlank @Size(max = 255) String addressLine1,
         @Size(max = 255) String addressLine2,
-        boolean isDefault
+        boolean isDefault,
+        @Pattern(regexp = "P[0-9]{12}") String customsCode
 ) {
 }

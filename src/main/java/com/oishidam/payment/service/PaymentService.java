@@ -49,14 +49,7 @@ public class PaymentService {
         if (order.getOrderStatus() != OrderStatus.PAYMENT_PENDING) {
             throw new ApiException(HttpStatus.CONFLICT, "ORDER_NOT_PENDING", "결제 대기 상태의 주문이 아닙니다.");
         }
-        if (clientKey == null || !clientKey.startsWith("test_gck_")
-                || secretKey == null || !secretKey.startsWith("test_gsk_")) {
-            throw new ApiException(
-                    HttpStatus.SERVICE_UNAVAILABLE,
-                    "TOSS_TEST_KEYS_REQUIRED",
-                    "토스 주문서형 테스트 키를 설정해 주세요."
-            );
-        }
+        clientKey();
 
         // 기존 결제 요청 확인 또는 신규 요청 저장
         PaymentRequest payment = payments.findByOrderId(orderId).orElse(null);
@@ -79,5 +72,14 @@ public class PaymentService {
                 order.getTotalAmount(),
                 clientKey
         );
+    }
+
+    // 결제 화면에서 사용할 공개 클라이언트 키를 확인한다.
+    public String clientKey() {
+        if (clientKey == null || !clientKey.startsWith("test_gck_")
+                || secretKey == null || !secretKey.startsWith("test_gsk_")) {
+            throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "TOSS_TEST_KEYS_REQUIRED", "토스 주문서형 테스트 키를 설정해 주세요.");
+        }
+        return clientKey;
     }
 }

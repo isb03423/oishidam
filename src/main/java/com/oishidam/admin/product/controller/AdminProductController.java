@@ -11,10 +11,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-@Tag(name = "관리자 - 상품", description = "관리자 상품, 옵션 및 이미지 관리")
+@Tag(name = "관리자 - 상품", description = "관리자 상품 및 이미지 관리")
 @RestController
 @RequestMapping("/api/admin/products")
 @RequiredArgsConstructor
@@ -27,9 +29,10 @@ public class AdminProductController {
     @GetMapping
     public ApiResponse<Page<AdminProductResponse>> list(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String keyword
     ) {
-        Page<AdminProductResponse> result = productService.list(page, size);
+        Page<AdminProductResponse> result = productService.list(page, size, keyword);
         return ApiResponse.ok(result);
     }
 
@@ -44,9 +47,10 @@ public class AdminProductController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<AdminProductDetailResponse> create(
-            @Valid @RequestBody AdminProductCreateRequest request
+            @Valid @RequestBody AdminProductRequest request,
+            @AuthenticationPrincipal Jwt jwt
     ) {
-        AdminProductDetailResponse result = productService.create(request);
+        AdminProductDetailResponse result = productService.create(request, Long.valueOf(jwt.getSubject()));
         return ApiResponse.ok(result);
     }
 
@@ -54,10 +58,31 @@ public class AdminProductController {
     @PutMapping("/{productId}")
     public ApiResponse<AdminProductResponse> update(
             @PathVariable Long productId,
-            @Valid @RequestBody AdminProductRequest request
+            @Valid @RequestBody AdminProductRequest request,
+            @AuthenticationPrincipal Jwt jwt
     ) {
-        AdminProductResponse result = productService.update(productId, request);
+        AdminProductResponse result = productService.update(productId, request, Long.valueOf(jwt.getSubject()));
         return ApiResponse.ok(result);
+    }
+
+    @Operation(summary = "상품 재고 이력 조회")
+    @GetMapping("/{productId}/stock-history")
+    public ApiResponse<Page<StockHistoryResponse>> stockHistory(
+            @PathVariable Long productId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        return ApiResponse.ok(productService.stockHistory(productId, page, size));
+    }
+
+    @Operation(summary = "상품 재고 수량 변경")
+    @PatchMapping("/{productId}/stock")
+    public ApiResponse<AdminProductResponse> updateStock(
+            @PathVariable Long productId,
+            @Valid @RequestBody StockUpdateRequest request,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        return ApiResponse.ok(productService.updateStock(productId, request.stockQuantity(), request.expectedStockQuantity(), Long.valueOf(jwt.getSubject())));
     }
 
     @Operation(summary = "상품 판매 상태 변경")
@@ -75,28 +100,6 @@ public class AdminProductController {
     public ApiResponse<Void> delete(@PathVariable Long productId) {
         productService.delete(productId);
         return ApiResponse.ok(null);
-    }
-
-    @Operation(summary = "상품 옵션 등록")
-    @PostMapping("/{productId}/variants")
-    @ResponseStatus(HttpStatus.CREATED)
-    public ApiResponse<AdminVariantResponse> createVariant(
-            @PathVariable Long productId,
-            @Valid @RequestBody AdminVariantRequest request
-    ) {
-        AdminVariantResponse result = productService.createVariant(productId, request);
-        return ApiResponse.ok(result);
-    }
-
-    @Operation(summary = "상품 옵션 수정")
-    @PutMapping("/{productId}/variants/{variantId}")
-    public ApiResponse<AdminVariantResponse> updateVariant(
-            @PathVariable Long productId,
-            @PathVariable Long variantId,
-            @Valid @RequestBody AdminVariantRequest request
-    ) {
-        AdminVariantResponse result = productService.updateVariant(productId, variantId, request);
-        return ApiResponse.ok(result);
     }
 
     @Operation(summary = "상품 이미지 등록")

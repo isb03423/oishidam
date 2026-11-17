@@ -10,6 +10,7 @@ public record AdminOrderSummaryResponse(
         Long orderId,
         String orderNumber,
         Long memberId,
+        String memberName,
         OrderStatus orderStatus,
         BigDecimal totalAmount,
         LocalDateTime createdAt
@@ -19,6 +20,7 @@ public record AdminOrderSummaryResponse(
                 order.getId(),
                 order.getOrderNumber(),
                 order.getMember().getId(),
+                order.getMember().getName(),
                 order.getOrderStatus(),
                 order.getTotalAmount(),
                 order.getCreatedAt()

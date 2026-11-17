@@ -17,7 +17,9 @@ import com.oishidam.order.repository.OrderStatusHistoryRepository;
 import com.oishidam.payment.entity.PaymentConfirmation;
 import com.oishidam.payment.repository.PaymentConfirmationRepository;
 import com.oishidam.payment.service.TossConfirmationClient;
-import com.oishidam.product.repository.ProductVariantRepository;
+import com.oishidam.product.repository.ProductRepository;
+import com.oishidam.product.service.StockHistoryService;
+import com.oishidam.product.entity.Product;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -41,13 +43,15 @@ public class OrderCancellationService {
 
     private final PaymentConfirmationRepository confirmations;
 
-    private final ProductVariantRepository variants;
+    private final ProductRepository products;
 
     private final TossConfirmationClient toss;
 
     private final TransactionTemplate transactions;
 
     private final Clock clock;
+
+    private final StockHistoryService stockHistory;
 
     // 주문 취소 요청
     public OrderCancelResponse cancel(
@@ -154,10 +158,13 @@ public class OrderCancellationService {
             }
 
             // 재고 복구 및 취소 상태 반영
-            items.findByOrderIdOrderByVariantIdAsc(orderId).forEach(item -> variants
-                    .findByIdForUpdate(item.getVariantId())
-                    .orElseThrow(() -> new ApiException(HttpStatus.CONFLICT, "VARIANT_NOT_FOUND", "주문 상품을 찾을 수 없습니다."))
-                    .restoreStock(item.getQuantity()));
+            items.findByOrderIdOrderByProductIdAsc(orderId).forEach(item -> {
+                Product product = products.findAnyByIdForUpdate(item.getProductId())
+                        .orElseThrow(() -> new ApiException(HttpStatus.CONFLICT, "PRODUCT_NOT_FOUND", "주문 상품을 찾을 수 없습니다."));
+                int previous = product.getStockQuantity();
+                product.restoreStock(item.getQuantity());
+                stockHistory.record(product, previous, "ORDER_CANCELLED_RESTORED", orderId, memberId);
+            });
             histories.save(
                     OrderStatusHistory.builder()
                             .order(order)

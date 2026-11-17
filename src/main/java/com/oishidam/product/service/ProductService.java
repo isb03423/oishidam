@@ -6,11 +6,9 @@ import com.oishidam.product.dto.ProductDetailResponse;
 import com.oishidam.product.dto.ProductSummaryResponse;
 import com.oishidam.product.entity.Product;
 import com.oishidam.product.entity.ProductImage;
-import com.oishidam.product.entity.ProductVariant;
 import com.oishidam.product.enums.SaleStatus;
 import com.oishidam.product.repository.ProductImageRepository;
 import com.oishidam.product.repository.ProductRepository;
-import com.oishidam.product.repository.ProductVariantRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -36,8 +34,6 @@ public class ProductService {
 
     private final ProductImageRepository imageRepository;
 
-    private final ProductVariantRepository variantRepository;
-
     private final CategoryService categoryService;
 
     private final Clock clock;
@@ -58,6 +54,7 @@ public class ProductService {
         // 정렬 및 페이징 설정
         Sort ordering = switch (sort) {
             case "latest" -> Sort.by(Sort.Order.desc("publishedAt"), Sort.Order.desc("id"));
+            case "new" -> Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"));
             case "name" -> Sort.by(Sort.Order.asc("name"), Sort.Order.asc("id"));
             case "popular" -> Sort.unsorted();
             default -> throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_SORT", "지원하지 않는 정렬 방식입니다.");
@@ -74,17 +71,19 @@ public class ProductService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_SORT", "인기순 검색은 지원하지 않습니다.");
         }
         LocalDateTime now = LocalDateTime.now(clock);
-        Page<Product> products = sort.equals("popular") && search == null
+        Page<Product> products = sort.equals("new") && search == null
+                ? productRepository.findNew(SaleStatus.ON_SALE, now, now.minusDays(30), categoryIds, pageable)
+                : sort.equals("popular") && search == null
                 ? productRepository.findPopular(SaleStatus.ON_SALE, now, categoryIds, pageable)
                 : search == null
                 ? productRepository.search(SaleStatus.ON_SALE, now, categoryIds, pageable)
                 : productRepository.searchByKeyword(SaleStatus.ON_SALE, now, categoryIds, search, pageable);
         List<Long> productIds = products.getContent().stream().map(Product::getId).toList();
         if (productIds.isEmpty()) {
-            return products.map(product -> toSummary(product, Map.of(), Map.of(), Map.of()));
+            return products.map(product -> toSummary(product, Map.of()));
         }
 
-        // 대표 이미지와 옵션 최저가 조회
+        // 대표 이미지 조회
         Map<Long, ProductImage> images = imageRepository.findByProductIdInOrderBySortOrderAscIdAsc(productIds).stream()
                 .filter(ProductImage::isPrimary)
                 .collect(Collectors.toMap(
@@ -92,16 +91,7 @@ public class ProductService {
                         Function.identity(),
                         (first, second) -> first
                 ));
-        List<ProductVariant> variants = variantRepository.findByProductIdInAndIsActiveTrueOrderByIdAsc(productIds);
-        Map<Long, BigDecimal> prices = variants.stream()
-                .collect(Collectors.toMap(
-                        variant -> variant.getProduct().getId(),
-                        ProductVariant::getPrice,
-                        BigDecimal::min
-                ));
-        Map<Long, Boolean> inStock = variants.stream().collect(Collectors.toMap(
-                variant -> variant.getProduct().getId(), variant -> variant.getStockQuantity() > 0, Boolean::logicalOr));
-        return products.map(product -> toSummary(product, images, prices, inStock));
+        return products.map(product -> toSummary(product, images));
     }
 
     // 상품 상세
@@ -122,7 +112,7 @@ public class ProductService {
                 )
                 .orElseThrow(this::productNotFound);
 
-        // 상품 이미지와 활성 옵션 조회
+        // 상품 이미지 조회
         List<ProductDetailResponse.ImageResponse> images = imageRepository
                 .findByProductIdInOrderBySortOrderAscIdAsc(List.of(productId)).stream()
                 .map(image -> new ProductDetailResponse.ImageResponse(
@@ -134,16 +124,6 @@ public class ProductService {
                         imageUrl(image.getStorageKey())
                 ))
                 .toList();
-        List<ProductDetailResponse.VariantResponse> variants = variantRepository
-                .findByProductIdInAndIsActiveTrueOrderByIdAsc(List.of(productId)).stream()
-                .map(variant -> new ProductDetailResponse.VariantResponse(
-                        variant.getId(),
-                        variant.getVariantName(),
-                        variant.getOptionValues(),
-                        variant.getPrice(),
-                        variant.getStockQuantity()
-                ))
-                .toList();
         return new ProductDetailResponse(
                 product.getId(),
                 product.getCategory().getId(),
@@ -152,17 +132,16 @@ public class ProductService {
                 product.getBrand(),
                 product.getPublishedAt(),
                 images,
-                variants,
-                variants.stream().noneMatch(variant -> variant.stockQuantity() > 0)
+                product.getPrice(),
+                product.getStockQuantity(),
+                product.getStockQuantity() == 0
         );
     }
 
     // 상품 목록 응답 생성
     private ProductSummaryResponse toSummary(
             Product product,
-            Map<Long, ProductImage> images,
-            Map<Long, BigDecimal> prices,
-            Map<Long, Boolean> inStock
+            Map<Long, ProductImage> images
     ) {
         ProductImage image = images.get(product.getId());
         ProductSummaryResponse.ImageResponse primaryImage = image == null ? null
@@ -172,10 +151,11 @@ public class ProductService {
                 product.getCategory().getId(),
                 product.getName(),
                 product.getBrand(),
-                prices.get(product.getId()),
+                product.getPrice(),
+                product.getStockQuantity(),
                 primaryImage,
                 product.getPublishedAt(),
-                !inStock.getOrDefault(product.getId(), false)
+                product.getStockQuantity() == 0
         );
     }
 

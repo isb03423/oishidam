@@ -1,4 +1,4 @@
-package com.oishidam.admin.product.dto;
+package com.oishidam.common.image;
 
 public record UploadedImage(
         String fileId,

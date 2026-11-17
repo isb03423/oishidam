@@ -8,10 +8,10 @@ import java.util.List;
 import java.util.Optional;
 
 public interface CartItemRepository extends JpaRepository<CartItem, Long> {
-    @EntityGraph(attributePaths = {"variant", "variant.product", "variant.product.category"})
+    @EntityGraph(attributePaths = {"product", "product.category"})
     List<CartItem> findAllByMemberIdOrderByIdDesc(Long memberId);
 
-    Optional<CartItem> findByMemberIdAndVariantId(Long memberId, Long variantId);
+    Optional<CartItem> findByMemberIdAndProductId(Long memberId, Long productId);
 
     Optional<CartItem> findByIdAndMemberId(Long id, Long memberId);
 }

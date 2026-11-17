@@ -7,9 +7,11 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 
 @Entity
 @Table(name = "products")
+@SecondaryTable(name = "product_stock", pkJoinColumns = @PrimaryKeyJoinColumn(name = "product_id"))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
@@ -33,6 +35,12 @@ public class Product extends BaseEntity {
     @Column(name = "brand", length = 100)
     private String brand;
 
+    @Column(nullable = false, precision = 14, scale = 0)
+    private BigDecimal price;
+
+    @Column(table = "product_stock", name = "stock_quantity", nullable = false)
+    private int stockQuantity;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "sale_status", nullable = false, length = 20)
     private SaleStatus saleStatus;
@@ -43,12 +51,20 @@ public class Product extends BaseEntity {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
-    public void update(Category category, String name, String description, String brand) {
+    public void update(Category category, String name, String description, String brand, BigDecimal price, int stockQuantity) {
         this.category = category;
         this.name = name;
         this.description = description;
         this.brand = brand;
+        this.price = price;
+        this.stockQuantity = stockQuantity;
     }
+
+    public void restoreStock(int quantity) { stockQuantity = Math.addExact(stockQuantity, quantity); }
+
+    public void deductStock(int quantity) { stockQuantity -= quantity; }
+
+    public void changeStock(int quantity) { stockQuantity = quantity; }
 
     public void changeStatus(SaleStatus saleStatus, LocalDateTime publishedAt) {
         this.saleStatus = saleStatus;

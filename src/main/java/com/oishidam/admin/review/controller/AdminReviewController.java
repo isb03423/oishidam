@@ -25,10 +25,11 @@ public class AdminReviewController {
     public ApiResponse<Page<AdminReviewResponse>> list(
             @RequestParam(required = false) Long productId,
             @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Boolean answered,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        return ApiResponse.ok(service.adminList(productId, keyword, page, size));
+        return ApiResponse.ok(service.adminList(productId, keyword, answered, page, size));
     }
 
     @Operation(summary = "리뷰 상세 조회")

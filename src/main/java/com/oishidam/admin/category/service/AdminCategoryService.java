@@ -33,6 +33,7 @@ public class AdminCategoryService {
     public AdminCategoryResponse create(AdminCategoryRequest request) {
         List<Category> categories = categoryRepository.findAllForUpdate();
         Category parent = findParent(categories, request.parentId());
+        validateDepth(categories, parent, null);
         Category category = categoryRepository.save(
                 Category.builder()
                         .parent(parent)
@@ -58,6 +59,7 @@ public class AdminCategoryService {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "CATEGORY_CYCLE", "카테고리를 자신의 하위 카테고리로 이동할 수 없습니다.");
             }
         }
+        validateDepth(categories, parent, category);
         category.update(parent, request.name().trim(), request.sortOrder(), request.isActive());
         return AdminCategoryResponse.from(category);
     }
@@ -82,6 +84,36 @@ public class AdminCategoryService {
     // 상위 카테고리 조회
     private Category findParent(List<Category> categories, Long parentId) {
         return parentId == null ? null : findRequired(categories, parentId);
+    }
+
+    // 이동할 하위 분류까지 포함해 상·중 2단계를 넘지 않는지 확인한다.
+    private void validateDepth(List<Category> categories, Category parent, Category category) {
+        int parentDepth = 0;
+        for (Category current = parent; current != null; current = current.getParent()) {
+            if (++parentDepth >= 2) {
+                throw depthExceeded();
+            }
+        }
+        int height = 1;
+        if (category != null) {
+            for (Category candidate : categories) {
+                int distance = 1;
+                for (Category current = candidate; current != null && distance <= 3; current = current.getParent(), distance++) {
+                    if (current.getId().equals(category.getId())) {
+                        height = Math.max(height, distance);
+                        break;
+                    }
+                }
+            }
+        }
+        if (parentDepth + height > 2) {
+            throw depthExceeded();
+        }
+    }
+
+    // 최대 분류 단계를 초과했을 때의 오류를 반환한다.
+    private ApiException depthExceeded() {
+        return new ApiException(HttpStatus.BAD_REQUEST, "CATEGORY_DEPTH_EXCEEDED", "카테고리는 상·중 2단계까지만 등록할 수 있습니다.");
     }
 
     // 필수 카테고리 조회

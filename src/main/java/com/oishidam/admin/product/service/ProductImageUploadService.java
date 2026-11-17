@@ -1,10 +1,11 @@
 package com.oishidam.admin.product.service;
 
-import com.oishidam.admin.product.dto.UploadedImage;
+import com.oishidam.common.image.UploadedImage;
 import com.oishidam.admin.product.dto.AdminImageRequest;
 import com.oishidam.admin.product.dto.AdminImageResponse;
 import com.oishidam.admin.product.dto.AdminImageUploadRequest;
 import com.oishidam.common.exception.ApiException;
+import com.oishidam.common.image.ImageKitService;
 import com.oishidam.product.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,7 +30,7 @@ public class ProductImageUploadService {
         }
 
         // 이미지 업로드 후 상품에 등록
-        UploadedImage image = imageKitService.upload(file);
+        UploadedImage image = imageKitService.upload(file, "/products");
         try {
             return productService.createImage(
                     productId,

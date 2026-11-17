@@ -18,9 +18,9 @@ import com.oishidam.payment.entity.PaymentConfirmation;
 import com.oishidam.payment.repository.PaymentConfirmationRepository;
 import com.oishidam.payment.repository.PaymentRequestRepository;
 import com.oishidam.product.entity.Product;
-import com.oishidam.product.entity.ProductVariant;
 import com.oishidam.product.enums.SaleStatus;
-import com.oishidam.product.repository.ProductVariantRepository;
+import com.oishidam.product.repository.ProductRepository;
+import com.oishidam.product.service.StockHistoryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -39,7 +39,7 @@ public class PaymentConfirmationService {
 
     private final OrderItemRepository items;
 
-    private final ProductVariantRepository variants;
+    private final ProductRepository products;
 
     private final CategoryService categories;
 
@@ -56,6 +56,8 @@ public class PaymentConfirmationService {
     private final Clock clock;
 
     private final OrderStatusHistoryRepository histories;
+
+    private final StockHistoryService stockHistory;
 
     // 결제 승인
     public PaymentConfirmResponse confirm(
@@ -152,26 +154,27 @@ public class PaymentConfirmationService {
         }
 
         // 주문 상품의 판매 상태와 재고 확인
-        List<OrderItem> orderItems = items.findByOrderIdOrderByVariantIdAsc(orderId);
+        List<OrderItem> orderItems = items.findByOrderIdOrderByProductIdAsc(orderId);
         if (orderItems.isEmpty()) {
             throw new ApiException(HttpStatus.CONFLICT, "ORDER_ITEMS_MISSING", "주문 상품을 찾을 수 없습니다.");
         }
         List<Long> visibleCategories = categories.categoryIds(null);
         LocalDateTime now = LocalDateTime.now(clock);
         for (OrderItem item : orderItems) {
-            ProductVariant variant = variants.findByIdForUpdate(item.getVariantId())
+            Product product = products.findAnyByIdForUpdate(item.getProductId())
                     .orElseThrow(() -> new ApiException(HttpStatus.CONFLICT, "ORDER_ITEM_UNAVAILABLE", "주문 상품을 구매할 수 없습니다."));
-            Product product = variant.getProduct();
-            if (!variant.isActive() || product.getDeletedAt() != null || product.getSaleStatus() != SaleStatus.ON_SALE
+            if (product.getDeletedAt() != null || product.getSaleStatus() != SaleStatus.ON_SALE
                     || product.getPublishedAt() == null || product.getPublishedAt().isAfter(now)
                     || !visibleCategories.contains(product.getCategory().getId())
-                    || variant.getPrice().compareTo(item.getUnitPrice()) != 0
-                    || variant.getStockQuantity() < item.getQuantity()) {
+                    || product.getPrice().compareTo(item.getUnitPrice()) != 0
+                    || product.getStockQuantity() < item.getQuantity()) {
                 throw new ApiException(HttpStatus.CONFLICT, "ORDER_ITEM_UNAVAILABLE", "상품의 가격 또는 판매 상태, 재고가 변경되었습니다.");
             }
 
             // 결제 승인 중 재고 차감
-            variant.deductStock(item.getQuantity());
+            int previous = product.getStockQuantity();
+            product.deductStock(item.getQuantity());
+            stockHistory.record(product, previous, "ORDER_RESERVED", orderId, memberId);
         }
         histories.save(
                 OrderStatusHistory.builder()
@@ -233,11 +236,11 @@ public class PaymentConfirmationService {
             confirmation.markPaid(LocalDateTime.now(clock));
 
             // 주문 후 변경되지 않은 장바구니 항목 삭제
-            for (OrderItem item : items.findByOrderIdOrderByVariantIdAsc(orderId)) {
+            for (OrderItem item : items.findByOrderIdOrderByProductIdAsc(orderId)) {
                 if (item.getCartItemId() != null) {
                     cart.findByIdAndMemberId(item.getCartItemId(), memberId)
                             .filter(cartItem -> cartItem.getQuantity() == item.getQuantity()
-                                    && cartItem.getVariant().getId().equals(item.getVariantId()))
+                                    && cartItem.getProduct().getId().equals(item.getProductId()))
                             .ifPresent(cart::delete);
                 }
             }
@@ -271,10 +274,12 @@ public class PaymentConfirmationService {
             throw new ApiException(HttpStatus.CONFLICT, "PAYMENT_KEY_MISMATCH", "기존 결제 요청과 일치하지 않습니다.");
         }
         if (order.getOrderStatus() == OrderStatus.PAYMENT_CONFIRMING) {
-            for (OrderItem item : items.findByOrderIdOrderByVariantIdAsc(orderId)) {
-                ProductVariant variant = variants.findByIdForUpdate(item.getVariantId())
+            for (OrderItem item : items.findByOrderIdOrderByProductIdAsc(orderId)) {
+                Product product = products.findAnyByIdForUpdate(item.getProductId())
                         .orElseThrow(() -> new ApiException(HttpStatus.CONFLICT, "ORDER_ITEM_UNAVAILABLE", "주문 상품을 찾을 수 없습니다."));
-                variant.restoreStock(item.getQuantity());
+                int previous = product.getStockQuantity();
+                product.restoreStock(item.getQuantity());
+                stockHistory.record(product, previous, "PAYMENT_FAILED_RESTORED", orderId, memberId);
             }
             histories.save(
                     OrderStatusHistory.builder()

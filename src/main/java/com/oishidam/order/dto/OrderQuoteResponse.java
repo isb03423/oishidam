@@ -15,8 +15,6 @@ public record OrderQuoteResponse(
             Long cartItemId,
             Long productId,
             String productName,
-            Long variantId,
-            String variantName,
             int quantity,
             BigDecimal unitPrice,
             BigDecimal lineAmount

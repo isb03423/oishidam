@@ -15,6 +15,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.format.annotation.DateTimeFormat;
+import java.time.LocalDate;
 
 @Tag(name = "주문", description = "주문 조회, 생성 및 취소")
 @RestController
@@ -44,10 +46,13 @@ public class OrderController {
     public ApiResponse<Page<OrderSummaryResponse>> list(
             @AuthenticationPrincipal Jwt jwt,
             @RequestParam(required = false) String status,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(defaultValue = "false") boolean excludePending,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        return ApiResponse.ok(orderQueryService.list(Long.valueOf(jwt.getSubject()), status, page, size));
+        return ApiResponse.ok(orderQueryService.list(Long.valueOf(jwt.getSubject()), status, from, keyword, excludePending, page, size));
     }
 
     @Operation(summary = "주문 상세 조회")

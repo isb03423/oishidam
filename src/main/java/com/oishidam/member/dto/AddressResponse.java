@@ -10,7 +10,8 @@ public record AddressResponse(
         String postalCode,
         String addressLine1,
         String addressLine2,
-        boolean isDefault
+        boolean isDefault,
+        String customsCode
 ) {
     public static AddressResponse from(Address address) {
         return new AddressResponse(
@@ -21,7 +22,8 @@ public record AddressResponse(
                 address.getPostalCode(),
                 address.getAddressLine1(),
                 address.getAddressLine2(),
-                address.isDefault()
+                address.isDefault(),
+                address.getCustomsCode()
         );
     }
 }

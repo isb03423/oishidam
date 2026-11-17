@@ -1,6 +1,5 @@
-package com.oishidam.admin.product.service;
+package com.oishidam.common.image;
 
-import com.oishidam.admin.product.dto.UploadedImage;
 import com.oishidam.common.exception.ApiException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,7 +44,7 @@ public class ImageKitService {
     }
 
     // 이미지 업로드
-    public UploadedImage upload(MultipartFile file) {
+    public UploadedImage upload(MultipartFile file, String folder) {
         if (privateKey.isBlank()) {
             throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "IMAGEKIT_NOT_CONFIGURED", "이미지 업로드 설정이 필요합니다.");
         }
@@ -76,7 +75,7 @@ public class ImageKitService {
         LinkedMultiValueMap<String, Object> parts = new LinkedMultiValueMap<>();
         parts.add("file", resource);
         parts.add("fileName", filename);
-        parts.add("folder", "/products");
+        parts.add("folder", folder);
         parts.add("isPrivateFile", "false");
         try {
             UploadedImage image = client.post().uri("https://upload.imagekit.io/api/v1/files/upload")

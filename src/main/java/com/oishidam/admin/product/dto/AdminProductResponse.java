@@ -4,6 +4,7 @@ import com.oishidam.product.entity.Product;
 import com.oishidam.product.enums.SaleStatus;
 
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 
 public record AdminProductResponse(
         Long productId,
@@ -11,6 +12,8 @@ public record AdminProductResponse(
         String name,
         String description,
         String brand,
+        BigDecimal price,
+        int stockQuantity,
         SaleStatus saleStatus,
         LocalDateTime publishedAt
 ) {
@@ -21,6 +24,8 @@ public record AdminProductResponse(
                 product.getName(),
                 product.getDescription(),
                 product.getBrand(),
+                product.getPrice(),
+                product.getStockQuantity(),
                 product.getSaleStatus(),
                 product.getPublishedAt()
         );

@@ -108,7 +108,7 @@ public class AdminOrderService {
         Order order = orders.findById(orderId).orElseThrow(this::notFound);
         return AdminOrderDetailResponse.from(
                 order,
-                items.findByOrderIdOrderByVariantIdAsc(orderId),
+                items.findByOrderIdOrderByProductIdAsc(orderId),
                 payments.findByOrderId(orderId).orElse(null),
                 histories.findByOrderIdOrderByIdAsc(orderId)
         );

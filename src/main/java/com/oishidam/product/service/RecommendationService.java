@@ -36,10 +36,10 @@ public class RecommendationService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_PAGINATION", "상품 수는 1~100이어야 합니다.");
         }
         if ("new".equals(type)) {
-            return new RecommendationResponse("NEW", products.search(null, null, 0, limit, "latest").getContent());
+            return new RecommendationResponse("NEW", products.search(null, null, 0, Math.min(limit, 8), "new").getContent());
         }
         if ("best".equals(type)) {
-            return best(limit, "BEST");
+            return best(Math.min(limit, 8), "BEST");
         }
         if (!"personalized".equals(type)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_RECOMMENDATION_TYPE", "지원하지 않는 추천 유형입니다.");

@@ -7,6 +7,7 @@ public record InquirySummaryResponse(
         String title,
         String status,
         Long memberId,
+        String memberName,
         LocalDateTime createdAt
 ) {
 }

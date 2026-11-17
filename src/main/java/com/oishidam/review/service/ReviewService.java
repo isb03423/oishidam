@@ -1,6 +1,8 @@
 package com.oishidam.review.service;
 
 import com.oishidam.common.exception.ApiException;
+import com.oishidam.common.image.ImageKitService;
+import com.oishidam.common.image.UploadedImage;
 import com.oishidam.member.entity.Member;
 import com.oishidam.member.repository.MemberRepository;
 import com.oishidam.order.entity.OrderItem;
@@ -12,21 +14,29 @@ import com.oishidam.review.dto.PublicReviewResponse;
 import com.oishidam.review.dto.ReviewContentRequest;
 import com.oishidam.review.dto.ReviewEligibilityResponse;
 import com.oishidam.review.dto.ReviewResponse;
+import com.oishidam.review.dto.ReviewUpdateRequest;
 import com.oishidam.review.entity.Review;
 import com.oishidam.review.repository.ReviewRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ReviewService {
     private final ReviewRepository reviews;
 
@@ -39,6 +49,8 @@ public class ReviewService {
     private final ProductService products;
 
     private final Clock clock;
+
+    private final ImageKitService imageKitService;
 
     // 상품 리뷰 목록
     @Transactional(readOnly = true)
@@ -78,6 +90,12 @@ public class ReviewService {
             Long itemId,
             ReviewContentRequest request
     ) {
+        return create(memberId, itemId, request, List.of());
+    }
+
+    // 첨부 이미지를 업로드하고 리뷰와 함께 저장
+    @Transactional
+    public ReviewResponse create(Long memberId, Long itemId, ReviewContentRequest request, List<MultipartFile> files) {
         Member member = lockMember(memberId);
         OrderItem item = item(itemId, memberId);
         LocalDateTime deadline = writeDeadline(item);
@@ -89,12 +107,14 @@ public class ReviewService {
         if (reviews.findByOrderItemId(itemId).isPresent()) {
             throw new ApiException(HttpStatus.CONFLICT, "REVIEW_ALREADY_EXISTS", "이미 리뷰를 작성한 주문 상품입니다.");
         }
+        List<String> urls = uploadImages(files, 0);
         return ReviewResponse.from(
                 reviews.saveAndFlush(
                         Review.builder()
                                 .orderItem(item)
                                 .member(member)
                                 .content(request.content().trim())
+                                .imageUrls(new ArrayList<>(urls))
                                 .build()
                 )
         );
@@ -111,6 +131,54 @@ public class ReviewService {
         Review review = ownReview(reviewId, memberId);
         validateEditable(review);
         review.updateContent(request.content().trim());
+        reviews.flush();
+        return ReviewResponse.from(review);
+    }
+
+    // 이미지 수를 검증하고 트랜잭션 실패 시 업로드한 파일을 정리한다.
+    private List<String> uploadImages(List<MultipartFile> files, int retained) {
+        if (files != null && files.size() + retained > 5) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "TOO_MANY_REVIEW_IMAGES", "리뷰 이미지는 최대 5장까지 첨부할 수 있습니다.");
+        }
+        List<UploadedImage> uploaded = new ArrayList<>();
+        // shortcut: 서버가 중단되면 이미지가 남을 수 있으므로 업로드가 많아지면 정리 작업을 도입한다.
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status != STATUS_COMMITTED) {
+                    for (UploadedImage image : uploaded) {
+                        try {
+                            imageKitService.delete(image.fileId());
+                        } catch (RuntimeException e) {
+                            log.error("ImageKit 업로드 파일 정리 실패: {}", image.fileId(), e);
+                        }
+                    }
+                }
+            }
+        });
+        if (files != null) {
+            for (MultipartFile file : files) {
+                uploaded.add(imageKitService.upload(file, "/reviews"));
+            }
+        }
+        return uploaded.stream().map(UploadedImage::url).toList();
+    }
+
+    // 기존 사진의 소유권과 수정 기한을 확인한 뒤 내용과 첨부 사진을 갱신한다.
+    @Transactional
+    public ReviewResponse updateWithImages(Long memberId, Long reviewId, ReviewUpdateRequest request, List<MultipartFile> files) {
+        lockMember(memberId);
+        Review review = ownReview(reviewId, memberId);
+        validateEditable(review);
+        List<String> retained = request.retainedImageUrls() == null ? List.copyOf(review.getImageUrls()) : request.retainedImageUrls();
+        if (retained.size() > 5 || retained.stream().distinct().count() != retained.size()
+                || !review.getImageUrls().containsAll(retained)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_REVIEW_IMAGES", "기존 첨부 이미지를 확인해 주세요.");
+        }
+        List<String> urls = new ArrayList<>(retained);
+        urls.addAll(uploadImages(files, retained.size()));
+        review.updateContent(request.content().trim());
+        review.updateImages(urls);
         reviews.flush();
         return ReviewResponse.from(review);
     }

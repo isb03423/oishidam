@@ -6,6 +6,8 @@ import com.oishidam.member.repository.MemberRepository;
 import com.oishidam.order.dto.OrderDetailResponse;
 import com.oishidam.order.dto.OrderSummaryResponse;
 import com.oishidam.order.enums.OrderStatus;
+import com.oishidam.order.entity.Order;
+import com.oishidam.order.entity.OrderItem;
 import com.oishidam.order.repository.OrderItemRepository;
 import com.oishidam.order.repository.OrderRepository;
 import com.oishidam.payment.repository.PaymentConfirmationRepository;
@@ -16,6 +18,11 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.jpa.domain.Specification;
+import jakarta.persistence.criteria.Predicate;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -33,6 +40,9 @@ public class OrderQueryService {
     public Page<OrderSummaryResponse> list(
             Long memberId,
             String status,
+            LocalDate from,
+            String keyword,
+            boolean excludePending,
             int page,
             int size
     ) {
@@ -49,8 +59,24 @@ public class OrderQueryService {
 
         // 정렬과 상태 조건을 적용해 주문 조회
         var pageable = PageRequest.of(page, size, Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")));
-        var result = requestedStatus == null ? orders.findAllByMemberId(memberId, pageable)
-                : orders.findAllByMemberIdAndOrderStatus(memberId, requestedStatus, pageable);
+        String search = keyword == null ? "" : keyword.trim().toLowerCase(Locale.ROOT);
+        if (search.length() > 200) throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_SEARCH", "검색어가 너무 깁니다.");
+        Specification<Order> filters = (root, query, cb) -> {
+            var predicates = new ArrayList<Predicate>();
+            predicates.add(cb.equal(root.get("member").get("id"), memberId));
+            if (requestedStatus != null) predicates.add(cb.equal(root.get("orderStatus"), requestedStatus));
+            if (excludePending) predicates.add(cb.notEqual(root.get("orderStatus"), OrderStatus.PAYMENT_PENDING));
+            if (from != null) predicates.add(cb.greaterThanOrEqualTo(root.get("createdAt"), from.atStartOfDay()));
+            if (!search.isEmpty()) {
+                String pattern = "%" + search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
+                var subquery = query.subquery(Long.class);
+                var item = subquery.from(OrderItem.class);
+                subquery.select(item.get("id")).where(cb.equal(item.get("order"), root), cb.like(cb.lower(item.get("productName")), pattern, '\\'));
+                predicates.add(cb.or(cb.like(cb.lower(root.get("orderNumber")), pattern, '\\'), cb.exists(subquery)));
+            }
+            return cb.and(predicates.toArray(Predicate[]::new));
+        };
+        var result = orders.findAll(filters, pageable);
         return result.map(OrderSummaryResponse::from);
     }
 
@@ -64,7 +90,7 @@ public class OrderQueryService {
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "ORDER_NOT_FOUND", "주문을 찾을 수 없습니다."));
         return OrderDetailResponse.from(
                 order,
-                items.findByOrderIdOrderByVariantIdAsc(orderId),
+                items.findByOrderIdOrderByProductIdAsc(orderId),
                 confirmations.findByOrderId(orderId).orElse(null)
         );
     }

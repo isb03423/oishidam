@@ -33,7 +33,8 @@ public record OrderDetailResponse(
                 order.getPostalCode(),
                 order.getAddressLine1(),
                 order.getAddressLine2(),
-                order.getDeliveryMemo()
+                order.getDeliveryMemo(),
+                order.getCustomsCode()
         );
         List<Item> itemResponses = items.stream().map(Item::from).toList();
         return new OrderDetailResponse(
@@ -57,15 +58,15 @@ public record OrderDetailResponse(
             String postalCode,
             String addressLine1,
             String addressLine2,
-            String deliveryMemo
+            String deliveryMemo,
+            String customsCode
     ) {
     }
 
     public record Item(
             Long orderItemId,
-            Long variantId,
+            Long productId,
             String productName,
-            String variantName,
             int quantity,
             BigDecimal unitPrice,
             BigDecimal lineAmount
@@ -73,9 +74,8 @@ public record OrderDetailResponse(
         private static Item from(OrderItem item) {
             return new Item(
                     item.getId(),
-                    item.getVariantId(),
+                    item.getProductId(),
                     item.getProductName(),
-                    item.getVariantName(),
                     item.getQuantity(),
                     item.getUnitPrice(),
                     item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity()))

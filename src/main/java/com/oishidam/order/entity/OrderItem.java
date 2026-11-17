@@ -7,7 +7,7 @@ import lombok.*;
 import java.math.BigDecimal;
 
 @Entity
-@Table(name = "order_items", uniqueConstraints = @UniqueConstraint(columnNames = {"order_id", "variant_id"}))
+@Table(name = "order_items", uniqueConstraints = @UniqueConstraint(columnNames = {"order_id", "product_id"}))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
@@ -23,15 +23,12 @@ public class OrderItem {
     private Order order;
 
     @Column(nullable = false)
-    private Long variantId;
+    private Long productId;
 
     private Long cartItemId;
 
     @Column(nullable = false, length = 200)
     private String productName;
-
-    @Column(nullable = false, length = 200)
-    private String variantName;
 
     @Column(nullable = false)
     private int quantity;
@@ -42,10 +39,9 @@ public class OrderItem {
     public static OrderItem fromQuote(Order order, OrderQuoteResponse.Item item) {
         return OrderItem.builder()
                 .order(order)
-                .variantId(item.variantId())
+                .productId(item.productId())
                 .cartItemId(item.cartItemId())
                 .productName(item.productName())
-                .variantName(item.variantName())
                 .quantity(item.quantity())
                 .unitPrice(item.unitPrice())
                 .build();

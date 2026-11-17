@@ -13,7 +13,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
-@Tag(name = "문의", description = "문의 제목 조회 및 고객 비공개 대화")
+@Tag(name = "문의", description = "문의 제목 조회 및 비공개 문의·답변")
 @RestController
 @RequestMapping("/api/inquiries")
 @RequiredArgsConstructor
@@ -28,8 +28,13 @@ public class InquiryController {
 
     @Operation(summary = "내 문의 목록")
     @GetMapping("/mine")
-    public ApiResponse<Page<InquirySummaryResponse>> mine(@AuthenticationPrincipal Jwt jwt, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
-        return ApiResponse.ok(service.myList(Long.valueOf(jwt.getSubject()), page, size));
+    public ApiResponse<Page<InquirySummaryResponse>> mine(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        return ApiResponse.ok(service.myList(Long.valueOf(jwt.getSubject()), status, page, size));
     }
 
     @Operation(summary = "문의 작성")
@@ -45,10 +50,11 @@ public class InquiryController {
         return ApiResponse.ok(service.detail(inquiryId, Long.valueOf(jwt.getSubject()), false));
     }
 
-    @Operation(summary = "문의 후속 메시지 작성")
-    @PostMapping("/{inquiryId}/messages")
-    @ResponseStatus(HttpStatus.CREATED)
-    public ApiResponse<InquiryMessageResponse> message(@AuthenticationPrincipal Jwt jwt, @PathVariable Long inquiryId, @Valid @RequestBody InquiryMessageRequest request) {
-        return ApiResponse.ok(service.addMessage(inquiryId, Long.valueOf(jwt.getSubject()), false, request));
+    @Operation(summary = "내 문의 삭제", description = "관리자 답변이 없는 문의만 삭제할 수 있습니다.")
+    @DeleteMapping("/{inquiryId}")
+    public ApiResponse<Void> delete(@AuthenticationPrincipal Jwt jwt, @PathVariable Long inquiryId) {
+        service.delete(inquiryId, Long.valueOf(jwt.getSubject()));
+        return ApiResponse.ok(null);
     }
+
 }

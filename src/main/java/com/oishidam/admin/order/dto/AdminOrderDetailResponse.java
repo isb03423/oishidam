@@ -12,6 +12,7 @@ import java.util.List;
 
 public record AdminOrderDetailResponse(
         Long memberId,
+        String memberName,
         OrderDetailResponse order,
         List<History> statusHistories
 ) {
@@ -23,6 +24,7 @@ public record AdminOrderDetailResponse(
     ) {
         return new AdminOrderDetailResponse(
                 order.getMember().getId(),
+                order.getMember().getName(),
                 OrderDetailResponse.from(order, items, payment),
                 histories.stream().map(History::from).toList()
         );

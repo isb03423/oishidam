@@ -3,7 +3,6 @@ package com.oishidam.product.dto;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
 
 public record ProductDetailResponse(
         Long productId,
@@ -13,7 +12,8 @@ public record ProductDetailResponse(
         String brand,
         LocalDateTime publishedAt,
         List<ImageResponse> images,
-        List<VariantResponse> variants,
+        BigDecimal price,
+        int stockQuantity,
         boolean isSoldOut
 ) {
     public record ImageResponse(
@@ -26,12 +26,4 @@ public record ProductDetailResponse(
     ) {
     }
 
-    public record VariantResponse(
-            Long variantId,
-            String name,
-            Map<String, Object> optionValues,
-            BigDecimal price,
-            int stockQuantity
-    ) {
-    }
 }

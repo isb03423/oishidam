@@ -5,8 +5,6 @@ import com.oishidam.common.exception.ApiException;
 import com.oishidam.member.entity.Member;
 import com.oishidam.member.enums.MemberRole;
 import com.oishidam.member.repository.MemberRepository;
-import com.oishidam.product.entity.ProductVariant;
-import com.oishidam.product.repository.ProductVariantRepository;
 import com.oishidam.review.dto.ReviewContentRequest;
 import com.oishidam.review.entity.Review;
 import com.oishidam.review.repository.ReviewRepository;
@@ -31,8 +29,6 @@ public class AdminReviewService {
 
     private final MemberRepository members;
 
-    private final ProductVariantRepository variants;
-
     private final Clock clock;
 
     // 관리자: 리뷰 목록
@@ -40,6 +36,7 @@ public class AdminReviewService {
     public Page<AdminReviewResponse> adminList(
             Long productId,
             String keyword,
+            Boolean answered,
             int page,
             int size
     ) {
@@ -50,14 +47,8 @@ public class AdminReviewService {
                 .replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
 
         // 조건에 맞는 리뷰와 상품 정보 조회
-        Page<Review> result = reviews.findForAdmin(productId, search, pageable(page, size));
-        List<Long> variantIds = result.stream().map(review -> review.getOrderItem().getVariantId()).distinct().toList();
-        Map<Long, Long> productIds = variants.findAllById(variantIds).stream()
-                .collect(Collectors.toMap(ProductVariant::getId, variant -> variant.getProduct().getId()));
-        return result.map(review -> AdminReviewResponse.from(
-                review,
-                productIds.get(review.getOrderItem().getVariantId())
-        ));
+        Page<Review> result = reviews.findForAdmin(productId, search, answered, pageable(page, size));
+        return result.map(review -> AdminReviewResponse.from(review, review.getOrderItem().getProductId()));
     }
 
     // 관리자: 리뷰 상세
@@ -88,8 +79,7 @@ public class AdminReviewService {
 
     // 리뷰의 상품 ID 조회
     private Long productId(Review review) {
-        return variants.findById(review.getOrderItem().getVariantId())
-                .map(variant -> variant.getProduct().getId()).orElseThrow(this::notFound);
+        return review.getOrderItem().getProductId();
     }
 
     // 활성 회원 조회

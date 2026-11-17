@@ -8,6 +8,7 @@ public record InquiryDetailResponse(
         String title,
         String status,
         Long memberId,
+        String memberName,
         Long orderId,
         LocalDateTime createdAt,
         List<InquiryMessageResponse> messages

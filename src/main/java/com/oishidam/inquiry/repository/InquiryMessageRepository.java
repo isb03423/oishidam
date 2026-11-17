@@ -7,4 +7,6 @@ import java.util.List;
 
 public interface InquiryMessageRepository extends JpaRepository<InquiryMessage, Long> {
     List<InquiryMessage> findByInquiryIdOrderByIdAsc(Long inquiryId);
+
+    boolean existsByInquiryIdAndSenderIdNot(Long inquiryId, Long senderId);
 }

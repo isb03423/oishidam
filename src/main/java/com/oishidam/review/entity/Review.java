@@ -7,6 +7,8 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "reviews")
@@ -31,6 +33,13 @@ public class Review extends BaseEntity {
     @Column(nullable = false, columnDefinition = "text")
     private String content;
 
+    @ElementCollection
+    @CollectionTable(name = "review_images", joinColumns = @JoinColumn(name = "review_id"))
+    @OrderColumn(name = "sort_order")
+    @Column(name = "image_url", nullable = false, length = 500)
+    @Builder.Default
+    private List<String> imageUrls = new ArrayList<>();
+
     private LocalDateTime deletedAt;
 
     @Column(columnDefinition = "text")
@@ -46,6 +55,11 @@ public class Review extends BaseEntity {
 
     public void updateContent(String content) {
         this.content = content;
+    }
+
+    public void updateImages(List<String> imageUrls) {
+        this.imageUrls.clear();
+        this.imageUrls.addAll(imageUrls);
     }
 
     public void delete(LocalDateTime now) {

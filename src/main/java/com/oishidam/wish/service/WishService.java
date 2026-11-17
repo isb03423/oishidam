@@ -6,11 +6,9 @@ import com.oishidam.member.entity.Member;
 import com.oishidam.member.repository.MemberRepository;
 import com.oishidam.product.entity.Product;
 import com.oishidam.product.entity.ProductImage;
-import com.oishidam.product.entity.ProductVariant;
 import com.oishidam.product.enums.SaleStatus;
 import com.oishidam.product.repository.ProductImageRepository;
 import com.oishidam.product.repository.ProductRepository;
-import com.oishidam.product.repository.ProductVariantRepository;
 import com.oishidam.wish.dto.WishResponse;
 import com.oishidam.wish.entity.WishItem;
 import com.oishidam.wish.repository.WishItemRepository;
@@ -32,8 +30,6 @@ public class WishService {
 
     private final ProductRepository products;
 
-    private final ProductVariantRepository variants;
-
     private final ProductImageRepository images;
 
     private final CategoryService categories;
@@ -48,9 +44,7 @@ public class WishService {
         LocalDateTime now = LocalDateTime.now(clock);
         return wishes.findByMemberIdAndProductDeletedAtIsNullOrderByIdDesc(memberId).stream().map(item -> {
             Product product = item.getProduct();
-            List<ProductVariant> active = variants
-                    .findByProductIdInAndIsActiveTrueOrderByIdAsc(List.of(product.getId()));
-            boolean soldOut = active.stream().noneMatch(variant -> variant.getStockQuantity() > 0);
+            boolean soldOut = product.getStockQuantity() == 0;
             boolean available = product.getSaleStatus() == SaleStatus.ON_SALE && product.getPublishedAt() != null
                     && !product.getPublishedAt().isAfter(now) && categoryIds.contains(product.getCategory().getId())
                     && !soldOut;
@@ -59,17 +53,12 @@ public class WishService {
             return new WishResponse(
                     product.getId(),
                     product.getName(),
-                    active.stream().map(ProductVariant::getPrice).min(java.math.BigDecimal::compareTo).orElse(null),
+                    product.getPrice(),
                     image,
                     product.getSaleStatus().name(),
                     soldOut,
                     available,
-                    active.stream().map(variant -> new WishResponse.Variant(
-                            variant.getId(),
-                            variant.getVariantName(),
-                            variant.getPrice(),
-                            variant.getStockQuantity()
-                    )).toList()
+                    product.getStockQuantity()
             );
         }).toList();
     }

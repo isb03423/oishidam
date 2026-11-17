@@ -23,6 +23,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.Base64;
 
 @Service
 @RequiredArgsConstructor
@@ -36,6 +37,8 @@ public class OrderService {
     private final OrderQuoteService quotes;
 
     private final OrderStatusHistoryRepository histories;
+
+    private final OrderNumberService orderNumbers;
 
     /**
      * 주문 생성
@@ -61,11 +64,16 @@ public class OrderService {
                 memberId,
                 new OrderQuoteRequest(
                         request.cartItemIds(),
-                        request.addressId()
+                        request.addressId(),
+                        request.directItems(),
+                        request.recipient()
                 )
         );
         Order order = orders.save(
-                Order.fromQuote(member, request.requestKey(), hash, request.deliveryMemo(), quote)
+                Order.fromQuote(
+                        member, orderNumbers.next(), request.requestKey(), hash, request.deliveryMemo(),
+                        request.customsCode() == null ? quote.recipient().customsCode() : request.customsCode(), quote
+                )
         );
 
         // 3. 초기 주문 상태와 상품 내역 저장
@@ -85,7 +93,14 @@ public class OrderService {
     // 중복 주문 요청 확인을 위한 해시 생성
     private String requestHash(OrderCreateRequest request) {
         String memo = request.deliveryMemo() == null ? "N" : "S" + request.deliveryMemo();
-        String value = request.addressId() + ":" + request.cartItemIds().stream().sorted().toList() + ":" + memo;
+        String value = request.addressId() + ":" + (request.cartItemIds() == null ? null : request.cartItemIds().stream().sorted().toList()) + ":" + memo;
+        if (request.directItems() != null || request.recipient() != null || request.customsCode() != null) {
+            var recipient = request.recipient();
+            value = request.addressId() + ":" + (request.cartItemIds() == null ? null : request.cartItemIds().stream().sorted().toList())
+                    + ":" + encode(memo) + ":" + request.directItems() + ":" + encode(request.customsCode())
+                    + ":" + (recipient == null ? "N" : encode(recipient.recipientName()) + ":" + encode(recipient.recipientPhone())
+                    + ":" + encode(recipient.postalCode()) + ":" + encode(recipient.addressLine1()) + ":" + encode(recipient.addressLine2()));
+        }
         try {
             return HexFormat.of().formatHex(
                     MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8))
@@ -93,5 +108,10 @@ public class OrderService {
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);
         }
+    }
+
+    // 요청 필드를 구분해 동일 요청 여부를 비교한다.
+    private String encode(String value) {
+        return value == null ? "N" : "S" + Base64.getEncoder().encodeToString(value.getBytes(StandardCharsets.UTF_8));
     }
 }

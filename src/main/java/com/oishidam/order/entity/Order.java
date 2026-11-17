@@ -27,8 +27,7 @@ public class Order extends BaseEntity {
     private Member member;
 
     @Column(nullable = false, unique = true, length = 36)
-    @Builder.Default
-    private String orderNumber = UUID.randomUUID().toString();
+    private String orderNumber;
 
     @Column(nullable = false, length = 36)
     private String requestKey;
@@ -68,18 +67,25 @@ public class Order extends BaseEntity {
     @Column(length = 255)
     private String deliveryMemo;
 
+    @Column(length = 13)
+    private String customsCode;
+
     public static Order fromQuote(
             Member member,
+            String orderNumber,
             UUID requestKey,
             String requestHash,
             String deliveryMemo,
+            String customsCode,
             OrderQuoteResponse quote
     ) {
         return Order.builder()
                 .member(member)
+                .orderNumber(orderNumber)
                 .requestKey(requestKey.toString())
                 .requestHash(requestHash)
                 .deliveryMemo(deliveryMemo)
+                .customsCode(customsCode)
                 .itemsAmount(quote.itemsAmount())
                 .shippingFee(quote.shippingFee())
                 .totalAmount(quote.totalAmount())

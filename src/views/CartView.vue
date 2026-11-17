@@ -6,6 +6,10 @@ import DeleteConfirmationDialog from '../components/DeleteConfirmationDialog.vue
 import MyPageLayout from '../components/MyPageLayout.vue'
 import { cartItems, cartLoading, cartBusy, cartError, loadCart, changeCartQuantity, removeCartItems } from '../stores/cart.js'
 
+const previewCount = 2
+const cartExpanded = ref(false)
+const visibleCartItems = computed(() => cartExpanded.value ? cartItems.value : cartItems.value.slice(0, previewCount))
+const remainingCount = computed(() => Math.max(0, cartItems.value.length - previewCount))
 const selection = ref([])
 const deleteDialog = ref(null)
 const router = useRouter()
@@ -25,6 +29,7 @@ const allSelected = computed(() =>
 )
 
 watch(cartItems, (items) => {
+  if (items.length <= previewCount) cartExpanded.value = false
   selection.value = selection.value.filter((id) => items.some((item) => item.product_id === id))
 })
 onMounted(loadCart)
@@ -57,8 +62,8 @@ async function deleteItems(ids) {
     </div>
 
     <template v-if="cartItems.length">
-      <ul class="cart-items">
-        <li v-for="item in cartItems" :key="item.product_id" class="cart-row">
+      <ul id="cart-items" class="cart-items">
+        <li v-for="item in visibleCartItems" :key="item.product_id" class="cart-row">
           <input v-model="selection" type="checkbox" :value="item.product_id" :disabled="cartLoading || cartBusy" :aria-label="`${item.name} 선택`" />
           <RouterLink
             class="cart-thumbnail product-thumbnail-zoom"
@@ -82,6 +87,19 @@ async function deleteItems(ids) {
           <button class="cart-remove" type="button" :disabled="cartLoading || cartBusy" :aria-label="`${item.name} 삭제`" @click="deleteDialog.open([item.product_id])">×</button>
         </li>
       </ul>
+      <button
+        v-if="remainingCount"
+        type="button"
+        class="cart-toggle"
+        aria-controls="cart-items"
+        :aria-expanded="cartExpanded"
+        @click="cartExpanded = !cartExpanded"
+      >
+        {{ cartExpanded ? '상품 접기' : '나머지 상품 ' + remainingCount + '개 더 보기' }}
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+          <path d="m4 6 4 4 4-4" />
+        </svg>
+      </button>
 
       <section class="cart-summary" aria-labelledby="cart-summary-title">
         <div class="cart-summary-content">
@@ -218,6 +236,29 @@ input[type='checkbox'] {
 .cart-quantity button:last-child { border-left: 1px solid var(--color-border); }
 .cart-quantity button:disabled, .cart-checkout:disabled { opacity: .5; cursor: default; }
 .cart-line-total { text-align: right; }
+
+.cart-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 40px;
+  margin-top: 8px;
+  padding: 5px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: #fff;
+  color: var(--color-primary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cart-toggle:hover { background: var(--color-background); }
+.cart-toggle svg { width: 16px; height: 16px; }
+.cart-toggle[aria-expanded='true'] svg { transform: rotate(180deg); }
 
 .cart-summary {
   margin-top: 16px;

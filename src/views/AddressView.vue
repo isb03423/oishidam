@@ -180,8 +180,15 @@ async function removeAddress(address) {
       <p v-if="!busy && !error && !orderedAddresses.length && !showForm" class="address-empty">등록된 배송지가 없습니다.</p>
       <article v-for="address in orderedAddresses" :key="address.id" class="address-card">
         <header class="address-card-heading">
-          <h2>{{ address.name }}</h2>
-          <span v-if="address.isDefault" class="address-default">기본 배송지</span>
+          <div class="address-card-title">
+            <h2>{{ address.name }}</h2>
+            <span v-if="address.isDefault" class="address-default">기본 배송지</span>
+          </div>
+          <div class="account-actions address-actions">
+            <button v-if="!address.isDefault" type="button" :disabled="busy" @click="setDefault(address.id)">기본 배송지 설정</button>
+            <button type="button" :disabled="busy" @click="openForm(address)">수정</button>
+            <button type="button" :disabled="busy" @click="removeAddress(address)">삭제</button>
+          </div>
         </header>
         <dl class="address-details">
           <div v-if="address.customs"><dt>통관번호</dt><dd>{{ address.customs.slice(0, 1) }}********{{ address.customs.slice(-4) }}</dd></div>
@@ -205,11 +212,6 @@ async function removeAddress(address) {
             <dd>{{ address.memo }}</dd>
           </div>
         </dl>
-        <div class="account-actions address-actions">
-          <button v-if="!address.isDefault" type="button" :disabled="busy" @click="setDefault(address.id)">기본 배송지 설정</button>
-          <button type="button" :disabled="busy" @click="openForm(address)">수정</button>
-          <button type="button" :disabled="busy" @click="removeAddress(address)">삭제</button>
-        </div>
       </article>
     </div>
   </MyPageLayout>
@@ -224,7 +226,8 @@ async function removeAddress(address) {
 .address-card { min-width: 0; padding: 16px; border: 1px solid var(--color-border); border-radius: 12px; }
 
 .address-card-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
-.address-card-heading h2 { margin: 0; font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
+.address-card-title { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.address-card-title h2 { margin: 0; font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
 .address-default {
   padding: 2px 8px;
   border-radius: 999px;
@@ -237,7 +240,7 @@ async function removeAddress(address) {
 .address-details {
   display: grid;
   gap: 8px;
-  margin: 12px 0 16px;
+  margin: 12px 0 0;
   padding-top: 12px;
   border-top: 1px solid var(--color-border);
 }
@@ -255,7 +258,7 @@ async function removeAddress(address) {
 .address-empty { color: #71666b; }
 .address-empty { padding: 24px 8px; text-align: center; }
 
-.address-actions { justify-content: flex-end; flex-wrap: wrap; gap: 8px; padding: 0; border: 0; }
+.address-actions { margin-inline-start: auto; justify-content: flex-end; flex-wrap: wrap; gap: 8px; padding: 0; border: 0; }
 .address-actions button { min-width: 0; padding-inline: 12px; }
 
 </style>

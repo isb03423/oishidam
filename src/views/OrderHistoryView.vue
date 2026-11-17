@@ -25,7 +25,11 @@ const keyword = ref('')
 const page = ref(1)
 const dialog = ref(null)
 const selectedOrder = ref(null)
-const isRepurchase = ref(false)
+const repurchaseItemsExpanded = ref(false)
+const visibleRepurchaseItems = computed(() => {
+  const items = selectedOrder.value?.items ?? []
+  return repurchaseItemsExpanded.value ? items : items.slice(0, 1)
+})
 const router = useRouter()
 const currency = new Intl.NumberFormat('ko-KR')
 const won = (price) => `${currency.format(price)}원`
@@ -81,9 +85,9 @@ function applySearch() {
   page.value = 1
 }
 
-async function showOrder(order, repurchase = false) {
+async function showRepurchase(order) {
   selectedOrder.value = order
-  isRepurchase.value = repurchase
+  repurchaseItemsExpanded.value = false
   purchaseError.value = ''
   await nextTick()
   dialog.value.showModal()
@@ -158,7 +162,7 @@ async function repurchase() {
               <svg v-else viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="m8 12 3 3 5-6" /></svg>
               {{ order.status }}
             </span>
-            <button type="button" :disabled="!order.items.length" @click="showOrder(order, true)">바로 구매하기</button>
+            <button type="button" :disabled="!order.items.length" @click="showRepurchase(order)">바로 구매하기</button>
             <button type="button" @click="router.push({ name: 'MyPageOrderDetail', params: { orderId: order.orderId ?? order.id } })">
               주문 상세보기
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
@@ -173,21 +177,76 @@ async function repurchase() {
       <Pagination v-model="page" :page-count="pageCount" label="주문 목록 페이지" />
     </template>
 
-    <dialog ref="dialog" class="order-dialog" aria-labelledby="order-dialog-title">
+    <dialog
+      ref="dialog"
+      class="order-dialog"
+      aria-labelledby="order-dialog-title"
+      aria-describedby="order-dialog-description"
+      @cancel="purchasing && $event.preventDefault()"
+    >
       <template v-if="selectedOrder">
-        <h2 id="order-dialog-title">{{ isRepurchase ? '재구매 상품 확인' : '주문 상세보기' }}</h2>
-        <p v-if="isRepurchase && session.source === 'mock'">예시 주문입니다. 실제 결제는 준비 중입니다.</p>
-        <p v-else-if="isRepurchase">현재 판매 가격과 재고를 확인한 뒤 주문서로 이동합니다.</p>
-        <p v-else>{{ selectedOrder.id }} · {{ selectedOrder.status }}</p>
-        <ul>
-          <li v-for="item in selectedOrder.items" :key="item.name">
-            <span>{{ item.name }} × {{ item.quantity }}</span>
-            <strong>{{ won(item.price * item.quantity) }}</strong>
+        <header class="repurchase-header">
+          <h2 id="order-dialog-title">상품을 다시 구매하시겠어요?</h2>
+          <button
+            class="repurchase-close"
+            type="button"
+            aria-label="닫기"
+            :disabled="purchasing"
+            @click="dialog.close()"
+          >×</button>
+        </header>
+        <p id="order-dialog-description" class="repurchase-description">
+          {{ session.source === 'mock' ? '예시 주문입니다. 실제 결제는 준비 중입니다.' : '현재 판매 정보로 주문서를 준비합니다.' }}
+        </p>
+        <ul id="repurchase-items" class="repurchase-items">
+          <li v-for="item in visibleRepurchaseItems" :key="item.product_id" class="repurchase-item">
+            <div class="repurchase-thumbnail" :class="item.tone" aria-hidden="true">
+              <img v-if="item.imageUrl" :src="item.imageUrl" alt="" />
+              <span v-else>{{ item.brand || '상품' }}</span>
+            </div>
+            <div class="repurchase-item-details">
+              <p>{{ item.name }}</p>
+              <span>수량 {{ item.quantity }}개</span>
+              <strong>{{ won(item.price * item.quantity) }}</strong>
+            </div>
           </li>
         </ul>
-        <p>{{ isRepurchase ? '이전 주문 금액' : '주문 금액' }} <strong>{{ won(selectedOrder.total) }}</strong></p>
-        <p v-if="purchaseError" role="alert">{{ purchaseError }}</p>
-        <form method="dialog"><button autofocus :disabled="purchasing">닫기</button> <button v-if="session.source !== 'mock' && isRepurchase" class="primary-button" type="button" :disabled="purchasing" @click="repurchase">주문서로 이동</button></form>
+        <button
+          v-if="selectedOrder.items.length > 1"
+          type="button"
+          class="repurchase-toggle"
+          :aria-expanded="repurchaseItemsExpanded"
+          aria-controls="repurchase-items"
+          @click="repurchaseItemsExpanded = !repurchaseItemsExpanded"
+        >
+          {{ repurchaseItemsExpanded ? '상품 접기' : `나머지 상품 ${selectedOrder.items.length - 1}개 더 보기` }}
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <path d="m4 6 4 4 4-4" />
+          </svg>
+        </button>
+        <dl class="repurchase-total">
+          <dt>이전 주문 금액</dt>
+          <dd>{{ won(selectedOrder.total) }}</dd>
+        </dl>
+        <p class="repurchase-note">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+            <circle cx="10" cy="10" r="7.2" />
+            <path d="M10 9v5" />
+            <circle cx="10" cy="6.7" r=".8" fill="currentColor" stroke="none" />
+          </svg>
+          <span>상품 가격 및 재고는 현재 판매 기준으로 적용되며, 주문서에서 최종 확인할 수 있습니다.</span>
+        </p>
+        <p v-if="purchaseError" class="repurchase-error" role="alert">{{ purchaseError }}</p>
+        <form method="dialog" class="repurchase-actions">
+          <button autofocus :disabled="purchasing">취소</button>
+          <button
+            v-if="session.source !== 'mock'"
+            class="primary-button"
+            type="button"
+            :disabled="purchasing"
+            @click="repurchase"
+          >{{ purchasing ? '상품 확인 중…' : '주문서로 이동' }}</button>
+        </form>
       </template>
     </dialog>
   </MyPageLayout>
@@ -376,38 +435,206 @@ svg {
 }
 
 .order-dialog {
-  width: min(400px, calc(100% - 32px));
+  width: min(525px, calc(100% - 32px));
+  max-height: calc(100dvh - 32px);
   box-sizing: border-box;
-  padding: 22px;
-  border: 1px solid var(--color-border);
-  border-radius: 14px;
-  color: var(--color-text);
+  padding: 20px;
+  border: 1px solid #d8d8d8;
+  border-radius: 24px;
+  background: #f2f2f2;
+  color: #171717;
 }
 
 .order-dialog::backdrop {
   background: rgb(57 44 50 / 45%);
 }
 
-.order-dialog h2 {
-  margin: 0;
-  font-size: 19px;
+.repurchase-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
 }
 
-.order-dialog ul {
+.repurchase-header h2 {
+  margin: 0;
+  font-size: clamp(20px, 5vw, 24px);
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.repurchase-close {
+  flex: 0 0 28px;
+  min-height: 32px;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  color: #5d5d5d;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.repurchase-description {
+  margin: 12px 0 14px;
+  color: #616161;
+  font-size: 18px;
+  line-height: 1.5;
+}
+
+.repurchase-items {
+  display: grid;
+  gap: 8px;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.order-dialog li {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 7px 0;
-  border-bottom: 1px solid var(--color-border);
+.repurchase-item {
+  display: grid;
+  grid-template-columns: clamp(60px, 19vw, 100px) minmax(0, 1fr);
+  align-items: center;
+  gap: 15px;
+  padding: 15px;
+  border-radius: 16px;
+  background: #fafafa;
 }
 
-.order-dialog form {
-  text-align: right;
+.repurchase-thumbnail {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 1px solid #e9e9e9;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.repurchase-thumbnail img {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  object-fit: contain;
+  background: #fff;
+}
+
+.repurchase-thumbnail span {
+  padding: 4px;
+  text-align: center;
+}
+
+.repurchase-thumbnail:is(.berry, .matcha, .potato, .cocoa) {
+  color: #fff;
+}
+
+.repurchase-item-details {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.repurchase-item-details p {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.repurchase-item-details span {
+  color: #616161;
+  font-size: 15px;
+}
+
+.repurchase-item-details strong {
+  color: inherit;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.repurchase-toggle {
+  width: 100%;
+  margin-top: 8px;
+  gap: 6px;
+  border-color: #d8d8d8;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.repurchase-toggle svg {
+  width: 16px;
+  height: 16px;
+}
+
+.repurchase-toggle[aria-expanded='true'] svg {
+  transform: rotate(180deg);
+}
+
+.repurchase-total {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  padding: 17px 0 27px;
+  border-bottom: 1px solid #e1e1e1;
+  font-size: 18px;
+}
+
+.repurchase-total dt {
+  color: #616161;
+}
+
+.repurchase-total dd {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.repurchase-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 24px 0 16px;
+  color: #616161;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.repurchase-note svg {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+}
+
+.repurchase-error {
+  margin: 0 0 12px;
+  color: #9b2944;
+  font-size: 15px;
+}
+
+.repurchase-actions {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  gap: 10px;
+}
+
+.repurchase-actions button {
+  min-height: 44px;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.repurchase-actions button:not(.primary-button) {
+  border-color: #d8d8d8;
+  background: transparent;
+  color: inherit;
+}
+
+.repurchase-actions button:not(.primary-button):hover:not(:disabled) {
+  border-color: #999;
 }
 
 @media (min-width: 861px) {

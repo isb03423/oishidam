@@ -48,9 +48,12 @@ const primaryImage = computed(() => images.value.find((image) => image.is_primar
 const currentImage = computed(() => images.value.find((image) => image.url === selectedImage.value) ?? primaryImage.value)
 const reviews = computed(() => development.mockEnabled ? product.value?.reviews ?? [] : serverReviews.value)
 const reviewCount = computed(() => development.mockEnabled ? reviews.value.length : reviewTotal.value)
-const averageRating = computed(() => reviews.value.length
-  ? (reviews.value.reduce((sum, review) => sum + review.rating, 0) / reviews.value.length).toFixed(1)
-  : null)
+const averageRating = computed(() => {
+  const ratedReviews = reviews.value.filter((review) => Number.isInteger(review.rating))
+  return ratedReviews.length
+    ? (ratedReviews.reduce((sum, review) => sum + review.rating, 0) / ratedReviews.length).toFixed(1)
+    : null
+})
 const soldOut = computed(() => product.value?.is_sold_out || !(product.value?.stock_quantity > 0))
 const maxQuantity = computed(() => soldOut.value ? 0 : product.value?.stock_quantity ?? 0)
 const lowStock = computed(() => maxQuantity.value > 0 && maxQuantity.value < 5)

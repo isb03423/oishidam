@@ -43,10 +43,11 @@ defineProps({
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 38px;
-  min-height: 38px;
+  width: 30px;
+  height: 30px;
+  flex: none;
   box-sizing: border-box;
-  padding: 6px 13px;
+  padding: 0;
   border: 1px solid var(--color-border);
   border-radius: 5px;
   background: #fff;

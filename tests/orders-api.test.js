@@ -48,13 +48,14 @@ test('주문 견적과 생성, 결제 요청과 승인 정보를 서버에 전�
   assert.equal(requests[3].body.amount, 13000)
 })
 
-test('주문 기간과 검색어, 결제 대기 제외 조건을 목록 요청에 전달한다', async () => {
+test('주문 상태, 기간, 검색어와 결제 대기 제외 조건을 목록 요청에 전달한다', async () => {
   requests.length = 0
-  await orders.getOrders(0, { size: 3, from: '2026-08-16', keyword: '과자', excludePending: true })
+  await orders.getOrders(0, { size: 3, from: '2026-08-16', keyword: '과자', status: 'DOMESTIC_SHIPPING', excludePending: true })
   const url = new URL(requests[0].url, 'http://localhost')
   assert.equal(url.searchParams.get('size'), '3')
   assert.equal(url.searchParams.get('from'), '2026-08-16')
   assert.equal(url.searchParams.get('keyword'), '과자')
+  assert.equal(url.searchParams.get('status'), 'DOMESTIC_SHIPPING')
   assert.equal(url.searchParams.get('excludePending'), 'true')
 })
 

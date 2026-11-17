@@ -9,6 +9,7 @@ import { getProduct } from '../services/catalog.js'
 import { cartLine } from '../stores/cart.js'
 import { startCheckout } from '../stores/checkout.js'
 import Pagination from '../components/common/Pagination.vue'
+import { orderStatuses, statusCode } from '../utils/adminStatus.js'
 
 const today = new Date()
 const orders = ref([])
@@ -20,6 +21,8 @@ const purchasing = ref(false)
 let revision = 0
 const pageSize = 3
 const months = ref(3)
+const status = ref('')
+const mockOrderStatuses = { 배송중: 'DOMESTIC_SHIPPING', 배송완료: 'DELIVERED' }
 const search = ref('')
 const keyword = ref('')
 const page = ref(1)
@@ -34,7 +37,7 @@ const router = useRouter()
 const currency = new Intl.NumberFormat('ko-KR')
 const won = (price) => `${currency.format(price)}원`
 
-watch([shoppingOwner, page, months, keyword], async () => {
+watch([shoppingOwner, page, months, keyword, status], async () => {
   const current = ++revision
   error.value = ''
   if (session.source === 'mock') { orders.value = getExampleOrders(new Date()); loading.value = false; return }
@@ -46,7 +49,13 @@ watch([shoppingOwner, page, months, keyword], async () => {
     start.setMonth(start.getMonth() - months.value, 1)
     start.setDate(Math.min(new Date().getDate(), new Date(start.getFullYear(), start.getMonth() + 1, 0).getDate()))
     const from = [start.getFullYear(), String(start.getMonth() + 1).padStart(2, '0'), String(start.getDate()).padStart(2, '0')].join('-')
-    const result = await getOrders(page.value - 1, { size: pageSize, from, keyword: keyword.value || undefined, excludePending: true })
+    const result = await getOrders(page.value - 1, {
+      size: pageSize,
+      from,
+      keyword: keyword.value || undefined,
+      status: status.value || undefined,
+      excludePending: status.value !== 'PAYMENT_PENDING',
+    })
     const details = await Promise.all(result.content.map((summary) => getOrder(summary.orderId)))
     const mapped = await Promise.all(details.map(async (data) => {
       const items = await Promise.all(data.items.map(async (item) => {
@@ -70,6 +79,7 @@ const filteredOrders = computed(() => {
 
   return orders.value.filter((order) =>
     order.date >= start &&
+    (!status.value || (mockOrderStatuses[order.status] ?? statusCode(order.status, orderStatuses)) === status.value) &&
     (order.id.toLowerCase().includes(keyword.value) ||
       order.items.some((item) => item.name.toLowerCase().includes(keyword.value))),
   )
@@ -118,6 +128,10 @@ async function repurchase() {
     stretch-content
   >
     <form class="order-filter" role="search" aria-label="주문 검색" @submit.prevent="applySearch">
+      <select v-model="status" aria-label="주문 상태" @change="page = 1">
+        <option value="">전체 상태</option>
+        <option v-for="[code, label] in orderStatuses" :key="code" :value="code">{{ label }}</option>
+      </select>
       <select v-model.number="months" aria-label="주문 조회 기간" @change="page = 1">
         <option :value="1">최근 1개월</option>
         <option :value="3">최근 3개월</option>
@@ -198,7 +212,12 @@ async function repurchase() {
         <p id="order-dialog-description" class="repurchase-description">
           {{ session.source === 'mock' ? '예시 주문입니다. 실제 결제는 준비 중입니다.' : '현재 판매 정보로 주문서를 준비합니다.' }}
         </p>
-        <ul id="repurchase-items" class="repurchase-items">
+        <ul
+          id="repurchase-items"
+          class="repurchase-items"
+          aria-label="재구매 상품 목록"
+          :tabindex="repurchaseItemsExpanded ? 0 : undefined"
+        >
           <li v-for="item in visibleRepurchaseItems" :key="item.product_id" class="repurchase-item">
             <div class="repurchase-thumbnail" :class="item.tone" aria-hidden="true">
               <img v-if="item.imageUrl" :src="item.imageUrl" alt="" />
@@ -260,6 +279,7 @@ async function repurchase() {
 
 .order-filter {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   padding: 14px 16px;
   margin-bottom: 14px;
@@ -279,6 +299,23 @@ select, input, button {
 
 select, input {
   padding: 0 10px;
+}
+
+.order-filter select {
+  appearance: none;
+  padding-inline-end: 36px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23392c32' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 14px;
+}
+
+@media (forced-colors: active) {
+  .order-filter select {
+    appearance: auto;
+    padding-inline-end: 10px;
+    background-image: none;
+  }
 }
 
 button {
@@ -312,7 +349,7 @@ button:disabled {
 
 .search-field {
   display: flex;
-  flex: 1;
+  flex: 1 1 190px;
   min-width: 0;
 }
 
@@ -435,14 +472,24 @@ svg {
 }
 
 .order-dialog {
-  width: min(525px, calc(100% - 32px));
+  width: min(460px, calc(100% - 32px));
   max-height: calc(100dvh - 32px);
+  overflow: hidden;
   box-sizing: border-box;
   padding: 20px;
   border: 1px solid #d8d8d8;
   border-radius: 24px;
   background: #f2f2f2;
   color: #171717;
+}
+
+.order-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.order-dialog > :not(.repurchase-items) {
+  flex: none;
 }
 
 .order-dialog::backdrop {
@@ -483,18 +530,29 @@ svg {
 
 .repurchase-items {
   display: grid;
-  gap: 8px;
+  align-content: start;
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: 248px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  gap: 6px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
+.repurchase-items:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
 .repurchase-item {
   display: grid;
-  grid-template-columns: clamp(60px, 19vw, 100px) minmax(0, 1fr);
+  grid-template-columns: clamp(52px, 16vw, 72px) minmax(0, 1fr);
   align-items: center;
-  gap: 15px;
-  padding: 15px;
+  gap: 12px;
+  padding: 8px 12px;
   border-radius: 16px;
   background: #fafafa;
 }
@@ -505,7 +563,7 @@ svg {
   aspect-ratio: 1;
   overflow: hidden;
   border: 1px solid #e9e9e9;
-  border-radius: 16px;
+  border-radius: 10px;
   font-size: 12px;
   font-weight: 700;
 }
@@ -529,7 +587,7 @@ svg {
 
 .repurchase-item-details {
   display: grid;
-  gap: 3px;
+  gap: 2px;
   min-width: 0;
 }
 
@@ -637,6 +695,18 @@ svg {
   border-color: #999;
 }
 
+@media (max-height: 480px) {
+  .order-dialog { padding: 12px; }
+  .repurchase-description { margin: 6px 0 8px; }
+  .repurchase-total { padding: 8px 0; }
+  .repurchase-note { margin: 8px 0; }
+}
+
+@media (max-height: 360px) {
+  .order-dialog { overflow-y: auto; }
+  .repurchase-items { min-height: min(90px, 30dvh); }
+}
+
 @media (min-width: 861px) {
   .order-list:has(.order-card:nth-child(3)) {
     flex: 1;
@@ -668,6 +738,9 @@ svg {
     gap: 6px;
     padding: 10px;
   }
+
+  .order-filter select { flex: 1 1 0; min-width: 0; }
+  .order-filter .search-field { flex-basis: 100%; }
 
   .order-actions {
     margin-left: 0;

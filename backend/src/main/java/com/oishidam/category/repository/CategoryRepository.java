@@ -14,6 +14,6 @@ public interface CategoryRepository extends JpaRepository<Category, Long> {
     List<Category> findAllByIsActiveTrueOrderBySortOrderAscIdAsc();
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select c from Category c order by c.id")
+    @Query("SELECT c FROM Category c ORDER BY c.id")
     List<Category> findAllForUpdate();
 }

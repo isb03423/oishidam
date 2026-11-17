@@ -1,11 +1,11 @@
 package com.oishidam.config;
 
 import com.oishidam.member.entity.Member;
+import com.oishidam.auth.repository.RevokedAccessTokenRepository;
 import com.oishidam.member.repository.MemberRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
@@ -45,9 +45,10 @@ public class JwtConfig {
     JwtDecoder jwtDecoder(
             SecretKey jwtSecretKey,
             MemberRepository memberRepository,
-            JdbcTemplate jdbcTemplate,
+            RevokedAccessTokenRepository revokedAccessTokenRepository,
             @Value("${oishidam.jwt.issuer}") String issuer,
-            @Value("${oishidam.jwt.audience}") String audience) {
+            @Value("${oishidam.jwt.audience}") String audience
+    ) {
 
         NimbusJwtDecoder decoder = NimbusJwtDecoder
                 .withSecretKey(jwtSecretKey)
@@ -57,7 +58,8 @@ public class JwtConfig {
         OAuth2TokenValidator<Jwt> issuerAndTimeValidator = JwtValidators.createDefaultWithIssuer(issuer);
         JwtClaimValidator<List<String>> audienceValidator = new JwtClaimValidator<>(
                 "aud",
-                audiences -> audiences != null && audiences.contains(audience));
+                audiences -> audiences != null && audiences.contains(audience)
+        );
 
         OAuth2TokenValidator<Jwt> memberValidator = new OAuth2TokenValidator<>() {
             @Override
@@ -68,10 +70,8 @@ public class JwtConfig {
                     boolean valid = version instanceof Number number && tokenId != null && jwt.getSubject() != null
                             && memberRepository.findById(Long.valueOf(jwt.getSubject()))
                             .filter(Member::isActive).filter(member -> member.getTokenVersion() == number.longValue())
-                                    .isPresent()
-                            && Boolean.FALSE.equals(jdbcTemplate.queryForObject(
-                            "select exists(select 1 from revoked_access_tokens where token_id = ?)", Boolean.class,
-                                    tokenId));
+                            .isPresent()
+                            && !revokedAccessTokenRepository.existsById(tokenId);
                     if (valid) {
                         return OAuth2TokenValidatorResult.success();
                     }
@@ -82,8 +82,11 @@ public class JwtConfig {
             }
         };
 
-        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(issuerAndTimeValidator, audienceValidator,
-                memberValidator));
+        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
+                issuerAndTimeValidator,
+                audienceValidator,
+                memberValidator
+        ));
 
         return decoder;
     }

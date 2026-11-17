@@ -8,13 +8,16 @@ public record ProductSummaryResponse(
         Long categoryId,
         String name,
         String brand,
-        BigDecimal minimumPrice,
+        BigDecimal price,
+        int stockQuantity,
         ImageResponse primaryImage,
-        LocalDateTime publishedAt
+        LocalDateTime publishedAt,
+        boolean isSoldOut
 ) {
     public record ImageResponse(
             String storageKey,
-            String altText
+            String altText,
+            String imageUrl
     ) {
     }
 }

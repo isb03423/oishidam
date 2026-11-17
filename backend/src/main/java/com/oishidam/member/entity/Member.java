@@ -4,14 +4,14 @@ import com.oishidam.common.entity.BaseEntity;
 import com.oishidam.member.enums.MemberGender;
 import com.oishidam.member.enums.MemberRole;
 import jakarta.persistence.*;
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 @Entity
 @Table(name = "members")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+@Builder
 public class Member extends BaseEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -39,10 +39,12 @@ public class Member extends BaseEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false, length = 20)
-    private MemberRole role;
+    @Builder.Default
+    private MemberRole role = MemberRole.USER;
 
     @Column(name = "is_active", nullable = false)
-    private boolean isActive;
+    @Builder.Default
+    private boolean isActive = true;
 
     @Column(name = "token_version", nullable = false)
     private long tokenVersion;
@@ -63,14 +65,10 @@ public class Member extends BaseEntity {
         this.isActive = false;
     }
 
-    public Member(String email, String password, String name, String phone, Integer birthYear, MemberGender gender) {
-        this.email = email;
-        this.password = password;
-        this.name = name;
-        this.phone = phone;
-        this.birthYear = birthYear;
-        this.gender = gender;
-        this.role = MemberRole.USER;
-        this.isActive = true;
+    public boolean changeActive(boolean active) {
+        if (this.isActive == active) return false;
+        this.isActive = active;
+        this.tokenVersion++;
+        return true;
     }
 }

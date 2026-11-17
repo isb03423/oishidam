@@ -21,6 +21,7 @@ public record MemberResponse(
                 member.getPhone(),
                 member.getBirthYear(),
                 member.getGender(),
-                member.getRole());
+                member.getRole()
+        );
     }
 }

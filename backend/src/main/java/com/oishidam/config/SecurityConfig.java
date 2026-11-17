@@ -16,8 +16,8 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.oauth2.server.resource.web.BearerTokenAuthenticationEntryPoint;
 import org.springframework.security.oauth2.server.resource.web.access.BearerTokenAccessDeniedHandler;
-import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.AuthenticationEntryPoint;
+import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -39,19 +39,28 @@ public class SecurityConfig {
         JwtAuthenticationConverter authenticationConverter = new JwtAuthenticationConverter();
         authenticationConverter.setJwtGrantedAuthoritiesConverter(authoritiesConverter);
 
-        AuthenticationEntryPoint authenticationEntryPoint = (request, response, exception) -> {
+        AuthenticationEntryPoint authenticationEntryPoint = (
+                request,
+                response,
+                exception
+        ) -> {
             new BearerTokenAuthenticationEntryPoint().commence(request, response, exception);
             response.setContentType("application/json;charset=UTF-8");
             response.getWriter().write("{\"success\":false,\"message\":\"인증이 필요합니다.\",\"data\":null}");
         };
 
-        AccessDeniedHandler accessDeniedHandler = (request, response, exception) -> {
+        AccessDeniedHandler accessDeniedHandler = (
+                request,
+                response,
+                exception
+        ) -> {
             new BearerTokenAccessDeniedHandler().handle(request, response, exception);
             response.setContentType("application/json;charset=UTF-8");
             response.getWriter().write("{\"success\":false,\"message\":\"접근 권한이 없습니다.\",\"data\":null}");
         };
 
         http
+
                 // 아래 CORS Bean 사용
                 .cors(Customizer.withDefaults())
 
@@ -68,17 +77,36 @@ public class SecurityConfig {
                 .logout(AbstractHttpConfigurer::disable)
 
                 .authorizeHttpRequests(auth -> auth
+                        // API 문서
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/swagger-ui.html",
+                                "/swagger-ui/**",
+                                "/v3/api-docs",
+                                "/v3/api-docs/**",
+                                "/v3/api-docs.yaml"
+                        ).permitAll()
+
                         // 회원가입·로그인
-                        .requestMatchers(HttpMethod.POST, "/api/auth/signup", "/api/auth/login", "/api/auth/refresh")
-                        .permitAll()
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/auth/signup",
+                                "/api/auth/login",
+                                "/api/auth/refresh"
+                        ).permitAll()
 
                         // 상품·카테고리 조회
-                        .requestMatchers(HttpMethod.GET,
+                        .requestMatchers(
+                                HttpMethod.GET,
                                 "/api/products",
                                 "/api/products/**",
+                                "/api/recommendations/products",
                                 "/api/categories",
                                 "/api/categories/**"
                         ).permitAll()
+
+                        .requestMatchers(HttpMethod.GET, "/api/inquiries").permitAll()
+                        .requestMatchers("/api/inquiries/**", "/api/inquiries").hasRole("USER")
 
                         // 관리자 전용
                         .requestMatchers("/api/admin/**")
@@ -106,7 +134,8 @@ public class SecurityConfig {
 
     @Bean
     UrlBasedCorsConfigurationSource corsConfigurationSource(
-            @Value("${oishidam.cors.allowed-origins}") String origin) {
+            @Value("${oishidam.cors.allowed-origins}") String origin
+    ) {
         CorsConfiguration configuration = new CorsConfiguration();
 
         configuration.setAllowedOrigins(List.of(origin));

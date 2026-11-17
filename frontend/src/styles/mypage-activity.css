@@ -1,0 +1,87 @@
+
+.activity-content {
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  margin-top: 18px;
+  color: var(--color-text);
+  font-size: 14px;
+}
+
+.activity-tabs,
+.activity-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.activity-tabs button,
+.activity-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 4px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-white);
+  color: var(--color-primary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.activity-tabs button {
+  border-color: transparent;
+  border-radius: 999px;
+  background: var(--color-background);
+  color: var(--color-text);
+}
+
+.activity-tabs button.is-active,
+.activity-button.is-primary {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-white);
+}
+
+.activity-button:disabled { opacity: .55; cursor: default; }
+.activity-button:not(:disabled):hover,
+.activity-tabs button:hover { border-color: var(--color-primary); }
+.activity-button:focus-visible,
+.activity-tabs button:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.activity-actions { justify-content: flex-end; }
+.activity-panel {
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-white);
+}
+
+.activity-editor { display: grid; gap: 16px; }
+.activity-field { display: grid; gap: 6px; font-weight: 650; }
+.activity-field :is(input, textarea) {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-white);
+  color: inherit;
+  font: inherit;
+  font-weight: 400;
+}
+
+.activity-field textarea { min-height: 140px; resize: vertical; }
+.activity-field :is(input, textarea):focus { outline: 1px solid var(--color-primary); }
+.activity-counter { justify-self: end; font-size: 12px; font-weight: 400; color: var(--color-secondary); }
+.activity-meta { color: var(--color-secondary); font-size: 12px; }
+.activity-copy { white-space: pre-wrap; overflow-wrap: anywhere; }
+.activity-empty { padding: 26px; color: var(--color-secondary); text-align: center; }

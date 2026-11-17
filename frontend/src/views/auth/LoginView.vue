@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import logo from '../../assets/images/oishidam_logo.png'
+import AlertDialog from '../../components/common/AlertDialog.vue'
 import { login, loginWithKakao } from '../../services/auth.js'
 import { development } from '../../config/development.js'
 
@@ -16,9 +17,14 @@ const error = ref('')
 const notice = ref('')
 const mockEnabled = computed(() => import.meta.env.DEV && development.mockEnabled)
 const demoHint = ref('')
+const adminDemoHint = ref('')
 if (route.query.signup === 'complete') notice.value = '회원가입이 완료되었습니다. 로그인해주세요.'
+watch(() => route.query.password, (status) => {
+  if (status === 'changed') notice.value = '비밀번호가 변경되었습니다. 다시 로그인해주세요.'
+}, { immediate: true })
 if (import.meta.env.DEV) {
-  import('../../mocks/auth.js').then(({ demoCredentials }) => {
+  import('../../mocks/auth.js').then(({ demoCredentials, demoAdminCredentials }) => {
+    adminDemoHint.value = `관리자 계정: ${demoAdminCredentials.email} / ${demoAdminCredentials.password}`
     demoHint.value = `테스트 계정: ${demoCredentials.email} / ${demoCredentials.password}`
   })
 }
@@ -29,15 +35,20 @@ async function submit(provider = 'email') {
   if (pending.value) return
   error.value = ''
   notice.value = ''
+  if (provider === 'email' && !password.value.trim()) {
+    error.value = '비밀번호를 입력해주세요.'
+    return
+  }
   const version = ++revision
   controller = new AbortController()
   pending.value = provider
   try {
-    if (provider === 'kakao') await loginWithKakao({ remember: remember.value, signal: controller.signal })
-    else await login({ email: email.value, password: password.value, remember: remember.value, signal: controller.signal })
+    const member = provider === 'kakao'
+      ? await loginWithKakao({ remember: remember.value, signal: controller.signal })
+      : await login({ email: email.value, password: password.value, remember: remember.value, signal: controller.signal })
     if (version === revision) {
       password.value = ''
-      await router.replace({ name: 'Home' })
+      await router.replace({ name: member.role === 'ADMIN' ? 'AdminDashboard' : 'Home' })
     }
   } catch (failure) {
     if (version === revision && !controller.signal.aborted) {
@@ -68,6 +79,7 @@ onBeforeUnmount(() => {
 
 <template>
   <main class="login-page">
+    <AlertDialog :message="error || notice" @close="error = ''; notice = ''" />
     <section class="login-panel" aria-labelledby="login-title">
       <RouterLink class="login-logo" to="/" aria-label="오이시담 홈">
         <img :src="logo" alt="오이시담" />
@@ -78,7 +90,7 @@ onBeforeUnmount(() => {
       <form class="login-form" :aria-busy="Boolean(pending)" @submit.prevent="submit('email')">
         <div class="login-field">
           <svg class="field-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m4 7 8 6 8-6" /></svg>
-          <input v-model="email" type="email" name="email" autocomplete="username" placeholder="이메일을 입력해주세요" aria-label="이메일" required :disabled="Boolean(pending)" />
+          <input v-model="email" type="email" maxlength="254" name="email" autocomplete="username" placeholder="이메일을 입력해주세요" aria-label="이메일" required :disabled="Boolean(pending)" />
         </div>
         <div class="login-field">
           <svg class="field-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3" /></svg>
@@ -89,11 +101,9 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="login-options">
-          <label class="remember-login"><input v-model="remember" type="checkbox" :disabled="Boolean(pending)" /> 로그인 상태 유지</label>
+          <label class="remember-login"><input v-model="remember" type="checkbox" :disabled="Boolean(pending)" /> 자동 로그인</label>
           <button class="login-text-button" type="button" @click="showUpcoming('비밀번호 찾기')">비밀번호 찾기</button>
         </div>
-        <p v-if="error" class="login-error" role="alert">{{ error }}</p>
-        <p v-if="notice" class="login-notice" role="status">{{ notice }}</p>
         <button class="login-submit" type="submit" :disabled="Boolean(pending)">{{ pending === 'email' ? '로그인 중…' : '로그인' }}</button>
       </form>
 
@@ -105,6 +115,7 @@ onBeforeUnmount(() => {
 
       <p class="login-signup">아직 회원이 아니신가요? <RouterLink class="login-text-button signup-button" to="/signup">회원가입 <span aria-hidden="true">›</span></RouterLink></p>
       <p v-if="mockEnabled" class="login-demo-note">개발용 로그인 · 실제 카카오 인증이 아닙니다.<br />{{ demoHint }}</p>
+        <p v-if="mockEnabled && adminDemoHint" class="login-notice">{{ adminDemoHint }}</p>
     </section>
   </main>
 </template>

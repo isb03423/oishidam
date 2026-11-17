@@ -1,4 +1,6 @@
 <script setup>
+import { getPasswordError, passwordRequirements } from '../../services/passwordPolicy.js'
+import PhoneInput from '../../components/common/PhoneInput.vue'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import logo from '../../assets/images/oishidam_logo.png'
@@ -78,20 +80,18 @@ const errors = computed(() => ({
     ? '이메일(아이디)을 입력해주세요.'
     : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())
       ? '이메일 형식을 확인해주세요.'
-      : '',
-  password: !form.password
-    ? '비밀번호를 입력해주세요.'
-    : form.password.length < 8
-      ? '비밀번호는 8자 이상 입력해주세요.'
-      : '',
+      : form.email.trim().length > 254 ? '이메일은 254자 이내로 입력해주세요.' : '',
+  password: getPasswordError(form.password),
   passwordConfirm: !form.passwordConfirm
     ? '비밀번호 확인을 입력해주세요.'
     : form.password !== form.passwordConfirm
       ? '비밀번호가 일치하지 않습니다.'
       : '',
-  name: !form.name.trim() ? '이름을 입력해주세요.' : '',
-  phone: form.phone.trim() && !/^[0-9 -]{9,20}$/.test(form.phone.trim())
-    ? '휴대폰 번호 형식을 확인해주세요.'
+  name: !form.name.trim()
+    ? '이름을 입력해주세요.'
+    : form.name.trim().length > 100 ? '이름은 100자 이내로 입력해주세요.' : '',
+  phone: form.phone.trim() && !/^\d{3}-\d{4}-\d{4}$/.test(form.phone)
+    ? '휴대폰 번호 11자리를 입력해주세요.'
     : '',
   birthDate: mockEnabled.value && birthDate.value === null ? '생년월일은 연·월·일을 모두 선택해주세요.' : '',
   agreements: !form.terms || !form.privacy ? '필수 약관에 모두 동의해주세요.' : '',
@@ -181,9 +181,10 @@ onBeforeUnmount(() => {
 
         <label class="signup-field" :class="{ 'has-error': shouldShowError('password') }">
           <svg class="field-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3" /></svg>
-          <input v-model="form.password" :type="showPassword ? 'text' : 'password'" name="password" autocomplete="new-password" placeholder="비밀번호 *" aria-label="비밀번호" :aria-invalid="shouldShowError('password')" :disabled="pending" @blur="touch('password')" />
+          <input v-model="form.password" :type="showPassword ? 'text' : 'password'" name="password" autocomplete="new-password" placeholder="비밀번호 *" aria-label="비밀번호" aria-describedby="signup-password-requirements" :aria-invalid="shouldShowError('password')" :disabled="pending" @blur="touch('password')" />
           <button class="password-toggle" type="button" :aria-label="showPassword ? '비밀번호 숨기기' : '비밀번호 표시'" @click="showPassword = !showPassword"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /><path v-if="!showPassword" d="m3 3 18 18" /></svg></button>
         </label>
+        <small id="signup-password-requirements">{{ passwordRequirements }}</small>
         <p v-if="shouldShowError('password')" class="field-error">{{ errors.password }}</p>
 
         <label class="signup-field" :class="{ 'has-error': shouldShowError('passwordConfirm') }">
@@ -199,10 +200,10 @@ onBeforeUnmount(() => {
         </label>
         <p v-if="shouldShowError('name')" class="field-error">{{ errors.name }}</p>
 
-        <label class="signup-field" :class="{ 'has-error': shouldShowError('phone') }">
+        <div class="signup-field" :class="{ 'has-error': shouldShowError('phone') }">
           <svg class="field-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.2 4.3 5.6 5.5c-.8.4-1.1 1.3-.8 2.1 2.1 5.6 5.9 9.4 11.5 11.5.8.3 1.7 0 2.1-.8l1.2-2.6-4-2-1.2 1.8c-2.2-1.1-4-2.9-5.1-5.1l1.8-1.2-2-4Z" /></svg>
-          <input v-model="form.phone" type="tel" name="phone" autocomplete="tel" inputmode="tel" placeholder="휴대폰 번호 (선택)" aria-label="휴대폰 번호 선택" :aria-invalid="shouldShowError('phone')" :disabled="pending" @blur="touch('phone')" />
-        </label>
+          <PhoneInput id="signup-phone" v-model="form.phone" label="휴대폰 번호 (선택)" :invalid="shouldShowError('phone')" :disabled="pending" @blur="touch('phone')" />
+        </div>
         <p v-if="shouldShowError('phone')" class="field-error">{{ errors.phone }}</p>
 
         <div class="optional-profile" :class="{ 'has-error': shouldShowError('birthDate') }">

@@ -1,18 +1,49 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, reactive } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import MyPageLayout from '../components/MyPageLayout.vue'
 import ProductCard from '../components/product/ProductCard.vue'
+import { getExampleOrders } from '../mocks/orders.js'
 import { getRecommendations } from '../services/catalog.js'
-import { session } from '../stores/session.js'
+import { getOrder, getOrders } from '../services/orders.js'
+import { orderDeliveryStep } from '../utils/orderDeliveryStep.js'
+import { getSessionRevision, session } from '../stores/session.js'
+import { wishedProducts } from '../stores/wishlist.js'
 
 const memberName = computed(() => session.member?.name || '오이시담')
+const latestOrder = ref(null)
+const deliveryOrder = computed(() => {
+  if (session.source === 'mock') return getExampleOrders(new Date()).find((order) => order.status === '배송중')
+  if (!latestOrder.value) return null
+  const data = latestOrder.value
+  return { id: data.orderNumber, orderId: data.orderId, status: data.orderStatus, items: data.items.map((item) => ({ name: item.productName })) }
+})
+const deliveryStep = computed(() => orderDeliveryStep(deliveryOrder.value?.status))
+const orderLoading = ref(session.source === 'api')
+const orderError = ref(false)
 const recommended = reactive({ items: [] })
+const failedImages = reactive(new Set())
+const wishlistPreview = computed(() => wishedProducts.value.slice(0, 4).map((product) => {
+  const image = product.images?.find((item) => item.is_primary && item.url)
+    ?? product.images?.find((item) => item.url)
+  return { id: product.product_id, name: product.name, url: image?.url }
+}))
 let controller
 
 onMounted(async () => {
   controller = new AbortController()
+  if (session.source === 'api') {
+    const revision = getSessionRevision()
+    try {
+      const orders = await getOrders(0, { excludePending: true, size: 1 })
+      if (controller.signal.aborted || revision !== getSessionRevision()) return
+      const latest = orders.content?.[0]
+      const detail = latest ? await getOrder(latest.orderId) : null
+      if (!controller.signal.aborted && revision === getSessionRevision()) latestOrder.value = detail
+    } catch { if (!controller.signal.aborted && revision === getSessionRevision()) orderError.value = true }
+    finally { if (!controller.signal.aborted && revision === getSessionRevision()) orderLoading.value = false }
+  }
   try {
-    const response = await getRecommendations({ signal: controller.signal })
+    const response = await getRecommendations({ signal: controller.signal, limit: 3 })
     recommended.items = Array.isArray(response?.items) ? response.items.slice(0, 3) : []
   } catch {
     recommended.items = []
@@ -23,7 +54,7 @@ onBeforeUnmount(() => controller?.abort())
 </script>
 
 <template>
-  <MyPageLayout
+  <MyPageLayout icon="member"
     class="mypage-overview"
     title="마이페이지"
     description="나의 쇼핑 정보를 한눈에 확인하세요."
@@ -42,28 +73,43 @@ onBeforeUnmount(() => controller?.abort())
     <div class="mypage-dashboard">
       <article class="dashboard-card delivery-card">
         <h2>주문/배송현황</h2>
-        <div class="delivery-progress" aria-label="주문 및 배송 진행 단계">
-          <div class="delivery-step is-complete">
+        <template v-if="deliveryOrder">
+        <div class="delivery-progress" :aria-label="'주문 및 배송 진행 단계 · ' + deliveryOrder.status">
+          <div class="delivery-step" :class="{ 'is-complete': deliveryStep > 0, 'is-active': deliveryStep === 0 }" :aria-current="deliveryStep === 0 ? 'step' : undefined">
             <span class="delivery-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14v12H5zM9 8V6a3 3 0 0 1 6 0v2" /></svg></span>
             <span>주문 완료</span>
           </div>
-          <span class="progress-line is-active"></span>
-          <div class="delivery-step is-complete">
+          <span class="progress-line" :class="{ 'is-active': deliveryStep >= 1 }"></span>
+          <div class="delivery-step" :class="{ 'is-complete': deliveryStep > 1, 'is-active': deliveryStep === 1 }" :aria-current="deliveryStep === 1 ? 'step' : undefined">
             <span class="delivery-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3ZM4 7.5 12 12l8-4.5M12 12v9" /></svg></span>
             <span>상품 준비</span>
           </div>
-          <span class="progress-line is-active"></span>
-          <div class="delivery-step is-active">
+          <span class="progress-line" :class="{ 'is-active': deliveryStep >= 2 }"></span>
+          <div class="delivery-step" :class="{ 'is-complete': deliveryStep > 2, 'is-active': deliveryStep === 2 }" :aria-current="deliveryStep === 2 ? 'step' : undefined">
             <span class="delivery-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h12v10H3zM15 10h3l3 3v4h-6zM7 19a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3ZM18 19a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z" /></svg></span>
             <span>배송 중</span>
           </div>
-          <span class="progress-line"></span>
-          <div class="delivery-step">
+          <span class="progress-line" :class="{ 'is-active': deliveryStep >= 3 }"></span>
+          <div class="delivery-step" :class="{ 'is-active': deliveryStep === 3 }" :aria-current="deliveryStep === 3 ? 'step' : undefined">
             <span class="delivery-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 12 3 3 7-7" /></svg></span>
             <span>배송 완료</span>
           </div>
         </div>
-        <p>주문번호: 12345678<br />상품명: [예시] 맛있는 유기농 오이 외 2건</p>
+        <RouterLink
+          class="delivery-order-link"
+          :to="{ name: 'MyPageOrderDetail', params: { orderId: deliveryOrder.orderId ?? deliveryOrder.id } }"
+        >
+          <span class="delivery-order-header">
+            <span>주문번호: {{ deliveryOrder.id }}</span>
+            <span class="delivery-order-detail">상세보기 &gt;</span>
+          </span>
+          <span>상품명: {{ deliveryOrder.items[0]?.name ?? '상품 정보 없음' }}<template v-if="deliveryOrder.items.length > 1"> 외 {{ deliveryOrder.items.length - 1 }}건</template></span>
+          <span v-if="deliveryStep < 0">주문상태: {{ deliveryOrder.status }}</span>
+        </RouterLink>
+        </template>
+        <p v-else-if="orderLoading" class="delivery-empty" role="status">최근 주문을 불러오는 중입니다.</p>
+        <p v-else-if="orderError" class="delivery-empty" role="alert">최근 주문 내역을 불러오지 못했습니다.</p>
+        <p v-else class="delivery-empty">최근 주문한 내역이 없습니다.</p>
       </article>
 
       <article class="dashboard-card ai-card">
@@ -85,35 +131,40 @@ onBeforeUnmount(() => controller?.abort())
 
       <RouterLink :to="{ name: 'MyPageWishlist' }" class="dashboard-card wishlist-card">
         <h2>찜한 상품</h2>
-        <div class="wishlist-items" aria-label="찜한 상품 예시">
-          <div class="wishlist-item tone-cream"></div>
-          <div class="wishlist-item tone-rose"></div>
-          <div class="wishlist-item tone-beige"></div>
-          <div class="wishlist-item tone-mint"></div>
-          <div class="wishlist-item tone-rose"></div>
-          <div class="wishlist-item tone-cream"></div>
-        </div>
+        <ul v-if="wishlistPreview.length" class="wishlist-items" aria-label="찜한 상품 미리보기">
+          <li v-for="product in wishlistPreview" :key="product.id" class="wishlist-item">
+            <img
+              v-if="product.url && !failedImages.has(product.url)"
+              :src="product.url"
+              :alt="product.name"
+              loading="lazy"
+              @error="failedImages.add(product.url)"
+            />
+            <span v-else>{{ product.name }}</span>
+          </li>
+        </ul>
+        <p v-else class="wishlist-empty">찜한 상품이 없습니다.</p>
       </RouterLink>
     </div>
 
     <section class="activity-bar" aria-label="회원 활동 바로가기">
       <strong>활동 내역</strong>
-      <button type="button">
+      <RouterLink :to="{ name: 'MyPageReviews' }">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v12H8l-3 3V4Z" /><path d="M8 8h8M8 12h5" /></svg>
-        후기 작성 가능 (N건)
-      </button>
+        후기 작성하기
+      </RouterLink>
       <button type="button">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.2 10h10.6l2-7H7.2M9 20a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3ZM17 20a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z" /></svg>
         장바구니 (N건)
       </button>
-      <button type="button">
+      <RouterLink :to="{ name: 'MyPageAddress' }">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z" /><circle cx="12" cy="10" r="2.5" /></svg>
         배송지 관리
-      </button>
-      <button type="button">
+      </RouterLink>
+      <RouterLink :to="{ name: 'MyPageInquiries' }">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v12H9l-4 4V4Z" /><path d="M10 9a2 2 0 1 1 3.7 1c-.7.6-1.7 1-1.7 2M12 14h.01" /></svg>
         1:1 문의 내역
-      </button>
+      </RouterLink>
     </section>
   </MyPageLayout>
 </template>
@@ -326,6 +377,14 @@ onBeforeUnmount(() => controller?.abort())
   flex-direction: column;
 }
 
+.delivery-empty {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  text-align: center;
+}
+
 .delivery-step {
   display: flex;
   flex: 0 0 auto;
@@ -385,7 +444,31 @@ onBeforeUnmount(() => controller?.abort())
   background: var(--color-primary);
 }
 
-.delivery-card > p {
+.delivery-order-link:hover,
+.delivery-order-link:focus-visible {
+  border-color: var(--color-primary);
+  background: var(--color-background);
+}
+
+.delivery-order-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  column-gap: 8px;
+}
+
+.delivery-order-detail {
+  margin-left: auto;
+  color: var(--color-primary);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.delivery-order-link {
+  display: grid;
+  gap: 2px;
+  overflow-wrap: anywhere;
   margin: auto 0 0;
   padding: 9px 10px;
   border: 1px solid var(--color-border);
@@ -486,17 +569,15 @@ onBeforeUnmount(() => controller?.abort())
   background: rgba(255, 255, 255, .8);
 }
 
-.tone-cream { background: #e8dfcf; }
-.tone-rose { background: #e9d3d4; }
-.tone-mint { background: #dce7df; }
-.tone-beige { background: #e8ded5; }
-
 .wishlist-items {
   display: grid;
   flex: 1;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-template-rows: repeat(2, minmax(0, 1fr));
   gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .wishlist-card {
@@ -505,18 +586,41 @@ onBeforeUnmount(() => controller?.abort())
 }
 
 .wishlist-item {
+  position: relative;
+  display: grid;
   min-height: 0;
+  min-width: 0;
+  place-items: center;
+  overflow: hidden;
   border-radius: 5px;
+  background: #f7f3f4;
 }
 
-.wishlist-item::after {
-  content: '';
-  display: block;
-  width: 60%;
-  height: 70%;
-  margin: 8px auto 0;
-  border: 1px solid rgba(57, 44, 50, .25);
-  border-radius: 50% 50% 8px 8px;
+.wishlist-item img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.wishlist-item span {
+  width: 100%;
+  padding-inline: 4px;
+  overflow: hidden;
+  color: #71666b;
+  font-size: 11px;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wishlist-empty {
+  display: grid;
+  flex: 1;
+  place-items: center;
+  color: #71666b;
+  font-size: 13px;
 }
 
 .activity-bar {
@@ -537,7 +641,7 @@ onBeforeUnmount(() => controller?.abort())
   font-weight: 500;
 }
 
-.activity-bar button {
+.activity-bar :is(button, a) {
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -550,7 +654,7 @@ onBeforeUnmount(() => controller?.abort())
   cursor: pointer;
 }
 
-.activity-bar button + button {
+.activity-bar :is(button, a) + :is(button, a) {
   margin-left: 0;
 }
 
@@ -565,7 +669,7 @@ onBeforeUnmount(() => controller?.abort())
   stroke-linejoin: round;
 }
 
-.activity-bar button:hover {
+.activity-bar :is(button, a):hover {
   color: var(--color-primary);
 }
 
@@ -597,7 +701,7 @@ onBeforeUnmount(() => controller?.abort())
     margin-right: 0;
   }
 
-  .activity-bar button + button {
+  .activity-bar :is(button, a) + :is(button, a) {
     margin-left: 0;
   }
 }

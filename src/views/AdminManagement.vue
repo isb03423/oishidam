@@ -23,15 +23,13 @@ if (import.meta.env.DEV && demo.value) {
 }
 
 const pages = {
-  products: { columns: ['상품명', '카테고리', '판매 상태'], fields: [
-    { key: 'name', label: '상품명' }, { key: 'category_id', label: '카테고리', options: () => data('categories').map((row) => [row.id, row.name]) },
+  products: { columns: ['상품명', '카테고리', '판매 상태', '재고'], fields: [
+    { key: 'name', label: '상품명' }, { key: 'stock_quantity', label: '재고 수량', type: 'number' }, { key: 'category_id', label: '카테고리', options: () => data('categories').map((row) => [row.id, row.name]) },
     { key: 'sale_status', label: '판매 상태', options: [['ON_SALE', '판매 중'], ['HIDDEN', '판매 중지']] },
-  ], cells: (row) => [row.name, data('categories').find((category) => category.id === row.category_id)?.name, row.sale_status === 'ON_SALE' ? '판매 중' : '판매 중지'] },
+  ], cells: (row) => [row.name, data('categories').find((category) => category.id === row.category_id)?.name, (row.sale_status === 'ON_SALE' ? '판매 중' : '판매 중지'), row.stock_quantity + '개'] },
   categories: { columns: ['카테고리명', '상위 카테고리', '상태'], fields: [
     { key: 'name', label: '카테고리명' }, { key: 'is_active', label: '상태', options: [[true, '사용'], [false, '숨김']] },
   ], cells: (row) => [row.name, data('categories').find((category) => category.id === row.parent_id)?.name ?? '—', row.is_active ? '사용' : '숨김'] },
-  inventory: { columns: ['상품', '옵션', '재고'], fields: [{ key: 'stock_quantity', label: '재고 수량', type: 'number' }],
-    cells: (row) => [data('products').find((product) => product.id === row.product_id)?.name, row.variant_name, row.stock_quantity + '개'] },
   orders: { columns: ['주문번호', '주문일', '주문자', '금액', '상태'], fields: [
     { key: 'status', label: '주문 상태', options: (row) => statuses.slice(statuses.indexOf(row.status), statuses.indexOf(row.status) + 2).map((status) => [status, status]) },
   ], cells: (row) => [row.id, date.format(row.date), row.customer, money.format(row.total) + '원', row.status] },
@@ -80,8 +78,8 @@ function save() {
 
 <template>
   <main class="management">
-    <h1>{{ title }}</h1>
-    <p v-if="!demo" class="card">관리자 API 연결 후 운영 데이터를 사용할 수 있어요.</p>
+    <header class="management-heading"><h1>{{ title }}</h1><p>{{ section === 'analytics' ? '고객의 쇼핑 활동과 관심을 살펴보세요.' : '오이시담 운영 정보를 관리하세요.' }}</p></header>
+    <section v-if="!demo" class="card feature-empty"><span class="feature-tag">준비 중</span><h2>고객 분석을 준비하고 있어요.</h2><p>분석 기능이 연결되면 이곳에서 고객별 쇼핑 경향을 확인할 수 있어요.</p></section>
     <p v-else-if="error" class="card" role="alert">{{ error }}</p>
     <p v-else-if="!source" class="card" role="status">데이터를 불러오는 중이에요.</p>
     <section v-else class="card">
@@ -103,12 +101,12 @@ function save() {
         </label>
         <div class="actions"><button type="submit">저장</button><button type="button" @click="editing = null">취소</button></div>
       </form>
-      <div v-if="rows.length" class="scroll">
-        <table>
+      <div v-if="rows.length" class="scroll" tabindex="0" role="region" :aria-label="title + ' 목록'">
+        <table class="data-table">
           <thead><tr><th v-for="column in page.columns" :key="column" scope="col">{{ column }}</th><th v-if="page.fields.length" scope="col">관리</th></tr></thead>
           <tbody><tr v-for="{ row, cells } in rows" :key="row.id">
-            <td v-for="(cell, index) in cells" :key="index">{{ cell }}</td>
-            <td v-if="page.fields.length"><button type="button" @click="editing = { ...row }; notice = ''">편집</button></td>
+            <td v-for="(cell, index) in cells" :key="index" :data-label="page.columns[index]">{{ cell }}</td>
+            <td v-if="page.fields.length" data-label="관리"><button type="button" @click="editing = { ...row }; notice = ''">편집</button></td>
           </tr></tbody>
         </table>
       </div>
@@ -117,21 +115,4 @@ function save() {
   </main>
 </template>
 
-<style scoped>
-.management { display: grid; gap: 16px; padding: clamp(16px, 2vw, 28px); }
-h1 { color: #592839; font-size: 1.85rem; font-weight: 800; }
-h2 { font-weight: 700; }
-.card { padding: 18px; border: 1px solid var(--color-border); border-radius: 14px; background: white; box-shadow: none; }
-.toolbar, .actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-.toolbar { justify-content: space-between; margin-bottom: 16px; }
-.toolbar p, .empty { color: var(--color-secondary); }
-.scroll { overflow-x: auto; }
-table { width: 100%; }
-th, td { padding: 10px; border-bottom: 1px solid var(--color-border); text-align: left; overflow-wrap: anywhere; }
-th { background: var(--color-background); white-space: nowrap; }
-input, select, textarea, button { padding: 7px 10px; border: 1px solid var(--color-border); border-radius: 8px; background: white; color: inherit; font: inherit; }
-button { color: var(--color-primary); white-space: nowrap; cursor: pointer; }
-button[type='submit'] { background: var(--color-primary); color: white; }
-.editor { display: grid; gap: 10px; margin-block: 12px; padding: 14px; background: var(--color-background); border-radius: 10px; }
-.editor label { display: grid; gap: 4px; }
-</style>
+<style scoped src="../styles/admin-management.css"></style>

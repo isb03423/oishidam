@@ -3,34 +3,45 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import DeleteConfirmationDialog from '../components/DeleteConfirmationDialog.vue'
 import MyPageLayout from '../components/MyPageLayout.vue'
 import ProductCard from '../components/product/ProductCard.vue'
+import Pagination from '../components/common/Pagination.vue'
+import { getProduct } from '../services/catalog.js'
 import { addProductsToCart } from '../stores/cart.js'
-import { removeWishes, wishedIds, wishedProducts } from '../stores/wishlist.js'
+import { loadWishes, removeWishes, wishedIds, wishedProducts, wishLoading, wishBusy, wishError } from '../stores/wishlist.js'
+import { getSessionRevision } from '../stores/session.js'
 
 const selection = ref([])
 const deleteDialog = ref(null)
 const sort = ref('new')
+const page = ref(1)
+const pageSize = 12
 const toasts = ref([])
-let toastTimer
+const toastTimers = new Map()
 let nextToastId = 0
 
 function dismissToast(id) {
+  clearTimeout(toastTimers.get(id))
+  toastTimers.delete(id)
   toasts.value = toasts.value.filter((toast) => toast.id !== id)
 }
 
 function showToast(type, message) {
-  toasts.value.push({ id: nextToastId++, type, message })
-  clearTimeout(toastTimer)
-  toastTimer = setTimeout(() => { toasts.value = [] }, 3000)
+  const id = nextToastId++
+  toasts.value.push({ id, type, message })
+  toastTimers.set(id, setTimeout(() => dismissToast(id), 3000))
 }
 
-function confirmDeletion(ids) {
-  removeWishes(ids)
-  showToast('success', '찜한 상품에서 삭제되었습니다.')
+async function confirmDeletion(ids) {
+  const revision = getSessionRevision()
+  const { removed } = await removeWishes(ids)
+  if (revision === getSessionRevision() && removed) showToast('success', `${removed}개 상품이 찜 목록에서 삭제되었습니다.`)
 }
 
-onBeforeUnmount(() => clearTimeout(toastTimer))
+onBeforeUnmount(() => {
+  toastTimers.forEach(clearTimeout)
+  toastTimers.clear()
+})
 const allSelected = computed(() =>
-  wishedIds.value.length > 0 && selection.value.length === wishedIds.value.length,
+  visibleProducts.value.length > 0 && visibleProducts.value.every((product) => selection.value.includes(product.product_id)),
 )
 const products = computed(() => {
   if (sort.value === 'new') return wishedProducts.value
@@ -41,23 +52,40 @@ const products = computed(() => {
     return (a.min_price - b.min_price) * direction
   })
 })
+const pageCount = computed(() => Math.ceil(products.value.length / pageSize))
+const visibleProducts = computed(() => products.value.slice((page.value - 1) * pageSize, page.value * pageSize))
+
+watch(sort, () => {
+  page.value = 1
+  selection.value = []
+})
+
+watch(page, () => { selection.value = [] })
+
+watch(pageCount, (count) => {
+  page.value = Math.min(page.value, Math.max(1, count))
+})
 
 watch(wishedIds, (ids) => {
   selection.value = selection.value.filter((id) => ids.includes(id))
 })
 
-function addSelectionToCart() {
+async function addSelectionToCart() {
+  const revision = getSessionRevision()
   const selected = wishedProducts.value.filter((product) => selection.value.includes(product.product_id))
   if (!selected.length) {
     showToast('warning', '상품을 먼저 선택해주세요.')
     return
   }
 
-  const { added, existing, unavailable, needsOption } = addProductsToCart(selected)
+  const results = await Promise.allSettled(selected.map((product) => getProduct(product.product_id)))
+  if (revision !== getSessionRevision()) return
+  const current = results.filter((result) => result.status === 'fulfilled').map((result) => result.value)
+  const { added, existing, unavailable } = await addProductsToCart(current)
+  if (revision !== getSessionRevision()) return
   if (added) showToast('info', `${added}개 상품을 장바구니에 담았어요.`)
   if (existing) showToast('info', `이미 담긴 상품 ${existing}개`)
-  if (unavailable) showToast('warning', `담을 수 없는 상품 ${unavailable}개`)
-  if (needsOption) showToast('warning', `옵션 선택이 필요한 상품 ${needsOption}개`)
+  if (unavailable + selected.length - current.length) showToast('warning', `담을 수 없는 상품 ${unavailable + selected.length - current.length}개`)
 }
 </script>
 
@@ -67,7 +95,24 @@ function addSelectionToCart() {
     title="찜한 상품"
     description="관심 있는 상품을 저장하고, 언제든지 다시 확인해보세요."
   >
+    <template #overlay>
+      <div class="wishlist-cart-toast-anchor">
+        <div class="wishlist-cart-toast" :class="{ 'is-stacked': toasts.length >= 5 }" :tabindex="toasts.length >= 5 ? 0 : undefined" role="status">
+          <div v-for="(toast, index) in toasts" :key="toast.id" class="wishlist-toast-row" :class="{ 'is-deep': toasts.length - index > 5 }" :style="{ '--stack-depth': Math.min(toasts.length - index - 1, 4), '--stack-order': index }">
+            <div class="wishlist-toast-row-inner">
+              <div class="wishlist-cart-toast-content" :class="toast.type">
+                <span class="toast-icon" aria-hidden="true">{{ toast.type === 'success' ? '✓' : toast.type === 'warning' ? '!' : 'i' }}</span>
+                <p>{{ toast.message }}</p>
+                <button type="button" aria-label="알림 닫기" @click="dismissToast(toast.id)">×</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
 
+    <p v-if="wishLoading" class="wishlist-empty" role="status">찜 목록을 불러오고 있어요.</p>
+    <p v-if="wishError" class="wishlist-empty">목록을 다시 불러와 주세요. <button type="button" :disabled="wishLoading || wishBusy" @click="loadWishes">다시 시도</button></p>
     <template v-if="products.length">
       <div class="wishlist-toolbar">
         <label class="wishlist-select-all">
@@ -75,9 +120,9 @@ function addSelectionToCart() {
             type="checkbox"
             :checked="allSelected"
             :indeterminate="selection.length > 0 && !allSelected"
-            @change="selection = $event.target.checked ? [...wishedIds] : []"
+            @change="selection = $event.target.checked ? visibleProducts.map((product) => product.product_id) : []"
           />
-          전체 선택 ({{ products.length }})
+          현재 페이지 전체 선택 ({{ visibleProducts.length }}) · 총 {{ products.length }}개
         </label>
         <select v-model="sort" aria-label="찜한 상품 정렬">
           <option value="new">최근 찜한 순</option>
@@ -87,7 +132,7 @@ function addSelectionToCart() {
       </div>
 
       <div class="wishlist-grid">
-        <div v-for="product in products" :key="product.product_id" class="wishlist-item">
+        <div v-for="product in visibleProducts" :key="product.product_id" class="wishlist-item">
           <input
             v-model="selection"
             class="wishlist-item-select"
@@ -102,7 +147,7 @@ function addSelectionToCart() {
       <div class="wishlist-selection">
         <span aria-live="polite">선택된 상품 <strong>{{ selection.length }}개</strong></span>
         <div class="wishlist-selection-actions">
-          <button type="button" :disabled="!selection.length" @click="deleteDialog.open(selection)">
+          <button type="button" :disabled="!selection.length || wishBusy || wishLoading" @click="deleteDialog.open(selection)">
             선택 상품 삭제
           </button>
           <button class="wishlist-add-to-cart" type="button" @click="addSelectionToCart">
@@ -112,19 +157,15 @@ function addSelectionToCart() {
       </div>
     </template>
 
-    <div v-else class="wishlist-empty">
+    <div v-else-if="!wishLoading && !wishError" class="wishlist-empty">
       <p role="status">아직 찜한 상품이 없어요.</p>
       <p>상품 카드의 하트를 누르면 여기에 표시돼요.</p>
       <RouterLink :to="{ name: 'Home' }">상품 둘러보기</RouterLink>
     </div>
-    <div class="wishlist-cart-toast" role="status">
-      <div v-for="toast in toasts" :key="toast.id" class="wishlist-cart-toast-content" :class="toast.type">
-        <span class="toast-icon" aria-hidden="true">{{ toast.type === 'success' ? '✓' : toast.type === 'warning' ? '!' : 'i' }}</span>
-        <p>{{ toast.message }}</p>
-        <button type="button" aria-label="알림 닫기" @click="dismissToast(toast.id)">×</button>
-      </div>
-    </div>
     <DeleteConfirmationDialog ref="deleteDialog" description="선택한 상품이 찜한 목록에서 삭제됩니다." @confirm="confirmDeletion" />
+    <template v-if="pageCount > 1" #below>
+      <Pagination v-model="page" :page-count="pageCount" label="찜한 상품 목록 페이지" />
+    </template>
   </MyPageLayout>
 </template>
 
@@ -193,14 +234,19 @@ function addSelectionToCart() {
   color: #fff;
 }
 
+.wishlist-cart-toast-anchor {
+  position: sticky;
+  top: 10px;
+  z-index: 100;
+  height: 0;
+}
+
 .wishlist-cart-toast {
   display: grid;
-  gap: 6px;
   position: absolute;
-  inset-inline-end: max(40px, calc((100% - var(--content-width)) / 2));
-  top: 24px;
-  z-index: 100;
-  width: min(360px, calc(100% - 80px));
+  inset-inline-end: 0;
+  top: 0;
+  width: min(360px, 100%);
 }
 
 .wishlist-cart-toast-content {
@@ -215,6 +261,52 @@ function addSelectionToCart() {
   color: var(--color-text);
   box-shadow: 0 8px 24px rgb(57 44 50 / 15%);
   font-size: 13px;
+}
+
+.wishlist-toast-row {
+  display: grid;
+  grid-template-rows: 1fr;
+  position: relative;
+  z-index: var(--stack-order);
+  transition: grid-template-rows 250ms ease, margin-bottom 250ms ease, opacity 250ms ease;
+}
+
+.wishlist-toast-row:not(:last-child) {
+  margin-bottom: 6px;
+}
+
+.wishlist-toast-row-inner {
+  min-height: 0;
+}
+
+.wishlist-cart-toast-content {
+  transition: transform 250ms ease;
+}
+
+.wishlist-cart-toast.is-stacked:not(:hover):not(:focus-within) .wishlist-toast-row:not(:last-child) {
+  grid-template-rows: 0fr;
+}
+
+.wishlist-cart-toast.is-stacked:not(:hover):not(:focus-within) .wishlist-toast-row.is-deep {
+  margin-bottom: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.wishlist-cart-toast.is-stacked:not(:hover):not(:focus-within) .wishlist-cart-toast-content {
+  transform: scale(calc(1 - var(--stack-depth) * .025));
+}
+
+.wishlist-cart-toast.is-stacked:is(:hover, :focus-within) {
+  max-height: calc(100vh - 20px);
+  overflow-y: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wishlist-toast-row,
+  .wishlist-cart-toast-content {
+    transition: none;
+  }
 }
 
 .wishlist-cart-toast p {
@@ -250,15 +342,6 @@ function addSelectionToCart() {
   font-size: 18px;
   line-height: 1;
   cursor: pointer;
-}
-
-@media (max-width: 720px) {
-  .wishlist-cart-toast {
-    inset-inline-end: 16px;
-    width: min(360px, calc(100% - 32px));
-    max-width: 360px;
-    margin-inline: auto;
-  }
 }
 
 .wishlist-grid {

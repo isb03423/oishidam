@@ -2,12 +2,42 @@ import { computed, reactive, readonly, watch } from 'vue'
 import { development } from '../config/development.js'
 
 const storageKey = 'oishidam:mock-session:v1'
-const state = reactive({ member: null, source: null })
+const apiStorageKey = 'oishidam:api-session:v1'
+const state = reactive({ member: null, source: null, restoreError: '' })
 export const session = readonly(state)
 export const shoppingOwner = computed(() => session.member
   ? JSON.stringify([session.source, session.member.member_id])
   : 'guest')
 let authTokens = null
+let rememberLogin = false
+let revision = 0
+
+export function getSessionRevision() { return revision }
+
+export function savedApiLogin() {
+  for (const [storage, remember] of [['sessionStorage', false], ['localStorage', true]]) {
+    try {
+      const saved = JSON.parse(window[storage].getItem(apiStorageKey) ?? 'null')
+      if (typeof saved?.refreshToken === 'string' && saved.refreshToken.trim()) return { refreshToken: saved.refreshToken, remember }
+      window[storage].removeItem(apiStorageKey)
+    } catch { /* 저장소 사용 불가 */ }
+  }
+  return null
+}
+
+export function updateAuthTokens(tokens, remember = rememberLogin) {
+  authTokens = tokens
+  rememberLogin = remember
+  try {
+    const storage = remember ? 'localStorage' : 'sessionStorage'
+    window[storage].setItem(apiStorageKey, JSON.stringify({ refreshToken: tokens.refreshToken }))
+    window[remember ? 'sessionStorage' : 'localStorage'].removeItem(apiStorageKey)
+  } catch { /* 저장소 사용 불가 시 현재 탭의 메모리 인증을 유지한다. */ }
+}
+
+export function setRestoreError(message) {
+  state.restoreError = message
+}
 
 export function getAuthTokens() {
   return authTokens
@@ -15,14 +45,20 @@ export function getAuthTokens() {
 
 function removeSavedSession() {
   for (const storage of ['localStorage', 'sessionStorage']) {
-    try { window[storage].removeItem(storageKey) } catch { /* 저장소 사용 불가 */ }
+    try {
+      window[storage].removeItem(storageKey)
+      window[storage].removeItem(apiStorageKey)
+    } catch { /* 저장소 사용 불가 */ }
   }
 }
 
 export function clearSession() {
+  revision++
   authTokens = null
   state.member = null
   state.source = null
+  state.restoreError = ''
+  rememberLogin = false
   removeSavedSession()
 }
 
@@ -33,8 +69,8 @@ export function normalizeMember(member = {}) {
     email: member.email,
     phone: member.phone,
     birth_year: member.birthYear,
-    gender: { M: 'MALE', F: 'FEMALE' }[member.gender] || 'NONE',
-    role: member.role,
+    gender: { M: 'MALE', F: 'FEMALE', 남성: 'MALE', 여성: 'FEMALE' }[member.gender] || 'NONE',
+    role: { 관리자: 'ADMIN', '일반 회원': 'USER' }[member.role] || member.role,
     status: member.isActive === false ? 'INACTIVE' : 'ACTIVE',
   }
 }
@@ -48,8 +84,11 @@ export function updateApiMember(member) {
 
 export function setSession(member, { mock = false, remember = false, tokens = null } = {}) {
   if (!member?.member_id || !member.name || (mock && member.status !== 'ACTIVE')) throw new Error('로그인 응답을 확인해주세요.')
+  revision++
   removeSavedSession()
   authTokens = tokens
+  rememberLogin = remember
+  state.restoreError = ''
   state.member = {
     member_id: member.member_id,
     name: member.name,
@@ -64,7 +103,7 @@ export function setSession(member, { mock = false, remember = false, tokens = nu
     cart_count: Number.isInteger(member.cart_count) && member.cart_count > 0 ? member.cart_count : 0,
   }
   state.source = mock ? 'mock' : 'api'
-  // 실제 인증 유지 정책은 서버 연동 시 확정. 브라우저에는 mock 프로필만 저장.
+  if (!mock && tokens?.refreshToken) updateAuthTokens(tokens, remember)
   if (mock && import.meta.env.DEV) {
     try {
       const storage = remember ? localStorage : sessionStorage

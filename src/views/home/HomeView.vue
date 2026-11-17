@@ -5,7 +5,7 @@ import ProductSection from '../../components/product/ProductSection.vue'
 import snacksImage from '../../assets/images/banners/snacks.png'
 import drinksImage from '../../assets/images/banners/drinks.png'
 import sweetsImage from '../../assets/images/banners/sweets.png'
-import { getProducts, getRecommendations } from '../../services/catalog.js'
+import { getRecommendations } from '../../services/catalog.js'
 import { development } from '../../config/development.js'
 
 // 추가 배너는 같은 형식으로 등록하면 슬라이드 버튼과 페이지 수에 반영됩니다.
@@ -64,7 +64,7 @@ async function loadProducts() {
   }
   await Promise.all([
     loadSection(recommended, () => getRecommendations({ signal, limit: 3 })),
-    loadSection(arrivals, () => getProducts({ sort: development.mockEnabled ? 'new' : undefined, size: 3 }, { signal })),
+    loadSection(arrivals, () => getRecommendations({ signal, type: 'new', limit: 3 })),
   ])
 }
 watch(() => [development.mockEnabled, development.scenario], loadProducts, { immediate: true })

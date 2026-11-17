@@ -1,0 +1,40 @@
+.admin-reply-dialog { position: fixed; inset: 0; width: min(720px, calc(100% - 40px)); max-height: min(88dvh, 900px); box-sizing: border-box; margin: auto; padding: 0; border: 1px solid var(--color-border); border-radius: 18px; background: white; color: var(--color-text); box-shadow: 0 24px 90px rgb(57 44 50 / 22%); }
+.admin-reply-dialog[open] { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
+.admin-reply-dialog::backdrop { background: rgb(38 26 33 / 42%); }
+.reply-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 26px 28px 22px; border-bottom: 1px solid var(--color-border); }
+.reply-heading > div { min-width: 0; }
+.reply-eyebrow { margin: 0 0 7px; color: var(--color-primary); font-size: 12px; font-weight: 700; }
+.reply-heading h2 { margin: 0; color: var(--color-text); font-size: 20px; font-weight: 750; line-height: 1.5; letter-spacing: -.025em; overflow-wrap: anywhere; }
+.reply-close { flex: none; padding: 7px 10px; border: 1px solid var(--color-border); border-radius: 7px; background: white; color: #82717c; font-size: 12px; }
+.reply-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 24px 28px; background: #f6f0f3; }
+.reply-composer { display: grid; gap: 10px; padding: 22px 28px 24px; border-top: 1px solid var(--color-border); background: white; }
+.reply-composer > label { font-size: 13px; font-weight: 700; }
+.reply-composer textarea { width: 100%; height: 126px; min-height: 90px; max-height: 220px; box-sizing: border-box; resize: vertical; padding: 13px 15px; border: 1px solid var(--color-border); border-radius: 10px; background: white; color: var(--color-text); font-size: 14px; line-height: 1.65; }
+.reply-composer textarea::placeholder { color: #a1949c; }
+.reply-composer footer { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+.reply-composer footer > div { display: flex; gap: 8px; margin-left: auto; }
+.reply-character-count { color: #9f8f99; font-size: 11px; font-variant-numeric: tabular-nums; }
+.reply-cancel { padding: 9px 18px; border: 1px solid var(--color-border); border-radius: 8px; background: white; color: #897680; font-size: 13px; }
+.reply-error { margin-top: 14px; padding: 12px 14px; border-radius: 8px; background: #fbecef; color: #9c405a; font-size: 13px; }
+.reply-saved { margin: 14px 0 0; font-size: 13px; color: #52745e; }
+
+.admin-reply-dialog :is(button, textarea) { box-sizing: border-box; font-family: inherit; line-height: 1.5; }
+.admin-reply-dialog button { cursor: pointer; }.admin-reply-dialog button:disabled { opacity: .5; cursor: default; }
+.admin-reply-dialog :is(button, textarea):focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; }
+.admin-reply-dialog:modal { overscroll-behavior: contain; }.admin-reply-dialog::backdrop { overflow: hidden; overscroll-behavior: contain; }
+.reply-submit { padding: 9px 18px; border: 1px solid var(--color-primary); border-radius: 8px; background: var(--color-primary); color: white; font-size: 13px; font-weight: 700; white-space: nowrap; }
+.reply-submit:not(:disabled):hover { background: #894256; }
+.reply-error button { padding: 5px 10px; border: 1px solid var(--color-border); border-radius: 6px; background: white; color: var(--color-primary); }
+.reply-loading { padding-block: 24px; color: #8e7383; font-size: 14px; text-align: center; }
+.review-reply-dialog .reply-body { background: #fbf8fa; }
+.review-original { padding: 22px; border: 1px solid #eadde1; border-radius: 12px; background: white; }
+.review-original > header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; font-size: 12px; color: #876c7b; }
+.review-original time { color: #9a8490; font-size: 11px; white-space: nowrap; }
+.review-original h3 { margin: 18px 0 12px; color: #644350; font-size: 15px; font-weight: 700; line-height: 1.6; }
+.review-original > p { margin-top: 16px; color: #604b56; font-size: 14px; line-height: 1.85; white-space: pre-wrap; overflow-wrap: anywhere; }
+.review-attachments { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }.review-attachments img { display: block; width: 112px; height: 112px; border-radius: 8px; object-fit: cover; }
+@media (max-width: 540px) {
+  .admin-reply-dialog { width: calc(100% - 24px); max-height: 92dvh; border-radius: 14px; }
+  .reply-heading { padding: 20px; gap: 12px; }.reply-heading h2 { font-size: 18px; }.reply-body { padding: 18px; }
+  .reply-composer { padding: 18px 20px; }.reply-composer textarea { height: 108px; }.review-original { padding: 18px; }
+}

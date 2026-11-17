@@ -6,6 +6,7 @@ import ProductCard from '../components/product/ProductCard.vue'
 import { development } from '../config/development.js'
 import { categories, categoryGroups } from '../data/categories.js'
 import { getProducts, getRecommendations } from '../services/catalog.js'
+import Pagination from '../components/common/Pagination.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -27,10 +28,10 @@ const listDescription = computed(() => {
   if (listType.value === 'best') return '오이시담의 베스트 상품을 한곳에서 만나보세요.'
   return ''
 })
-const categoryLink = (id) => ({ name: 'Products', query: { categoryId: id, sort: listType.value } })
+const categoryLink = (id) => ({ name: 'Products', query: { categoryId: id } })
 const priceSort = computed(() => ['price_asc', 'price_desc'].includes(route.query.order) ? route.query.order : '')
 const defaultSortLabel = computed(() => {
-  if (!development.mockEnabled) return '기본 정렬'
+  if (!development.mockEnabled && !listType.value) return '기본 정렬'
   return listType.value === 'best' ? '베스트순' : '최신순'
 })
 const countLabel = computed(() => {
@@ -45,7 +46,6 @@ function changeOrder(event) {
 }
 
 function productBadge(product) {
-  if (!development.mockEnabled) return ''
   if (listType.value === 'new') return 'NEW'
   const rank = listType.value === 'best' && bestRanks.value[product.product_id]
   return rank ? 'TOP ' + rank : ''
@@ -68,6 +68,9 @@ const title = computed(() => {
 const hasNext = computed(() => total.value == null
   ? products.value.length === pageSize
   : (page.value + 1) * pageSize < total.value)
+const pageCount = computed(() => Math.max(page.value + 1,
+  total.value == null ? page.value + 1 + Number(hasNext.value) : Math.ceil(total.value / pageSize),
+))
 const pageLink = (index) => ({
   name: 'Products',
   query: { ...route.query, page: index ? String(index + 1) : undefined },
@@ -82,8 +85,8 @@ watch(
     failed.value = false
     try {
       const options = { signal: controller.signal }
-      const response = recommended.value
-        ? await getRecommendations(options)
+      const response = listType.value || recommended.value
+        ? await getRecommendations({ ...options, type: listType.value, limit: listType.value ? 8 : undefined })
         : await getProducts({
           categoryId: categoryId.value,
           keyword: keyword.value || undefined,
@@ -95,8 +98,8 @@ watch(
       if (controller.signal.aborted) return
       if (!Array.isArray(response?.items)) throw new Error('상품 응답 형식 오류')
       products.value = response.items
-      total.value = response.total
-      bestRanks.value = response.bestRanks ?? {}
+      total.value = listType.value ? response.items.length : response.total
+      bestRanks.value = listType.value === 'best' ? Object.fromEntries(response.items.map((product, index) => [product.product_id, index + 1])) : {}
     } catch {
       if (!controller.signal.aborted) failed.value = true
     } finally {
@@ -126,16 +129,13 @@ watch(
           {{ option === activeGroup ? '전체' : option.name }}
         </RouterLink>
       </nav>
-      <p v-if="listType && !development.mockEnabled" class="catalog-note">
-        현재 서버의 기본 상품 목록을 표시합니다.
-      </p>
       <div v-if="!recommended" class="catalog-toolbar">
         <span class="catalog-count" aria-live="polite">{{ countLabel }}</span>
         <label>
           <span class="is-sr-only">상품 정렬</span>
           <select
-            :value="development.mockEnabled ? priceSort : ''"
-            :disabled="!development.mockEnabled"
+            :value="development.mockEnabled && !listType ? priceSort : ''"
+            :disabled="!development.mockEnabled || Boolean(listType)"
             @change="changeOrder"
           >
             <option value="">{{ defaultSortLabel }}</option>
@@ -153,11 +153,7 @@ watch(
       <div v-else class="products-grid">
         <ProductCard v-for="product in products" :key="product.product_id" :product="product" :badge="productBadge(product)" />
       </div>
-      <nav v-if="!loading && !failed && !recommended && (page > 0 || hasNext)" class="product-pages" aria-label="상품 목록 페이지">
-        <RouterLink v-if="page > 0" :to="pageLink(page - 1)">이전</RouterLink>
-        <span aria-current="page">{{ page + 1 }}</span>
-        <RouterLink v-if="hasNext" :to="pageLink(page + 1)">다음</RouterLink>
-      </nav>
+      <Pagination v-if="!loading && !failed && !recommended && !listType" :model-value="page + 1" :page-count="pageCount" :page-link="(number) => pageLink(number - 1)" label="상품 목록 페이지" />
     </section>
   </main>
 </template>
@@ -269,8 +265,7 @@ watch(
   text-align: center;
 }
 
-.products-state button,
-.product-pages a {
+.products-state button {
   display: inline-block;
   padding: 6px 13px;
   border: 1px solid var(--color-border);
@@ -282,14 +277,6 @@ watch(
 
 .products-state button {
   margin-top: 10px;
-}
-
-.product-pages {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  margin-top: 24px;
 }
 
 @media (max-width: 850px) {

@@ -1,11 +1,23 @@
 <script setup>
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import MyPageLayout from '../components/MyPageLayout.vue'
 import { getExampleOrders } from '../mocks/orders.js'
+import { session, shoppingOwner } from '../stores/session.js'
+import { getOrder, getOrders } from '../services/orders.js'
+import { getProduct } from '../services/catalog.js'
+import { cartLine } from '../stores/cart.js'
+import { startCheckout } from '../stores/checkout.js'
+import Pagination from '../components/common/Pagination.vue'
 
 const today = new Date()
-const orders = getExampleOrders(today)
+const orders = ref([])
+const totalPages = ref(0)
+const loading = ref(false)
+const error = ref('')
+const purchaseError = ref('')
+const purchasing = ref(false)
+let revision = 0
 const pageSize = 3
 const months = ref(3)
 const search = ref('')
@@ -18,22 +30,50 @@ const router = useRouter()
 const currency = new Intl.NumberFormat('ko-KR')
 const won = (price) => `${currency.format(price)}원`
 
+watch([shoppingOwner, page, months, keyword], async () => {
+  const current = ++revision
+  error.value = ''
+  if (session.source === 'mock') { orders.value = getExampleOrders(new Date()); loading.value = false; return }
+  if (session.source !== 'api') { orders.value = []; return }
+  loading.value = true
+  orders.value = []
+  try {
+    const start = new Date()
+    start.setMonth(start.getMonth() - months.value, 1)
+    start.setDate(Math.min(new Date().getDate(), new Date(start.getFullYear(), start.getMonth() + 1, 0).getDate()))
+    const from = [start.getFullYear(), String(start.getMonth() + 1).padStart(2, '0'), String(start.getDate()).padStart(2, '0')].join('-')
+    const result = await getOrders(page.value - 1, { size: pageSize, from, keyword: keyword.value || undefined, excludePending: true })
+    const details = await Promise.all(result.content.map((summary) => getOrder(summary.orderId)))
+    const mapped = await Promise.all(details.map(async (data) => {
+      const items = await Promise.all(data.items.map(async (item) => {
+        let product
+        try { product = await getProduct(String(item.productId)) } catch { /* 주문 당시 상품은 계속 표시 */ }
+        return { product_id: String(item.productId), name: item.productName, quantity: item.quantity, price: item.unitPrice, imageUrl: product?.images?.find((image) => image.is_primary)?.url ?? product?.images?.[0]?.url }
+      }))
+      return { id: data.orderNumber, orderId: data.orderId, date: new Date(data.createdAt), displayDate: data.createdAt?.slice(0, 10).replaceAll('-', '.'), status: data.orderStatus, total: data.totalAmount, items, quantity: items.reduce((sum, item) => sum + item.quantity, 0) }
+    }))
+    if (current === revision) { orders.value = mapped; totalPages.value = result.totalPages }
+  } catch (failure) { if (current === revision) error.value = failure.message }
+  finally { if (current === revision) loading.value = false }
+}, { immediate: true })
+onBeforeUnmount(() => { revision++ })
+
 const filteredOrders = computed(() => {
   const start = new Date(today)
   start.setMonth(start.getMonth() - months.value, 1)
   const monthEnd = new Date(start.getFullYear(), start.getMonth() + 1, 0).getDate()
   start.setDate(Math.min(today.getDate(), monthEnd))
 
-  return orders.filter((order) =>
+  return orders.value.filter((order) =>
     order.date >= start &&
     (order.id.toLowerCase().includes(keyword.value) ||
       order.items.some((item) => item.name.toLowerCase().includes(keyword.value))),
   )
 })
 
-const pageCount = computed(() => Math.ceil(filteredOrders.value.length / pageSize))
+const pageCount = computed(() => session.source === 'mock' ? Math.ceil(filteredOrders.value.length / pageSize) : totalPages.value)
 const visibleOrders = computed(() =>
-  filteredOrders.value.slice((page.value - 1) * pageSize, page.value * pageSize),
+  session.source === 'mock' ? filteredOrders.value.slice((page.value - 1) * pageSize, page.value * pageSize) : orders.value,
 )
 
 function applySearch() {
@@ -44,8 +84,26 @@ function applySearch() {
 async function showOrder(order, repurchase = false) {
   selectedOrder.value = order
   isRepurchase.value = repurchase
+  purchaseError.value = ''
   await nextTick()
   dialog.value.showModal()
+}
+
+async function repurchase() {
+  if (purchasing.value) return
+  purchasing.value = true
+  purchaseError.value = ''
+  const owner = shoppingOwner.value
+  try {
+    const products = await Promise.all(selectedOrder.value.items.map((item) => getProduct(item.product_id)))
+    if (owner !== shoppingOwner.value) return
+    const lines = products.map((product, index) => cartLine(product, selectedOrder.value.items[index].quantity))
+    if (lines.some((item) => !item.available)) throw new Error('판매가 종료되었거나 재고가 부족한 상품이 있습니다.')
+    startCheckout(lines)
+    dialog.value.close()
+    await router.push({ name: 'Checkout' })
+  } catch (failure) { purchaseError.value = failure.message || '상품을 확인하지 못했습니다.' }
+  finally { purchasing.value = false }
 }
 </script>
 
@@ -71,7 +129,9 @@ async function showOrder(order, repurchase = false) {
     </form>
 
     <div class="order-list" aria-label="주문 목록">
-      <article v-for="order in visibleOrders" :key="order.id" class="order-card">
+      <p v-if="loading" class="empty-orders" role="status">주문을 불러오는 중이에요.</p>
+      <p v-else-if="error" class="empty-orders" role="alert">{{ error }}</p>
+      <article v-for="order in visibleOrders" v-else :key="order.id" class="order-card">
         <header class="order-meta">
           <span><strong>주문일</strong> {{ order.displayDate }}</span>
           <span><strong>주문번호</strong> {{ order.id }}</span>
@@ -79,16 +139,16 @@ async function showOrder(order, repurchase = false) {
         <div class="order-body">
           <div class="order-product">
             <RouterLink
-              class="order-thumbnail product-thumbnail-zoom"
+              v-if="order.items.length" class="order-thumbnail product-thumbnail-zoom"
               :class="order.items[0].tone"
               :to="{ name: 'ProductDetail', params: { productId: order.items[0].product_id } }"
               :aria-label="order.items[0].name + ' 상품 상세보기'"
             >
               <img v-if="order.items[0].imageUrl" :src="order.items[0].imageUrl" alt="" loading="lazy" />
-              <span v-else>{{ order.items[0].brand }}</span>
+              <span v-else>{{ order.items[0].brand || '상품' }}</span>
             </RouterLink>
             <div>
-              <h2>{{ order.items[0].name }}<template v-if="order.items.length > 1"> 외 {{ order.items.length - 1 }}건</template></h2>
+              <h2>{{ order.items[0]?.name ?? '상품 정보 없음' }}<template v-if="order.items.length > 1"> 외 {{ order.items.length - 1 }}건</template></h2>
               <p>총 {{ order.quantity }}개 <span>{{ won(order.total) }}</span></p>
             </div>
           </div>
@@ -98,36 +158,26 @@ async function showOrder(order, repurchase = false) {
               <svg v-else viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="m8 12 3 3 5-6" /></svg>
               {{ order.status }}
             </span>
-            <button type="button" @click="showOrder(order, true)">바로 구매하기</button>
-            <button type="button" @click="router.push({ name: 'MyPageOrderDetail', params: { orderId: order.id } })">
+            <button type="button" :disabled="!order.items.length" @click="showOrder(order, true)">바로 구매하기</button>
+            <button type="button" @click="router.push({ name: 'MyPageOrderDetail', params: { orderId: order.orderId ?? order.id } })">
               주문 상세보기
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
             </button>
           </div>
         </div>
       </article>
-      <p v-if="!visibleOrders.length" class="empty-orders" role="status">조건에 맞는 주문이 없습니다.</p>
+      <p v-if="!loading && !error && !visibleOrders.length" class="empty-orders" role="status">조건에 맞는 주문이 없습니다.</p>
     </div>
 
     <template v-if="pageCount > 1" #below>
-      <nav class="order-pagination" aria-label="주문 목록 페이지">
-        <button type="button" aria-label="이전 페이지" :disabled="page === 1" @click="page--">‹</button>
-        <button
-          v-for="number in pageCount"
-          :key="number"
-          type="button"
-          :aria-current="page === number ? 'page' : undefined"
-          :aria-label="`${number}페이지`"
-          @click="page = number"
-        >{{ number }}</button>
-        <button type="button" aria-label="다음 페이지" :disabled="page === pageCount" @click="page++">›</button>
-      </nav>
+      <Pagination v-model="page" :page-count="pageCount" label="주문 목록 페이지" />
     </template>
 
     <dialog ref="dialog" class="order-dialog" aria-labelledby="order-dialog-title">
       <template v-if="selectedOrder">
         <h2 id="order-dialog-title">{{ isRepurchase ? '재구매 상품 확인' : '주문 상세보기' }}</h2>
-        <p v-if="isRepurchase">예시 주문입니다. 실제 결제는 준비 중입니다.</p>
+        <p v-if="isRepurchase && session.source === 'mock'">예시 주문입니다. 실제 결제는 준비 중입니다.</p>
+        <p v-else-if="isRepurchase">현재 판매 가격과 재고를 확인한 뒤 주문서로 이동합니다.</p>
         <p v-else>{{ selectedOrder.id }} · {{ selectedOrder.status }}</p>
         <ul>
           <li v-for="item in selectedOrder.items" :key="item.name">
@@ -136,9 +186,8 @@ async function showOrder(order, repurchase = false) {
           </li>
         </ul>
         <p>{{ isRepurchase ? '이전 주문 금액' : '주문 금액' }} <strong>{{ won(selectedOrder.total) }}</strong></p>
-        <form method="dialog">
-          <button class="primary-button" autofocus>닫기</button>
-        </form>
+        <p v-if="purchaseError" role="alert">{{ purchaseError }}</p>
+        <form method="dialog"><button autofocus :disabled="purchasing">닫기</button> <button v-if="session.source !== 'mock' && isRepurchase" class="primary-button" type="button" :disabled="purchasing" @click="repurchase">주문서로 이동</button></form>
       </template>
     </dialog>
   </MyPageLayout>
@@ -192,7 +241,7 @@ button:disabled {
   cursor: default;
 }
 
-.primary-button, .order-pagination [aria-current='page'] {
+.primary-button {
   border-color: var(--color-primary);
   background: var(--color-primary);
   color: #fff;
@@ -318,21 +367,6 @@ svg {
   font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
-}
-
-.order-pagination {
-  display: flex;
-  justify-content: center;
-  gap: 5px;
-  margin-top: 14px;
-}
-
-.order-pagination button {
-  min-width: 28px;
-  min-height: 28px;
-  padding: 0 6px;
-  border-radius: 5px;
-  font-size: 12px;
 }
 
 .empty-orders {

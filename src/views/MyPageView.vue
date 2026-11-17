@@ -1,14 +1,25 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, reactive } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import MyPageLayout from '../components/MyPageLayout.vue'
 import ProductCard from '../components/product/ProductCard.vue'
 import { getExampleOrders } from '../mocks/orders.js'
 import { getRecommendations } from '../services/catalog.js'
-import { session } from '../stores/session.js'
+import { getOrder, getOrders } from '../services/orders.js'
+import { orderDeliveryStep } from '../utils/orderDeliveryStep.js'
+import { getSessionRevision, session } from '../stores/session.js'
 import { wishedProducts } from '../stores/wishlist.js'
 
 const memberName = computed(() => session.member?.name || '오이시담')
-const deliveryOrder = getExampleOrders(new Date()).find((order) => order.status === '배송중')
+const latestOrder = ref(null)
+const deliveryOrder = computed(() => {
+  if (session.source === 'mock') return getExampleOrders(new Date()).find((order) => order.status === '배송중')
+  if (!latestOrder.value) return null
+  const data = latestOrder.value
+  return { id: data.orderNumber, orderId: data.orderId, status: data.orderStatus, items: data.items.map((item) => ({ name: item.productName })) }
+})
+const deliveryStep = computed(() => orderDeliveryStep(deliveryOrder.value?.status))
+const orderLoading = ref(session.source === 'api')
+const orderError = ref(false)
 const recommended = reactive({ items: [] })
 const failedImages = reactive(new Set())
 const wishlistPreview = computed(() => wishedProducts.value.slice(0, 4).map((product) => {
@@ -20,6 +31,17 @@ let controller
 
 onMounted(async () => {
   controller = new AbortController()
+  if (session.source === 'api') {
+    const revision = getSessionRevision()
+    try {
+      const orders = await getOrders(0, { excludePending: true, size: 1 })
+      if (controller.signal.aborted || revision !== getSessionRevision()) return
+      const latest = orders.content?.[0]
+      const detail = latest ? await getOrder(latest.orderId) : null
+      if (!controller.signal.aborted && revision === getSessionRevision()) latestOrder.value = detail
+    } catch { if (!controller.signal.aborted && revision === getSessionRevision()) orderError.value = true }
+    finally { if (!controller.signal.aborted && revision === getSessionRevision()) orderLoading.value = false }
+  }
   try {
     const response = await getRecommendations({ signal: controller.signal, limit: 3 })
     recommended.items = Array.isArray(response?.items) ? response.items.slice(0, 3) : []
@@ -51,38 +73,43 @@ onBeforeUnmount(() => controller?.abort())
     <div class="mypage-dashboard">
       <article class="dashboard-card delivery-card">
         <h2>주문/배송현황</h2>
-        <div class="delivery-progress" aria-label="주문 및 배송 진행 단계">
-          <div class="delivery-step is-complete">
+        <template v-if="deliveryOrder">
+        <div class="delivery-progress" :aria-label="'주문 및 배송 진행 단계 · ' + deliveryOrder.status">
+          <div class="delivery-step" :class="{ 'is-complete': deliveryStep > 0, 'is-active': deliveryStep === 0 }" :aria-current="deliveryStep === 0 ? 'step' : undefined">
             <span class="delivery-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14v12H5zM9 8V6a3 3 0 0 1 6 0v2" /></svg></span>
             <span>주문 완료</span>
           </div>
-          <span class="progress-line is-active"></span>
-          <div class="delivery-step is-complete">
+          <span class="progress-line" :class="{ 'is-active': deliveryStep >= 1 }"></span>
+          <div class="delivery-step" :class="{ 'is-complete': deliveryStep > 1, 'is-active': deliveryStep === 1 }" :aria-current="deliveryStep === 1 ? 'step' : undefined">
             <span class="delivery-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3ZM4 7.5 12 12l8-4.5M12 12v9" /></svg></span>
             <span>상품 준비</span>
           </div>
-          <span class="progress-line is-active"></span>
-          <div class="delivery-step is-active">
+          <span class="progress-line" :class="{ 'is-active': deliveryStep >= 2 }"></span>
+          <div class="delivery-step" :class="{ 'is-complete': deliveryStep > 2, 'is-active': deliveryStep === 2 }" :aria-current="deliveryStep === 2 ? 'step' : undefined">
             <span class="delivery-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h12v10H3zM15 10h3l3 3v4h-6zM7 19a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3ZM18 19a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z" /></svg></span>
             <span>배송 중</span>
           </div>
-          <span class="progress-line"></span>
-          <div class="delivery-step">
+          <span class="progress-line" :class="{ 'is-active': deliveryStep >= 3 }"></span>
+          <div class="delivery-step" :class="{ 'is-active': deliveryStep === 3 }" :aria-current="deliveryStep === 3 ? 'step' : undefined">
             <span class="delivery-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 12 3 3 7-7" /></svg></span>
             <span>배송 완료</span>
           </div>
         </div>
         <RouterLink
-          v-if="deliveryOrder"
           class="delivery-order-link"
-          :to="{ name: 'MyPageOrderDetail', params: { orderId: deliveryOrder.id } }"
+          :to="{ name: 'MyPageOrderDetail', params: { orderId: deliveryOrder.orderId ?? deliveryOrder.id } }"
         >
           <span class="delivery-order-header">
             <span>주문번호: {{ deliveryOrder.id }}</span>
             <span class="delivery-order-detail">상세보기 &gt;</span>
           </span>
-          <span>상품명: {{ deliveryOrder.items[0].name }}<template v-if="deliveryOrder.items.length > 1"> 외 {{ deliveryOrder.items.length - 1 }}건</template></span>
+          <span>상품명: {{ deliveryOrder.items[0]?.name ?? '상품 정보 없음' }}<template v-if="deliveryOrder.items.length > 1"> 외 {{ deliveryOrder.items.length - 1 }}건</template></span>
+          <span v-if="deliveryStep < 0">주문상태: {{ deliveryOrder.status }}</span>
         </RouterLink>
+        </template>
+        <p v-else-if="orderLoading" class="delivery-empty" role="status">최근 주문을 불러오는 중입니다.</p>
+        <p v-else-if="orderError" class="delivery-empty" role="alert">최근 주문 내역을 불러오지 못했습니다.</p>
+        <p v-else class="delivery-empty">최근 주문한 내역이 없습니다.</p>
       </article>
 
       <article class="dashboard-card ai-card">
@@ -348,6 +375,14 @@ onBeforeUnmount(() => controller?.abort())
 .delivery-card {
   display: flex;
   flex-direction: column;
+}
+
+.delivery-empty {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  text-align: center;
 }
 
 .delivery-step {

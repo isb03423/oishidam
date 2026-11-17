@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { session } from '../../stores/session.js'
-import { toggleWish, wishedIds } from '../../stores/wishlist.js'
+import { toggleWish, wishedIds, wishBusy, wishLoading } from '../../stores/wishlist.js'
 
 const props = defineProps({
   product: { type: Object, required: true },
@@ -69,6 +69,7 @@ function toggleProductWish() {
         :class="{ 'is-wished': wished }"
         :aria-label="`${product.name} ${wished ? '찜 해제' : '찜하기'}`"
         :aria-pressed="wished"
+        :disabled="wishBusy || wishLoading"
         @click="toggleProductWish"
       >
         <svg viewBox="0 0 24 24" aria-hidden="true">

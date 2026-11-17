@@ -9,9 +9,6 @@ export function getManagementData() {
   return {
     products: products.map((product) => ({ ...product, id: product.product_id })),
     categories: categories.map((category) => ({ ...category, id: category.category_id })),
-    inventory: products.flatMap((product) => product.variants.map((variant) => ({
-      ...variant, id: variant.variant_id, product_id: product.product_id,
-    }))),
     orders: getAdminDashboard(new Date()).orders.sort((a, b) => b.date - a.date),
     members: getMockCustomers(),
     inquiries: getExampleInquiries('admin-dashboard'),

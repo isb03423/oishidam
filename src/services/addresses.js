@@ -11,11 +11,12 @@ function toAddress(data) {
     address: data.addressLine1,
     detail: data.addressLine2 ?? '',
     isDefault: data.isDefault,
+    customs: data.customsCode ?? '',
   }
 }
 
 export async function getAddresses(signal) {
-  const data = await apiRequest({ path: '/addresses', signal, authenticated: true, mock: false })
+  const data = await apiRequest({ path: '/members/me/addresses', signal, authenticated: true, mock: false })
   return (Array.isArray(data) ? data : data.addresses).map(toAddress)
 }
 
@@ -27,10 +28,11 @@ export async function saveAddress(address, id, signal) {
     postalCode: address.postalCode,
     addressLine1: address.address,
     addressLine2: address.detail,
+    isDefault: address.isDefault,
+    customsCode: address.customs?.trim().toUpperCase() || null,
   }
-  if (id == null) data.isDefault = address.isDefault
   const saved = await apiRequest({
-    path: id == null ? '/addresses' : addressPath(id),
+    path: id == null ? '/members/me/addresses' : addressPath(id),
     method: id == null ? 'POST' : 'PATCH',
     data, signal, authenticated: true, mock: false,
   })
@@ -38,7 +40,7 @@ export async function saveAddress(address, id, signal) {
 }
 
 function addressPath(id) {
-  return '/addresses/' + encodeURIComponent(id)
+  return '/members/me/addresses/' + encodeURIComponent(id)
 }
 
 export function deleteAddress(id, signal) {

@@ -2,8 +2,8 @@ import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/home/HomeView.vue'
 import { session } from '../stores/session.js'
 import { hasPasswordProof } from '../services/account.js'
+import { accessRedirect } from './access.js'
 
-const requireInquiryLogin = () => session.member ? true : { name: 'Login' }
 const inquiryView = () => import('../views/InquiryHistoryView.vue')
 
 const routes = [
@@ -29,13 +29,21 @@ const routes = [
     component: () => import('../views/CheckoutView.vue'),
   },
   {
-    path: '/admin/:section(products|categories|inventory|orders|members|inquiries|reviews|analytics)?',
+    path: '/payment/success', name: 'PaymentSuccess',
+    component: () => import('../views/PaymentResultView.vue'),
+  },
+  {
+    path: '/payment/fail', name: 'PaymentFail',
+    component: () => import('../views/PaymentResultView.vue'),
+  },
+  {
+    path: '/admin/inventory',
+    redirect: (to) => ({ name: 'AdminDashboard', params: { section: 'products' }, query: to.query, hash: to.hash }),
+  },
+  {
+    path: '/admin/:section(products|categories|orders|members|inquiries|reviews|analytics)?',
     name: 'AdminDashboard',
     meta: { hideLayout: true },
-    beforeEnter: () => {
-      if (!session.member) return { name: 'Login' }
-      return session.member.role === 'ADMIN' ? true : { name: 'Home' }
-    },
     component: () => import('../views/AdminDashboardView.vue'),
   },
   {
@@ -73,13 +81,11 @@ const routes = [
   {
     path: '/mypage/inquiries',
     name: 'MyPageInquiries',
-    beforeEnter: requireInquiryLogin,
     component: inquiryView
   },
   {
     path: '/mypage/inquiries/new',
     name: 'MyPageInquiryWrite',
-    beforeEnter: requireInquiryLogin,
     component: inquiryView
   },
   {
@@ -90,19 +96,16 @@ const routes = [
   {
     path: '/mypage/address',
     name: 'MyPageAddress',
-    beforeEnter: () => session.member ? true : { name: 'Login' },
     component: () => import('../views/AddressView.vue')
   },
   {
     path: '/mypage/profile',
     name: 'MyPageProfile',
-    beforeEnter: () => session.member ? true : { name: 'Login' },
     component: () => import('../views/ProfileView.vue')
   },
   {
     path: '/mypage/withdraw',
     name: 'MyPageWithdraw',
-    beforeEnter: () => session.member ? true : { name: 'Login' },
     component: () => import('../views/WithdrawView.vue')
   },
   {
@@ -119,16 +122,27 @@ const routes = [
   {
     path: '/mypage/wishlist',
     name: 'MyPageWishlist',
-    beforeEnter: () => session.member ? true : { name: 'Login' },
     component: () => import('../views/WishlistView.vue')
+  },
+  {
+    path: '/access-denied',
+    name: 'AccessDenied',
+    meta: { hideLayout: true },
+    component: () => import('../views/AccessDeniedView.vue')
+  },
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'NotFound',
+    meta: { hideLayout: true },
+    component: () => import('../views/AccessDeniedView.vue')
   }
-
-  // 앞으로 사용자·관리자 URL을 여기에 추가
 ]
 
 const router = createRouter({
   history: createWebHistory(),
   routes
 })
+
+router.beforeEach((to, from) => accessRedirect(to, from, session.member))
 
 export default router

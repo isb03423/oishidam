@@ -1,20 +1,22 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { shippingFee, startCheckout } from '../stores/checkout.js'
 import DeleteConfirmationDialog from '../components/DeleteConfirmationDialog.vue'
 import MyPageLayout from '../components/MyPageLayout.vue'
-import { cartItems, changeCartQuantity, removeCartItems } from '../stores/cart.js'
+import { cartItems, cartLoading, cartBusy, cartError, loadCart, changeCartQuantity, removeCartItems } from '../stores/cart.js'
 
 const selection = ref([])
 const deleteDialog = ref(null)
 const router = useRouter()
-const selectedItems = computed(() => cartItems.value.filter((item) => selection.value.includes(item.variant_id)))
+const selectedItems = computed(() => cartItems.value.filter((item) => selection.value.includes(item.product_id)))
 const subtotal = computed(() => selectedItems.value.reduce((sum, item) => sum + item.price * item.quantity, 0))
 const formatter = new Intl.NumberFormat('ko-KR')
 const won = (value) => Number.isFinite(value) ? `${formatter.format(value)}원` : '가격 확인 필요'
 
-function checkoutSelected() {
+async function checkoutSelected() {
+  await loadCart()
+  if (cartError.value || !selectedItems.value.length || selectedItems.value.some((item) => !item.available)) return
   startCheckout(selectedItems.value, true)
   router.push({ name: 'Checkout' })
 }
@@ -23,32 +25,41 @@ const allSelected = computed(() =>
 )
 
 watch(cartItems, (items) => {
-  selection.value = selection.value.filter((id) => items.some((item) => item.variant_id === id))
+  selection.value = selection.value.filter((id) => items.some((item) => item.product_id === id))
 })
+onMounted(loadCart)
+async function changeQuantity(id, delta) {
+  try { await changeCartQuantity(id, delta) } catch { /* 오류는 장바구니 상태에 표시됩니다. */ }
+}
+async function deleteItems(ids) {
+  try { await removeCartItems(ids) } catch { /* 성공한 항목은 유지하고 실패한 항목을 표시합니다. */ }
+}
 </script>
 
 <template>
   <MyPageLayout icon="cart" title="장바구니" description="담아둔 상품을 확인하고 주문해보세요.">
+    <p v-if="cartLoading" role="status">장바구니를 불러오는 중이에요.</p>
+    <div v-if="cartError" role="alert"><p>{{ cartError }}</p><button type="button" :disabled="cartBusy || cartLoading" @click="loadCart">다시 불러오기</button></div>
     <div class="cart-toolbar">
       <label class="cart-select-all">
         <input
           type="checkbox"
           :checked="allSelected"
-          :disabled="!cartItems.length"
+          :disabled="!cartItems.length || cartLoading || cartBusy"
           :indeterminate="selection.length > 0 && !allSelected"
-          @change="selection = $event.target.checked ? cartItems.map((item) => item.variant_id) : []"
+          @change="selection = $event.target.checked ? cartItems.map((item) => item.product_id) : []"
         />
         전체 선택 ({{ cartItems.length }})
       </label>
-      <button type="button" :disabled="!selection.length" @click="deleteDialog.open(selection)">
+      <button type="button" :disabled="!selection.length || cartLoading || cartBusy" @click="deleteDialog.open(selection)">
         선택 상품 삭제
       </button>
     </div>
 
     <template v-if="cartItems.length">
       <ul class="cart-items">
-        <li v-for="item in cartItems" :key="item.variant_id" class="cart-row">
-          <input v-model="selection" type="checkbox" :value="item.variant_id" :aria-label="`${item.name} 선택`" />
+        <li v-for="item in cartItems" :key="item.product_id" class="cart-row">
+          <input v-model="selection" type="checkbox" :value="item.product_id" :disabled="cartLoading || cartBusy" :aria-label="`${item.name} 선택`" />
           <RouterLink
             class="cart-thumbnail product-thumbnail-zoom"
             :to="{ name: 'ProductDetail', params: { productId: item.product_id } }"
@@ -60,14 +71,15 @@ watch(cartItems, (items) => {
           <div class="cart-product">
             <strong>{{ item.name || item.product_id }}</strong>
             <b>{{ won(item.price) }}</b>
+            <p v-if="!item.available" role="status">판매 상태 또는 재고를 확인해주세요.</p>
           </div>
           <div class="cart-quantity" :aria-label="`${item.name} 수량`">
-            <button type="button" :disabled="item.quantity <= 1" :aria-label="`${item.name} 수량 줄이기`" @click="changeCartQuantity(item.variant_id, -1)">−</button>
+            <button type="button" :disabled="item.quantity <= 1 || cartLoading || cartBusy" :aria-label="`${item.name} 수량 줄이기`" @click="changeQuantity(item.product_id, -1)">−</button>
             <span aria-live="polite">{{ item.quantity }}</span>
-            <button type="button" :disabled="item.quantity >= (item.stock ?? 1)" :aria-label="`${item.name} 수량 늘리기`" @click="changeCartQuantity(item.variant_id, 1)">+</button>
+            <button type="button" :disabled="item.quantity >= (item.stock ?? 1) || cartLoading || cartBusy" :aria-label="`${item.name} 수량 늘리기`" @click="changeQuantity(item.product_id, 1)">+</button>
           </div>
           <strong class="cart-line-total">{{ won(item.price * item.quantity) }}</strong>
-          <button class="cart-remove" type="button" :aria-label="`${item.name} 삭제`" @click="deleteDialog.open([item.variant_id])">×</button>
+          <button class="cart-remove" type="button" :disabled="cartLoading || cartBusy" :aria-label="`${item.name} 삭제`" @click="deleteDialog.open([item.product_id])">×</button>
         </li>
       </ul>
 
@@ -80,13 +92,13 @@ watch(cartItems, (items) => {
             <div class="cart-total"><dt>총 결제 예정 금액</dt><dd>{{ won(subtotal + shippingFee) }}</dd></div>
           </dl>
         </div>
-        <button class="cart-checkout" type="button" :disabled="!selectedItems.length || !Number.isFinite(subtotal)" @click="checkoutSelected">
+        <button class="cart-checkout" type="button" :disabled="!selectedItems.length || selectedItems.some((item) => !item.available) || cartLoading || cartBusy || Boolean(cartError) || !Number.isFinite(subtotal)" @click="checkoutSelected">
           {{ selectedItems.length ? `${selectedItems.length}개 상품 주문하기` : '선택 상품 주문하기' }}
         </button>
       </section>
     </template>
-    <p v-else class="cart-empty" role="status">장바구니에 담긴 상품이 없어요.</p>
-    <DeleteConfirmationDialog ref="deleteDialog" description="선택한 상품이 장바구니에서 삭제됩니다." @confirm="removeCartItems" />
+    <p v-else-if="!cartLoading && !cartError" class="cart-empty" role="status">장바구니에 담긴 상품이 없어요.</p>
+    <DeleteConfirmationDialog ref="deleteDialog" description="선택한 상품이 장바구니에서 삭제됩니다." @confirm="deleteItems" />
   </MyPageLayout>
 </template>
 

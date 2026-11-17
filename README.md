@@ -42,8 +42,16 @@ API 주소가 없는데 mock을 끄면 `API_BASE_URL_MISSING` 오류를 표시�
 
 - 프로젝트 로고, 이메일·비밀번호 필수 입력, 비밀번호 표시 전환, 로그인 상태 유지, 카카오 버튼을 구현했습니다. 네이버·구글 로그인은 제공하지 않습니다.
 - Mock 모드의 테스트 계정은 `demo@oishidam.test` / `Oishi1234!`입니다. 잘못된 계정은 401, 개발 도구의 오류 시나리오는 503을 반환합니다.
-- 카카오 버튼은 Mock 모드에서 가상 카카오 회원으로 로그인합니다. 실제 카카오 계정 인증이나 OAuth 동의는 수행하지 않습니다. Mock을 끄면 서버 연동 준비 안내를 표시합니다.
+- 카카오 버튼은 Mock 모드에서 가상 회원으로, API 모드에서는 실제 카카오 인증 팝업으로 로그인합니다. 백엔드의 `/oauth2/authorization/kakao`를 열고, 같은 백엔드 출처와 해당 팝업에서 온 결과만 수신합니다. 성공하면 `GET /api/members/me`로 회원 정보를 확인하고 로그인합니다. 팝업 차단·닫기·인증 실패·3분 시간 초과는 로그인 화면에 표시합니다.
 - 성공 시 홈으로 이동하고 헤더에 이름·로그아웃 버튼을 표시합니다. 로그인 상태 유지는 mock 프로필을 localStorage에 최대 7일 보관하며, 미선택 시 sessionStorage를 사용합니다. 비밀번호는 저장하지 않습니다. 이 프로필은 서버 권한 검증에 사용할 수 없습니다.
 - Mock/API 전환 시 프로필을 초기화하고 진행 중인 로그인 요청을 취소합니다. 실제 토큰 자동 재발급은 전달 정책 확정 후 연결합니다. 서버 전용 비밀키는 프론트엔드에 넣지 않습니다.
 - 실제 인증 요청은 `POST /api/auth/signup` (email, password, name 및 선택 입력 phone, birthYear, gender), `POST /api/auth/login` (email, password), `POST /api/auth/logout` (Bearer 액세스 토큰과 본문의 refreshToken)을 사용합니다. 토큰은 메모리에 보관하며 새로고침 시 다시 로그인해야 합니다.
 - 비밀번호 찾기는 아직 준비 중 안내를 표시합니다. 회원가입은 `/signup`에서 이메일·비밀번호·이름과 필수 약관 동의로 진행할 수 있으며, 휴대폰 번호는 선택입니다. 개발용 mock 가입 정보는 브라우저를 새로고침하면 초기화됩니다.
+
+### 실제 카카오 로그인 설정
+
+- 로컬 프론트 API 주소는 `VITE_API_BASE_URL=http://localhost:8080/api`로 설정하고 Mock을 끕니다.
+- 백엔드 `.env`에 `KAKAO_LOGIN_ENABLED=true`, 카카오 REST API 키인 `KAKAO_CLIENT_ID`, `KAKAO_CLIENT_SECRET`, `FRONTEND_URL=http://localhost:5173`을 설정합니다. `FRONTEND_URL`은 프론트를 연 주소의 출처와 정확히 같아야 합니다.
+- 카카오 개발자 콘솔에서 카카오 로그인을 활성화하고 Redirect URI로 `http://localhost:8080/login/oauth2/code/kakao`를 등록합니다. 이 주소는 프론트엔드 주소가 아니라 백엔드 콜백 주소입니다. [카카오 설정 문서](https://developers.kakao.com/docs/ko/kakaologin/prerequisite)
+- 서버 주소와 설정을 바꾸면 해당 개발 서버를 재시작합니다. 실제 토큰은 기존 이메일 로그인처럼 메모리에만 보관합니다.
+- `npm test`로 팝업 출처·창 검증과 취소·오류 처리를 확인합니다.

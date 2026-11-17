@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import logo from '../../assets/images/oishidam_logo.png'
+import AlertDialog from '../../components/common/AlertDialog.vue'
 import { login, loginWithKakao } from '../../services/auth.js'
 import { development } from '../../config/development.js'
 
@@ -78,6 +79,7 @@ onBeforeUnmount(() => {
 
 <template>
   <main class="login-page">
+    <AlertDialog :message="error || notice" @close="error = ''; notice = ''" />
     <section class="login-panel" aria-labelledby="login-title">
       <RouterLink class="login-logo" to="/" aria-label="오이시담 홈">
         <img :src="logo" alt="오이시담" />
@@ -102,8 +104,6 @@ onBeforeUnmount(() => {
           <label class="remember-login"><input v-model="remember" type="checkbox" :disabled="Boolean(pending)" /> 자동 로그인</label>
           <button class="login-text-button" type="button" @click="showUpcoming('비밀번호 찾기')">비밀번호 찾기</button>
         </div>
-        <p v-if="error" class="login-error" role="alert">{{ error }}</p>
-        <p v-if="notice" class="login-notice" role="status">{{ notice }}</p>
         <button class="login-submit" type="submit" :disabled="Boolean(pending)">{{ pending === 'email' ? '로그인 중…' : '로그인' }}</button>
       </form>
 

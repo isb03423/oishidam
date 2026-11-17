@@ -5,10 +5,13 @@ import placeholder from '../assets/images/favicon-mark.png'
 import { development } from '../config/development.js'
 import { categories } from '../data/categories.js'
 import { getProduct } from '../services/catalog.js'
-import { addVariantToCart, cartLine } from '../stores/cart.js'
+import { getProductReviews } from '../services/reviews.js'
+import AlertDialog from '../components/common/AlertDialog.vue'
+import Pagination from '../components/common/Pagination.vue'
+import { addProductToCart, cartLine, cartBusy, cartLoading } from '../stores/cart.js'
 import { startCheckout } from '../stores/checkout.js'
 import { session } from '../stores/session.js'
-import { toggleWish, wishedIds } from '../stores/wishlist.js'
+import { toggleWish, wishedIds, wishBusy, wishLoading } from '../stores/wishlist.js'
 
 const tabs = [
   { id: 'details', label: '상품 상세정보' },
@@ -23,13 +26,19 @@ const retry = ref(0)
 const tab = ref('details')
 const selectedImage = ref(null)
 const failedImages = ref(new Set())
-const variantId = ref(null)
 const quantity = ref(1)
 const notice = ref('')
 const cartDialog = ref(null)
 const reviewDialog = ref(null)
 const activeReview = ref(null)
-const optionSelect = ref(null)
+const serverReviews = ref([])
+const reviewPage = ref(1)
+const reviewTotal = ref(null)
+const reviewPages = ref(0)
+const reviewLoading = ref(false)
+const reviewError = ref('')
+const reviewNotice = ref('')
+const reviewRetry = ref(0)
 const formatter = new Intl.NumberFormat('ko-KR')
 const won = (price) => Number.isFinite(price) ? `${formatter.format(price)}원` : '가격 확인 필요'
 
@@ -37,17 +46,15 @@ const category = computed(() => categories.find((item) => item.category_id === S
 const images = computed(() => (product.value?.images ?? []).filter((image) => image.url && !failedImages.value.has(image.url)))
 const primaryImage = computed(() => images.value.find((image) => image.is_primary) ?? images.value[0])
 const currentImage = computed(() => images.value.find((image) => image.url === selectedImage.value) ?? primaryImage.value)
-const reviews = computed(() => development.mockEnabled ? product.value?.reviews ?? [] : [])
+const reviews = computed(() => development.mockEnabled ? product.value?.reviews ?? [] : serverReviews.value)
+const reviewCount = computed(() => development.mockEnabled ? reviews.value.length : reviewTotal.value)
 const averageRating = computed(() => reviews.value.length
   ? (reviews.value.reduce((sum, review) => sum + review.rating, 0) / reviews.value.length).toFixed(1)
   : null)
-const variants = computed(() => (product.value?.variants ?? []).filter((variant) => variant.is_active))
-const inStock = (variant) => variant.stock_quantity > 0
-const soldOut = computed(() => product.value?.is_sold_out || (variants.value.length > 0 && !variants.value.some(inStock)))
-const selected = computed(() => variants.value.find((variant) => variant.variant_id === variantId.value))
-const maxQuantity = computed(() => soldOut.value ? 0 : selected.value?.stock_quantity ?? 0)
+const soldOut = computed(() => product.value?.is_sold_out || !(product.value?.stock_quantity > 0))
+const maxQuantity = computed(() => soldOut.value ? 0 : product.value?.stock_quantity ?? 0)
 const lowStock = computed(() => maxQuantity.value > 0 && maxQuantity.value < 5)
-const canOrder = computed(() => !soldOut.value && variants.value.some(inStock))
+const canOrder = computed(() => !soldOut.value && maxQuantity.value > 0)
 const wished = computed(() => Boolean(session.member) && wishedIds.value.includes(product.value?.product_id))
 
 watch(
@@ -58,19 +65,19 @@ watch(
     onCleanup(() => controller.abort())
     status.value = 'loading'
     product.value = null
+    reviewPage.value = 1
+    activeReview.value = null
+    reviewNotice.value = ''
+    reviewDialog.value?.close()
     tab.value = 'details'
     selectedImage.value = null
     failedImages.value.clear()
-    variantId.value = null
     quantity.value = 1
     clearNotice()
     try {
       const detail = await getProduct(id, { signal: controller.signal })
       if (controller.signal.aborted) return
       product.value = detail
-      if (variants.value.length === 1 && inStock(variants.value[0])) {
-        variantId.value = variants.value[0].variant_id
-      }
       status.value = detail ? 'ready' : 'missing'
     } catch (error) {
       if (!controller.signal.aborted) {
@@ -81,13 +88,31 @@ watch(
   { immediate: true },
 )
 
+watch([() => product.value?.product_id, tab, reviewPage, reviewRetry, () => development.mockEnabled], async ([id], _, onCleanup) => {
+  const controller = new AbortController()
+  onCleanup(() => controller.abort())
+  reviewLoading.value = false
+  reviewError.value = ''
+  if (!id) { serverReviews.value = []; reviewTotal.value = null; reviewPages.value = 0; return }
+  if (development.mockEnabled || tab.value !== 'reviews') return
+  reviewLoading.value = true
+  serverReviews.value = []
+  try {
+    const result = await getProductReviews(id, reviewPage.value - 1, { signal: controller.signal })
+    if (controller.signal.aborted) return
+    if (reviewPage.value > 1 && reviewPage.value > result.totalPages) { reviewPage.value = Math.max(1, result.totalPages); return }
+    serverReviews.value = result.content
+    reviewTotal.value = result.totalElements
+    reviewPages.value = result.totalPages
+  } catch (failure) {
+    if (!controller.signal.aborted) { reviewError.value = failure.message; reviewNotice.value = failure.message }
+  } finally {
+    if (!controller.signal.aborted) reviewLoading.value = false
+  }
+})
+
 function clearNotice() {
   notice.value = ''
-}
-
-function changeOption() {
-  quantity.value = 1
-  clearNotice()
 }
 
 function changeQuantity(delta) {
@@ -122,29 +147,25 @@ function toggleProductWish() {
   toggleWish(product.value)
 }
 
-function order(buyNow) {
+async function order(buyNow) {
   if (!session.member) {
     router.push({ name: 'Login' })
     return
   }
 
   clearNotice()
-  if (!selected.value) {
-    notice.value = '상품 옵션을 선택해주세요.'
-    optionSelect.value?.focus()
-    return
-  }
   if (buyNow) {
-    if (!canOrder.value || !Number.isFinite(selected.value.price) || quantity.value > maxQuantity.value) return
-    startCheckout([cartLine(product.value, selected.value, quantity.value)])
+    if (!canOrder.value || !Number.isFinite(product.value.price) || quantity.value > maxQuantity.value) return
+    startCheckout([cartLine(product.value, quantity.value)])
     router.push({ name: 'Checkout' })
     return
   }
-  if (addVariantToCart(product.value, variantId.value, quantity.value)) {
+  try {
+    await addProductToCart(product.value, quantity.value)
     cartDialog.value.showModal()
-    return
+  } catch (error) {
+    notice.value = error.message
   }
-  notice.value = '장바구니에 담을 수 있는 재고 수량을 확인해주세요.'
 }
 </script>
 
@@ -195,21 +216,12 @@ function order(buyNow) {
         <section class="summary" aria-labelledby="product-title">
           <span v-if="category" class="category">{{ category.name }}</span>
           <h1 id="product-title">{{ product.name }}</h1>
-          <p class="price">{{ won(selected?.price ?? product.min_price) }}</p>
+          <p class="price">{{ won(product.price) }}</p>
 
           <p v-if="soldOut" class="stock-badge" role="status">품절</p>
           <p v-if="product.summary" class="description">{{ product.summary }}</p>
 
           <div class="purchase-fields">
-            <div v-if="variants.length > 1" class="field-row">
-              <label for="product-option">옵션</label>
-              <select id="product-option" ref="optionSelect" v-model="variantId" :disabled="soldOut" @change="changeOption">
-                <option :value="null" disabled>옵션을 선택해주세요</option>
-                <option v-for="variant in variants" :key="variant.variant_id" :value="variant.variant_id" :disabled="!inStock(variant)">
-                  {{ variant.variant_name }} · {{ won(variant.price) }}{{ inStock(variant) ? '' : ' (품절)' }}
-                </option>
-              </select>
-            </div>
             <div class="field-row">
               <span id="quantity-label">수량</span>
               <div class="quantity-row">
@@ -227,7 +239,7 @@ function order(buyNow) {
               </div>
             </div>
           </div>
-          <div class="total"><span>선택 상품 총금액</span><strong>{{ selected ? won(selected.price * quantity) : '—' }}</strong></div>
+          <div class="total"><span>선택 상품 총금액</span><strong>{{ won(product.price * quantity) }}</strong></div>
           <p v-if="lowStock" class="stock-notice" role="status">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3ZM4 7.5 12 12l8-4.5M12 12v9" />
@@ -235,11 +247,11 @@ function order(buyNow) {
             <span>품절 임박 · 구매 전 재고를 확인해 주세요</span>
           </p>
           <div class="purchase-actions">
-            <button type="button" class="action outline wish" :aria-pressed="wished" @click="toggleProductWish">
+            <button type="button" class="action outline wish" :aria-pressed="wished" :disabled="wishBusy || wishLoading" @click="toggleProductWish">
               찜하기
             </button>
-            <button type="button" class="action outline" :disabled="!canOrder" :aria-haspopup="session.member ? 'dialog' : undefined" @click="order(false)">장바구니 담기</button>
-            <button type="button" class="action primary" :disabled="!canOrder" @click="order(true)">바로 구매하기</button>
+            <button type="button" class="action outline" :disabled="!canOrder || cartBusy || cartLoading" :aria-haspopup="session.member ? 'dialog' : undefined" @click="order(false)">장바구니 담기</button>
+            <button type="button" class="action primary" :disabled="!canOrder || cartBusy || cartLoading" @click="order(true)">바로 구매하기</button>
           </div>
           <p v-if="notice" class="notice" role="status">{{ notice }}</p>
           <dialog ref="cartDialog" class="cart-dialog" aria-labelledby="cart-dialog-title">
@@ -254,7 +266,7 @@ function order(buyNow) {
 
       <div class="detail-tabs" role="tablist" aria-label="상품 정보">
         <button v-for="(item, index) in tabs" :id="`tab-${item.id}`" :key="item.id" type="button" role="tab" :aria-selected="tab === item.id" :tabindex="tab === item.id ? 0 : -1" :aria-controls="`panel-${item.id}`" @click="tab = item.id" @keydown="selectTab($event, index)">
-          {{ item.label }}<template v-if="item.id === 'reviews' && development.mockEnabled"> ({{ reviews.length }})</template>
+          {{ item.label }}<template v-if="item.id === 'reviews' && reviewCount != null"> ({{ reviewCount }})</template>
         </button>
       </div>
       <section v-show="tab === 'details'" id="panel-details" class="detail-panel" role="tabpanel" aria-labelledby="tab-details" tabindex="0">
@@ -270,23 +282,24 @@ function order(buyNow) {
       </section>
       <section v-show="tab === 'reviews'" id="panel-reviews" class="detail-panel" role="tabpanel" aria-labelledby="tab-reviews" tabindex="0">
         <h2>상품 리뷰</h2>
-        <template v-if="development.mockEnabled">
           <div class="review-summary">
-            <div>
+            <div v-if="development.mockEnabled">
               <span>평균 별점</span>
               <strong><span aria-hidden="true">★</span> {{ averageRating ?? '—' }}</strong>
               <span v-if="averageRating">/ 5</span>
             </div>
-            <span>전체 리뷰 {{ reviews.length }}건</span>
+            <span v-if="reviewCount != null">전체 리뷰 {{ reviewCount }}건</span>
           </div>
 
+          <p v-if="reviewLoading" class="activity-empty" role="status">리뷰를 불러오고 있어요.</p>
+          <p v-if="reviewError" class="activity-empty">{{ reviewError }} <button type="button" class="action outline" @click="reviewRetry++">다시 시도</button></p>
           <div v-if="reviews.length" class="review-list">
             <article v-for="review in reviews" :key="review.id" class="activity-panel review-entry">
               <button type="button" class="review-card" aria-haspopup="dialog" @click="openReview(review)">
                 <span class="review-main">
                   <strong class="review-product-name">{{ product.name }}</strong>
                   <span class="review-meta">
-                    <span class="review-stars" :aria-label="`5점 만점에 ${review.rating}점`">
+                    <span v-if="review.rating != null" class="review-stars" :aria-label="`5점 만점에 ${review.rating}점`">
                       <span aria-hidden="true">{{ '★'.repeat(review.rating) }}{{ '☆'.repeat(5 - review.rating) }}</span>
                     </span>
                     <time :datetime="review.date">{{ review.date }}</time>
@@ -304,7 +317,8 @@ function order(buyNow) {
               </button>
             </article>
           </div>
-          <p v-else class="activity-empty">아직 등록된 리뷰가 없어요.</p>
+          <p v-else-if="!reviewLoading && !reviewError" class="activity-empty">아직 등록된 리뷰가 없어요.</p>
+          <Pagination v-if="!development.mockEnabled" v-model="reviewPage" :page-count="reviewPages" :disabled="reviewLoading" label="상품 리뷰 페이지" />
           <dialog ref="reviewDialog" class="review-dialog" aria-labelledby="review-dialog-title">
             <header class="review-dialog-header">
               <h2 id="review-dialog-title">상품 리뷰 상세</h2>
@@ -315,7 +329,7 @@ function order(buyNow) {
             <div v-if="activeReview" class="review-main">
               <strong class="review-product-name">{{ product.name }}</strong>
               <p class="review-meta">
-                <span class="review-stars" :aria-label="`5점 만점에 ${activeReview.rating}점`">
+                <span v-if="activeReview.rating != null" class="review-stars" :aria-label="`5점 만점에 ${activeReview.rating}점`">
                   <span aria-hidden="true">{{ '★'.repeat(activeReview.rating) }}{{ '☆'.repeat(5 - activeReview.rating) }}</span>
                 </span>
                 <time :datetime="activeReview.date">{{ activeReview.date }}</time>
@@ -332,8 +346,6 @@ function order(buyNow) {
               </div>
             </div>
           </dialog>
-        </template>
-        <p v-else>상품 리뷰 조회와 작성 기능을 준비 중이에요.</p>
       </section>
       <section v-show="tab === 'customs'" id="panel-customs" class="detail-panel" role="tabpanel" aria-labelledby="tab-customs" tabindex="0">
         <h2>해외배송 통관 안내</h2>
@@ -355,6 +367,7 @@ function order(buyNow) {
       </section>
     </template>
   </main>
+  <AlertDialog :message="reviewNotice" @close="reviewNotice = ''" />
 </template>
 
 <style scoped src="../styles/mypage-activity.css"></style>

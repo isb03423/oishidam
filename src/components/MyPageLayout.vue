@@ -31,6 +31,7 @@ const titleIcons = {
         :class="{ 'mypage-content--stretch': stretchContent }"
         aria-labelledby="mypage-title"
       >
+        <slot name="overlay" />
         <header class="mypage-heading">
           <h1 id="mypage-title">
             <svg v-if="titleIcons[icon]" class="mypage-title-icon" viewBox="0 0 24 24" aria-hidden="true">

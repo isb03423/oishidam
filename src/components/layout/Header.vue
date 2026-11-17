@@ -222,6 +222,7 @@ async function handleLogout() {
   logoutError.value = ''
   try {
     await logout()
+    if (!session.member) await router.replace({ name: 'Home' })
   } catch {
     logoutError.value = '로그아웃하지 못했습니다. 잠시 후 다시 시도해주세요.'
   } finally {

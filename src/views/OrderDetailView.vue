@@ -1,22 +1,60 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import MyPageLayout from '../components/MyPageLayout.vue'
 import { getExampleOrders } from '../mocks/orders.js'
+import { session, shoppingOwner } from '../stores/session.js'
+import { cancelOrder, getOrder } from '../services/orders.js'
+import { getProduct } from '../services/catalog.js'
+import { formatPhone } from '../services/phone.js'
 
 const route = useRoute()
 const isItemsExpanded = ref(false)
 const cancellationDialog = ref(null)
 const currency = new Intl.NumberFormat('ko-KR')
 const orders = getExampleOrders(new Date())
-const receiptWaves = Array.from({ length: 25 }, (_, index) => index * 4)
+const order = ref(null)
+const error = ref('')
+const cancelError = ref('')
+const cancelReason = ref('')
+const busy = ref(false)
+let revision = 0
+async function load() {
+  const current = ++revision
+  const id = route.params.orderId
+  isItemsExpanded.value = false
+  order.value = null
+  error.value = ''
+  if (session.source === 'mock') {
+    order.value = orders.find((item) => item.id === id) ?? null
+    if (!order.value) error.value = '주문을 찾을 수 없습니다.'
+    return
+  }
+  try {
+    const data = await getOrder(id)
+    const images = await Promise.all(data.items.map(async (item) => {
+      try { return (await getProduct(String(item.productId))).images?.find((image) => image.is_primary)?.url ?? null } catch { return null }
+    }))
+    if (current !== revision) return
+    order.value = { ...data, id: data.orderNumber, status: data.orderStatus, total: data.totalAmount, displayDate: data.createdAt?.replace('T', ' ').slice(0, 16) ?? '—', items: data.items.map((item, index) => ({ product_id: String(item.productId), name: item.productName, quantity: item.quantity, price: item.unitPrice, imageUrl: images[index] })) }
+  } catch (failure) { if (current === revision) error.value = failure.message }
+}
+watch([() => route.params.orderId, shoppingOwner], load, { immediate: true })
+onBeforeUnmount(() => { revision++ })
 
-const order = computed(() =>
-  orders.find((item) => item.id === route.params.orderId) ?? orders[0],
-)
+async function confirmCancellation() {
+  if (busy.value || !order.value) return
+  busy.value = true
+  cancelError.value = ''
+  try {
+    await cancelOrder(order.value.orderId, cancelReason.value.trim())
+    cancellationDialog.value.close()
+    await load()
+  } catch (failure) { cancelError.value = failure.message } finally { busy.value = false }
+}
 
 const visibleItems = computed(() =>
-  isItemsExpanded.value ? order.value.items : order.value.items.slice(0, 1),
+  isItemsExpanded.value ? order.value?.items ?? [] : order.value?.items.slice(0, 1) ?? [],
 )
 
 const won = (price) => `${currency.format(price)}원`
@@ -31,15 +69,9 @@ const won = (price) => `${currency.format(price)}원`
       </RouterLink>
     </template>
 
-    <article class="order-receipt" aria-label="주문 내역서">
-      <svg class="receipt-frame" viewBox="0 0.7 100 98.6" preserveAspectRatio="none" aria-hidden="true">
-        <rect class="receipt-paper" x="0" y="1.4" width="100" height="97.2" />
-        <g class="receipt-edge">
-          <path v-for="start in receiptWaves" :key="`top-${start}`" :d="`M${start} 1.4 Q${start + 2} 0 ${start + 4} 1.4`" />
-          <path v-for="start in receiptWaves" :key="`bottom-${start}`" :d="`M${start} 98.6 Q${start + 2} 100 ${start + 4} 98.6`" />
-          <path d="M0 1.4 V98.6 M100 1.4 V98.6" />
-        </g>
-      </svg>
+    <p v-if="error" role="alert">{{ error }}</p>
+    <p v-else-if="!order" role="status">주문을 불러오는 중이에요.</p>
+    <article v-if="order" class="order-receipt" aria-label="주문 내역서">
       <header class="receipt-heading">
         <p>주문 내역서</p>
         <span>ORDER RECEIPT</span>
@@ -60,7 +92,7 @@ const won = (price) => `${currency.format(price)}원`
               :aria-label="item.name + ' 상품 상세보기'"
             >
               <img v-if="item.imageUrl" :src="item.imageUrl" alt="" loading="lazy" />
-              <span v-else>{{ item.brand }}</span>
+              <span v-else>{{ item.brand || '상품' }}</span>
             </RouterLink>
             <div>
               <strong>{{ item.name }}</strong>
@@ -90,31 +122,30 @@ const won = (price) => `${currency.format(price)}원`
       </section>
 
       <footer class="receipt-total">
-        <div><span>상품금액</span><strong>{{ won(order.total) }}</strong></div>
-        <div><span>배송비</span><strong>0원</strong></div>
+        <div><span>상품금액</span><strong>{{ won(order.itemsAmount ?? order.total) }}</strong></div>
+        <div><span>배송비</span><strong>{{ won(order.shippingFee ?? 0) }}</strong></div>
         <div class="receipt-final-total"><span>총 결제금액</span><strong>{{ won(order.total) }}</strong></div>
       </footer>
     </article>
 
     <dialog ref="cancellationDialog" class="order-cancel-dialog" aria-labelledby="cancel-dialog-title">
       <h2 id="cancel-dialog-title">주문 취소</h2>
-      <p>주문 취소 기능을 준비 중입니다.</p>
-      <form method="dialog">
-        <button class="order-cancel-button" autofocus>닫기</button>
-      </form>
+      <p v-if="session.source === 'mock'">주문 취소 기능을 준비 중입니다.</p>
+      <template v-else><p>주문을 취소하시겠어요?</p><label>취소 사유 <input v-model="cancelReason" maxlength="200" /></label><p v-if="cancelError" role="alert">{{ cancelError }}</p></template>
+      <div><button class="order-cancel-button" type="button" :disabled="busy" @click="cancellationDialog.close()">닫기</button> <button v-if="session.source !== 'mock'" class="order-cancel-button" type="button" :disabled="busy" @click="confirmCancellation">주문 취소</button></div>
     </dialog>
 
     <template #side>
-      <aside class="order-info-list" aria-label="주문 부가 정보">
+      <aside v-if="order" class="order-info-list" aria-label="주문 부가 정보">
         <section class="order-info-card">
           <h2>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h8l3 3v15H7zM15 3v4h4M10 12h5M10 16h5" /></svg>
             주문정보
-            <button class="order-cancel-button" type="button" @click="cancellationDialog.showModal()">주문 취소</button>
+            <button v-if="session.source === 'mock' || order.canCancel" class="order-cancel-button" type="button" @click="cancelError = ''; cancelReason = ''; cancellationDialog.showModal()">주문 취소</button>
           </h2>
           <dl>
             <div><dt>주문번호</dt><dd>{{ order.id }}</dd></div>
-            <div><dt>주문일시</dt><dd>{{ order.displayDate }} 14:32</dd></div>
+            <div><dt>주문일시</dt><dd>{{ order.displayDate }}<template v-if="session.source === 'mock'"> 14:32</template></dd></div>
             <div><dt>주문상태</dt><dd><span class="status-chip">{{ order.status }}</span></dd></div>
           </dl>
         </section>
@@ -125,10 +156,11 @@ const won = (price) => `${currency.format(price)}원`
             배송정보
           </h2>
           <dl>
-            <div><dt>받는사람</dt><dd>김오이</dd></div>
-            <div><dt>연락처</dt><dd>010-1234-5678</dd></div>
-            <div><dt>개인통관고유부호</dt><dd>등록 정보 없음</dd></div>
-            <div><dt>배송지</dt><dd>서울특별시 강남구 테헤란로 123, 10층 (역삼동)</dd></div>
+            <div><dt>받는사람</dt><dd>{{ order.recipient?.recipientName ?? (session.source === 'mock' ? '김오이' : '—') }}</dd></div>
+            <div><dt>연락처</dt><dd>{{ order.recipient?.recipientPhone ? formatPhone(order.recipient.recipientPhone) : session.source === 'mock' ? '010-1234-5678' : '—' }}</dd></div>
+            <div><dt>개인통관고유부호</dt><dd>{{ order.recipient?.customsCode || '등록 정보 없음' }}</dd></div>
+            <div><dt>배송지</dt><dd>{{ order.recipient ? `${order.recipient.addressLine1} ${order.recipient.addressLine2 ?? ''} (${order.recipient.postalCode})` : session.source === 'mock' ? '서울특별시 강남구 테헤란로 123, 10층 (역삼동)' : '—' }}</dd></div>
+            <div v-if="order.recipient?.deliveryMemo"><dt>배송 요청사항</dt><dd>{{ order.recipient.deliveryMemo }}</dd></div>
           </dl>
         </section>
 
@@ -138,8 +170,8 @@ const won = (price) => `${currency.format(price)}원`
             결제정보
           </h2>
           <dl>
-            <div><dt>결제수단</dt><dd>카드 결제 (삼성카드)</dd></div>
-            <div><dt>결제일시</dt><dd>{{ order.displayDate }} 14:32</dd></div>
+            <div><dt>결제수단</dt><dd>{{ session.source === 'mock' ? '카드 결제 (삼성카드)' : '—' }}</dd></div>
+            <div><dt>결제일시</dt><dd>{{ session.source === 'mock' ? order.displayDate + ' 14:32' : order.paidAt?.replace('T', ' ').slice(0, 16) ?? '—' }}</dd></div>
             <div><dt>결제금액</dt><dd>{{ won(order.total) }}</dd></div>
           </dl>
         </section>
@@ -219,32 +251,24 @@ const won = (price) => `${currency.format(price)}원`
   margin-top: 4px;
   padding: 30px 20px 34px;
   box-sizing: border-box;
+  background: #fffdfd;
+  border-inline: 1px solid #d9bec6;
+  filter: drop-shadow(0 10px 16px rgb(57 44 50 / 14%));
 }
 
-/* SVG가 상·하단의 물결과 외곽선을 직접 그립니다. */
-.receipt-frame {
+.order-receipt::before, .order-receipt::after {
+  content: '';
   position: absolute;
-  inset: 0;
-  z-index: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  filter: drop-shadow(0 10px 16px rgb(57 44 50 / 14%));
+  left: -1px;
+  right: -1px;
+  height: 10px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='10' viewBox='0 0 24 10'%3E%3Cpath d='M0 10 Q6 -8 12 10 Q18 -8 24 10' fill='%23fffdfd' stroke='%23d9bec6'/%3E%3C/svg%3E") repeat-x left bottom / 24px 10px;
   pointer-events: none;
 }
+.order-receipt::before { top: -9px; }
+.order-receipt::after { bottom: -9px; transform: rotate(180deg); }
 
-.receipt-paper {
-  fill: #fffdfd;
-}
-
-.receipt-edge {
-  fill: none;
-  stroke: #d9bec6;
-  stroke-width: 1;
-  vector-effect: non-scaling-stroke;
-}
-
-.order-receipt > :not(.receipt-frame) {
+.order-receipt > * {
   position: relative;
   z-index: 1;
 }

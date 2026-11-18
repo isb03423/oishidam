@@ -12,6 +12,7 @@ import AdminListPanel from '../components/admin/AdminListPanel.vue'
 import AdminIcon from '../components/admin/AdminIcon.vue'
 import { getAdminList } from '../services/admin.js'
 import { getSessionRevision, session, shoppingOwner } from '../stores/session.js'
+import { reviewSentimentFilters } from '../utils/reviewSentiments.js'
 
 const route = useRoute()
 const items = ref([])
@@ -19,6 +20,7 @@ const total = ref(0)
 const pages = ref(0)
 const page = ref(0)
 const status = ref('')
+const sentimentFilter = ref('')
 const query = ref('')
 const keyword = ref('')
 const productQuery = ref('')
@@ -38,9 +40,10 @@ watch(shoppingOwner, () => {
   items.value = []
   total.value = pages.value = page.value = 0
   status.value = query.value = keyword.value = productQuery.value = productFilter.value = notice.value = ''
+  sentimentFilter.value = ''
 }, { immediate: true })
 
-watch([shoppingOwner, page, status, keyword, productFilter, retry], async (_, __, onCleanup) => {
+watch([shoppingOwner, page, status, sentimentFilter, keyword, productFilter, retry], async (_, __, onCleanup) => {
   const controller = new AbortController()
   const revision = getSessionRevision()
   onCleanup(() => controller.abort())
@@ -48,7 +51,7 @@ watch([shoppingOwner, page, status, keyword, productFilter, retry], async (_, __
   error.value = ''
   try {
     if (session.source !== 'api' || session.member?.role !== 'ADMIN') return
-    const result = await getAdminList('reviews', { page: page.value, size: 10, keyword: keyword.value || undefined, ...productParams.value, answered: status.value ? status.value === 'ANSWERED' : undefined }, controller.signal)
+    const result = await getAdminList('reviews', { page: page.value, size: 10, keyword: keyword.value || undefined, ...productParams.value, answered: status.value ? status.value === 'ANSWERED' : undefined, sentiment: sentimentFilter.value || undefined }, controller.signal)
     if (controller.signal.aborted || revision !== getSessionRevision()) return
     if (page.value > 0 && page.value >= result.totalPages) { page.value = Math.max(0, result.totalPages - 1); return }
     items.value = result.content
@@ -63,6 +66,10 @@ watch([shoppingOwner, page, status, keyword, productFilter, retry], async (_, __
 
 function search() { keyword.value = query.value.trim(); productFilter.value = productQuery.value.trim(); page.value = 0; retry.value++ }
 function filter(value) { status.value = value; page.value = 0 }
+function filterSentiment(value) { sentimentFilter.value = value; page.value = 0 }
+watch(() => route.query.sentiment, (value) => {
+  filterSentiment(typeof value === 'string' && reviewSentimentFilters.some(item => item.value === value) ? value : '')
+}, { immediate: true })
 watch(() => route.query.status, (value) => { if (filters.some((item) => item.value === value)) filter(value) }, { immediate: true })
 watch(() => route.query.productId, (value, previous) => {
   if (typeof value === 'string' && /^\d+$/.test(value)) {
@@ -80,6 +87,7 @@ watch(() => route.query.id, (id) => { if (typeof id === 'string' && /^\d+$/.test
     <AdminListPanel :total="total" :loading="loading" aria-label="고객 후기 목록">
       <template #filters>
         <label class="inquiry-status-filter" for="admin-review-status"><span>답변 상태</span><select id="admin-review-status" :value="status" @change="filter($event.target.value)"><option v-for="item in filters" :key="item.value" :value="item.value">{{ item.label }}</option></select></label>
+        <label class="inquiry-status-filter" for="admin-review-sentiment"><span>감정</span><select id="admin-review-sentiment" :value="sentimentFilter" @change="filterSentiment($event.target.value)"><option v-for="item in reviewSentimentFilters" :key="item.value" :value="item.value">{{ item.label }}</option></select></label>
         <form class="inquiry-search" role="search" @submit.prevent="search"><label class="product-id-field" for="admin-review-product"><span>상품 ID·상품명</span><input id="admin-review-product" v-model="productQuery" type="search" maxlength="100" placeholder="상품 ID 또는 상품명" /></label><label for="admin-review-search"><span>후기 내용</span><input id="admin-review-search" v-model="query" type="search" maxlength="100" placeholder="검색어를 입력하세요" /></label><button type="submit" :disabled="loading"><AdminIcon name="search" />검색</button></form>
       </template>
       <template #actions><span>{{ loading ? '불러오는 중…' : keyword ? `‘${keyword}’ 검색 결과` : '최근 등록순' }}</span></template>
@@ -96,7 +104,7 @@ watch(() => route.query.id, (id) => { if (typeof id === 'string' && /^\d+$/.test
             <td class="inquiry-author">{{ item.memberName || '이름 확인 중' }}</td><td class="inquiry-date"><time :datetime="item.createdAt">{{ stamp(item.createdAt) }}</time></td>
           </tr></tbody>
         </table>
-        <p v-else-if="!error" class="inquiry-empty" role="status">{{ loading ? '후기 내역을 불러오고 있어요.' : keyword || status || productFilter ? '검색 조건에 맞는 후기가 없습니다.' : '아직 등록된 후기가 없습니다.' }}</p>
+        <p v-else-if="!error" class="inquiry-empty" role="status">{{ loading ? '후기 내역을 불러오고 있어요.' : keyword || status || productFilter || sentimentFilter ? '검색 조건에 맞는 후기가 없습니다.' : '아직 등록된 후기가 없습니다.' }}</p>
       </div>
       <template #footer>
         <Pagination :model-value="page + 1" :page-count="pages" :disabled="loading" label="후기 목록 페이지" @update:model-value="page = $event - 1" />

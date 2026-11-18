@@ -7,6 +7,8 @@ export const getAdminOperations = (period, signal) => request('/dashboard/operat
 export const getAdminStockAlerts = (params, signal) => request('/dashboard/stock-alerts', { params, signal })
 export const getAdminCustomerAnalytics = (signal) => request('/analytics/customers', { params: { charts: true }, signal, timeout: 70000 })
 export const getAdminReviewAnalytics = (signal) => request('/reviews/analytics', { signal })
+export const analyzeAdminPendingReviews = (signal) => request('/reviews/analytics/analyze-pending', { method: 'POST', params: { limit: 500 }, signal, timeout: 70000 })
+export const getAdminSentimentProducts = (params, signal) => request('/reviews/analytics/products', { params, signal })
 export const getAdminCategories = (signal) => request('/categories', { signal })
 export const getAdminList = (section, params, signal) => request('/' + section, { params, signal })
 export const getAdminStockHistory = (id, params, signal) => request(idPath('products', id) + '/stock-history', { params, signal })

@@ -134,3 +134,20 @@ test('후기 감정분석은 관리자 인증을 사용해 저장된 결과를 �
   assert.equal(requests.at(-1).url, '/api/admin/reviews/analytics')
   assert.equal(requests.at(-1).token, 'Bearer ai-admin-token')
 })
+
+test('상품별 감정 목록과 후기 검색은 감정·페이지 조건을 관리자 API에 전달한다', async () => {
+  await api.getAdminSentimentProducts({ page: 2, size: 10, sentiment: 'VERY_NEGATIVE' })
+  assert.equal(requests.at(-1).url, '/api/admin/reviews/analytics/products?page=2&size=10&sentiment=VERY_NEGATIVE')
+  assert.equal(requests.at(-1).token, 'Bearer ai-admin-token')
+  await api.getAdminList('reviews', { page: 0, size: 10, sentiment: 'UNANALYZED', answered: false })
+  assert.equal(requests.at(-1).url, '/api/admin/reviews?page=0&size=10&sentiment=UNANALYZED&answered=false')
+})
+
+
+test('미분석 후기 분석은 관리자 JWT로 최대 500건을 POST 요청한다', async () => {
+  session.setSession({ member_id: 1, name: '관리자', role: 'ADMIN' }, { tokens: { accessToken: 'analyze-admin-token' } })
+  await api.analyzeAdminPendingReviews()
+  assert.equal(requests.at(-1).method, 'POST')
+  assert.equal(requests.at(-1).url, '/api/admin/reviews/analytics/analyze-pending?limit=500')
+  assert.equal(requests.at(-1).token, 'Bearer analyze-admin-token')
+})

@@ -121,7 +121,7 @@
         </button>
 
         <RouterLink
-          v-if="session.member"
+          v-if="session.member?.role === 'USER'"
           :to="{ path: '/products', query: { recommend: 'ai' } }"
           class="nav-link ai-recommend-link"
         >
@@ -404,6 +404,7 @@ function requireLogin(memberRoute) {
 .account-actions {
   display: grid;
   grid-template-columns: minmax(52px, max-content) max-content;
+  column-gap: 14px;
   align-items: center;
   justify-content: end;
   width: max-content;
@@ -465,7 +466,7 @@ function requireLogin(memberRoute) {
 }
 
 .action-divider {
-  width: 1px;
+  width: 2px;
   height: 15px;
   flex: 0 0 1px;
   background: #b9afb3;

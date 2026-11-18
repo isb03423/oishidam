@@ -7,6 +7,7 @@ import { development } from '../config/development.js'
 import { categories, categoryGroups } from '../data/categories.js'
 import { getProducts, getRecommendations } from '../services/catalog.js'
 import Pagination from '../components/common/Pagination.vue'
+import { shoppingOwner } from '../stores/session.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -15,6 +16,7 @@ const total = ref()
 const bestRanks = ref({})
 const loading = ref(true)
 const failed = ref(false)
+const recommendationSource = ref('')
 const retry = ref(0)
 const pageSize = 20
 const categoryId = computed(() => typeof route.query.categoryId === 'string' ? route.query.categoryId : undefined)
@@ -22,8 +24,16 @@ const category = computed(() => categories.find((item) => item.category_id === c
 const activeGroup = computed(() => categoryGroups.find((group) =>
   group.category_id === (category.value?.parent_id ?? category.value?.category_id),
 ))
-const listType = computed(() => ['new', 'best'].includes(route.query.sort) ? route.query.sort : undefined)
+const aiRecommended = computed(() => route.query.recommend === 'ai')
+const listType = computed(() => !aiRecommended.value && ['new', 'best'].includes(route.query.sort) ? route.query.sort : undefined)
 const listDescription = computed(() => {
+  if (aiRecommended.value && !loading.value && !failed.value && products.value.length) {
+    if (recommendationSource.value === 'PERSONALIZED') return '찜과 최근 구매 내역을 바탕으로 고른 상품이에요.'
+    if (recommendationSource.value === 'DEMOGRAPHIC') return '같은 연령대·성별의 고객이 최근 많이 구매한 상품이에요.'
+    if (recommendationSource.value === 'PERSONALIZED_WITH_DEMOGRAPHIC') {
+      return '찜과 최근 구매 내역으로 고른 상품에 같은 연령대·성별의 고객이 많이 구매한 상품을 더했어요.'
+    }
+  }
   if (listType.value === 'new') return '오이시담에 새로 들어온 일본 상품을 만나보세요.'
   if (listType.value === 'best') return '오이시담의 베스트 상품을 한곳에서 만나보세요.'
   return ''
@@ -51,17 +61,17 @@ function productBadge(product) {
   return rank ? 'TOP ' + rank : ''
 }
 const keyword = computed(() => typeof route.query.keyword === 'string' ? route.query.keyword.trim() : '')
-const recommended = computed(() => route.query.collection === 'recommended' || route.query.recommend === 'ai')
+const recommended = computed(() => route.query.collection === 'recommended' || aiRecommended.value)
 const page = computed(() => {
   const number = Number(route.query.page)
   return Number.isSafeInteger(number) && number > 0 ? number - 1 : 0
 })
 const title = computed(() => {
+  if (aiRecommended.value) return 'AI 추천'
   if (listType.value === 'new') return '신상품'
   if (listType.value === 'best') return '베스트'
   if (category.value) return category.value.name
   if (keyword.value) return keyword.value + ' 검색 결과'
-  if (route.query.recommend === 'ai') return 'AI 추천'
   if (recommended.value) return '추천 상품'
   return '전체 상품'
 })
@@ -77,7 +87,7 @@ const pageLink = (index) => ({
 })
 
 watch(
-  () => [route.query, development.mockEnabled, development.scenario, retry.value],
+  () => [route.query, development.mockEnabled, development.scenario, retry.value, aiRecommended.value && shoppingOwner.value],
   async (_, __, onCleanup) => {
     const controller = new AbortController()
     onCleanup(() => controller.abort())
@@ -86,7 +96,11 @@ watch(
     try {
       const options = { signal: controller.signal }
       const response = listType.value || recommended.value
-        ? await getRecommendations({ ...options, type: listType.value, limit: listType.value ? 8 : undefined })
+        ? await getRecommendations({
+          ...options,
+          type: aiRecommended.value ? 'personalized' : listType.value,
+          limit: aiRecommended.value || listType.value ? 8 : undefined,
+        })
         : await getProducts({
           categoryId: categoryId.value,
           keyword: keyword.value || undefined,
@@ -98,6 +112,7 @@ watch(
       if (controller.signal.aborted) return
       if (!Array.isArray(response?.items)) throw new Error('상품 응답 형식 오류')
       products.value = response.items
+      recommendationSource.value = response.source ?? ''
       total.value = listType.value ? response.items.length : response.total
       bestRanks.value = listType.value === 'best' ? Object.fromEntries(response.items.map((product, index) => [product.product_id, index + 1])) : {}
     } catch {
@@ -149,7 +164,7 @@ watch(
         <p>상품을 불러오지 못했어요.</p>
         <button type="button" @click="retry++">다시 시도</button>
       </div>
-      <p v-else-if="!products.length" class="products-state" role="status">등록된 상품이 없어요.</p>
+      <p v-else-if="!products.length" class="products-state" role="status">{{ recommended ? '추천할 상품이 없어요.' : '등록된 상품이 없어요.' }}</p>
       <div v-else class="products-grid">
         <ProductCard v-for="product in products" :key="product.product_id" :product="product" :badge="productBadge(product)" />
       </div>

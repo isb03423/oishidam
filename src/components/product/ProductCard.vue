@@ -7,6 +7,7 @@ import { toggleWish, wishedIds, wishBusy, wishLoading } from '../../stores/wishl
 const props = defineProps({
   product: { type: Object, required: true },
   badge: { type: String, default: '' },
+  interactive: { type: Boolean, default: true },
 })
 const router = useRouter()
 const wished = computed(() => Boolean(session.member) && wishedIds.value.includes(props.product.product_id))
@@ -40,6 +41,7 @@ function toggleProductWish() {
 <template>
   <article class="product-card">
     <RouterLink
+      v-if="interactive"
       class="product-detail-link"
       :to="`/products/${encodeURIComponent(product.product_id)}`"
       :aria-label="`${product.name} 상품 상세보기`"
@@ -64,6 +66,7 @@ function toggleProductWish() {
         <span>이미지 준비 중</span>
       </div>
       <button
+        v-if="interactive"
         type="button"
         class="product-wish"
         :class="{ 'is-wished': wished }"

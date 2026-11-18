@@ -14,9 +14,8 @@ class Setting:
     DB_USER: str = os.getenv("DB_USER", "postgres")
     DB_PASSWORD: str = os.getenv("DB_PASSWORD")
 
-    # 추천 요청 인증에 사용하는 서버 설정
+    # 모든 요청의 JWT와 현재 회원 권한을 검증하는 Spring Boot 주소
     SPRING_API_URL: str = os.getenv("SPRING_API_URL", "http://127.0.0.1:8080/api").rstrip("/")
-    AI_RECOMMENDATION_TOKEN: str = os.getenv("AI_RECOMMENDATION_TOKEN", "")
 
     FRONTEND_ORIGINS: list[str] = [
         origin.strip() for origin in os.getenv(

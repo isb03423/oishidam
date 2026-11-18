@@ -73,9 +73,8 @@ export async function saveProfile(fields) {
     if (!name) throw new Error('이름을 입력해주세요.')
     if (name !== member.name) data.name = name
     if (phone !== (member.phone ?? '')) data.phone = phone
-    if (fields.birth_year !== (member.birth_year ?? '') && fields.birth_year !== '') data.birthYear = Number(fields.birth_year)
-    const gender = { MALE: 'M', FEMALE: 'F' }[fields.gender]
-    if (gender && fields.gender !== member.gender) data.gender = gender
+    if (fields.birth_year !== (member.birth_year ?? '')) data.birthYear = fields.birth_year === '' ? null : Number(fields.birth_year)
+    if (fields.gender !== member.gender) data.gender = { MALE: 'M', FEMALE: 'F' }[fields.gender] ?? null
     if (!Object.keys(data).length) return
     const updated = await apiRequest({ path: '/members/me', method: 'PATCH', authenticated: true, mock: false, data })
     if (session.member === member) updateApiMember(updated)

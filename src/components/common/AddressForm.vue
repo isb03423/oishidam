@@ -102,7 +102,7 @@ function submit() {
 .address-form { min-width: 0; overflow: hidden; border: 1px solid var(--color-border); border-radius: 12px; background: #fff; color: var(--color-text); font-size: var(--font-size-body); }
 .address-form-heading { padding: 15px 20px; background: var(--color-accent); color: var(--color-primary); }
 .address-form-heading h2 { margin: 0; font-size: var(--font-size-section); font-weight: 600; }
-.address-fields { display: grid; grid-template-columns: 108px minmax(0, 1fr); gap: 14px 16px; padding: 18px 20px; }
+.address-fields { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 14px 16px; padding: 18px 20px; }
 .address-label { align-self: start; padding-top: 8px; font-weight: 600; }
 .address-label span, .message { color: var(--color-primary); }
 .address-form input:not([type='checkbox']), .address-form textarea { width: 100%; min-width: 0; box-sizing: border-box; min-height: 36px; padding: 7px 10px; border: 1px solid var(--color-border); border-radius: 7px; color: inherit; background: #fff; font: inherit; font-size: var(--font-size-control); }

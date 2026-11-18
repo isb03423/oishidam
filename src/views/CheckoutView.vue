@@ -3,6 +3,7 @@ import { computed, nextTick, reactive, ref, watch, onMounted, onBeforeUnmount } 
 import PhoneInput from '../components/common/PhoneInput.vue'
 import AddressForm from '../components/common/AddressForm.vue'
 import AlertDialog from '../components/common/AlertDialog.vue'
+import DeleteConfirmationDialog from '../components/DeleteConfirmationDialog.vue'
 import { development } from '../config/development.js'
 import { deleteAddress, getAddresses, saveAddress } from '../services/addresses.js'
 import { formatPhone, phoneDigits } from '../services/phone.js'
@@ -17,6 +18,7 @@ const memoChoice = ref('')
 const previousInputs = restoreCheckout()
 const addresses = ref([])
 const addressDialog = ref(null)
+const deleteAddressDialog = ref(null)
 const addressError = ref('')
 const addressLoading = ref(false)
 const addressBusy = ref(false)
@@ -119,8 +121,10 @@ async function saveDraftAddress(value) {
   finally { if (owner === shoppingOwner.value) addressBusy.value = false }
 }
 
-async function removeSavedAddress(address) {
-  if (addressBusy.value || !window.confirm(`‘${address.name}’ 배송지를 삭제할까요?`)) return
+async function removeSavedAddress([addressId]) {
+  if (addressBusy.value) return
+  const address = addresses.value.find(({ id }) => id === addressId)
+  if (!address) return
   const owner = shoppingOwner.value
   addressBusy.value = true
   addressError.value = ''
@@ -294,6 +298,7 @@ async function requestPayment(orderNumber) {
 <template>
   <div class="checkout-page">
     <AlertDialog :message="notice" @close="notice = ''" />
+    <DeleteConfirmationDialog :key="shoppingOwner" ref="deleteAddressDialog" description="선택한 배송지를 삭제합니다." @confirm="removeSavedAddress" />
     <main class="site-container checkout-content">
       <header class="checkout-header">
         <div><h1>주문서</h1><p>주문 정보를 확인하고 주문을 완료해 주세요.</p></div>
@@ -350,7 +355,7 @@ async function requestPayment(orderNumber) {
                     </div>
                     <p class="address-phone">{{ formatPhone(address.phone) }}</p>
                     <p class="address-lines">{{ address.address }} {{ address.detail }} <span>({{ address.postalCode }})</span></p>
-                    <div class="address-actions"><button type="button" :disabled="addressBusy" @click="editAddress(address)">수정</button><button type="button" :disabled="addressBusy" @click="removeSavedAddress(address)">삭제</button></div>
+                    <div class="address-actions"><button type="button" :disabled="addressBusy" @click="editAddress(address)">수정</button><button type="button" :disabled="addressBusy" @click="deleteAddressDialog.open([address.id])">삭제</button></div>
                   </li>
                 </ul>
               </template>

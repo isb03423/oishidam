@@ -1,6 +1,8 @@
 <script setup>
 import { getPasswordError, passwordRequirements } from '../services/passwordPolicy.js'
 import PhoneInput from '../components/common/PhoneInput.vue'
+import NotificationToast from '../components/common/NotificationToast.vue'
+import { useToasts } from '../composables/useToasts.js'
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import MyPageLayout from '../components/MyPageLayout.vue'
@@ -8,6 +10,7 @@ import { canChangePassword, canManageAccount, changePassword, clearPasswordProof
 import { session } from '../stores/session.js'
 
 const router = useRouter()
+const { toasts, showToast, dismissToast, pauseToast, resumeToast } = useToasts()
 const fields = reactive({})
 const securityStep = ref('summary')
 const newPassword = ref('')
@@ -33,6 +36,8 @@ onBeforeUnmount(() => {
 
 const password = ref('')
 const showPassword = ref(false)
+const showNewPassword = ref(false)
+const showConfirmation = ref(false)
 const passwordError = ref('')
 const profileMessage = ref('')
 const busy = ref(false)
@@ -65,7 +70,7 @@ async function submitProfile() {
   try {
     await saveProfile(fields)
     reset()
-    profileMessage.value = '회원정보를 수정했습니다.'
+    showToast('success', '회원정보를 수정했습니다.')
   } catch (error) {
     profileMessage.value = error.message
   } finally {
@@ -73,13 +78,30 @@ async function submitProfile() {
   }
 }
 
+function updateBirthYear(event) {
+  const digits = event.target.value.replace(/\D/g, '').slice(0, 4)
+  event.target.value = digits
+  fields.birth_year = digits ? Number(digits) : ''
+}
+
 function resetSecurity(step = 'summary') {
   clearPasswordProof()
   securityStep.value = step
   newPassword.value = confirmation.value = ''
   showPassword.value = false
+  showNewPassword.value = showConfirmation.value = false
   password.value = ''
   passwordError.value = ''
+}
+
+function startPasswordChange() {
+  if (session.source !== 'api') return resetSecurity('verify')
+  if (!password.value.trim()) {
+    passwordError.value = '현재 비밀번호를 입력해주세요.'
+    return
+  }
+  passwordError.value = ''
+  securityStep.value = 'change'
 }
 
 async function confirmIdentity() {
@@ -106,13 +128,14 @@ async function submitPassword() {
   try {
     const live = session.source === 'api'
     await changePassword(newPassword.value, confirmation.value, live ? password.value : undefined)
+    password.value = ''
     if (live) await router.replace({ name: 'Login', query: { password: 'changed' } })
     else resetSecurity('complete')
   } catch (error) {
+    if (error.code === 'INVALID_PASSWORD') resetSecurity()
     if (session.source === 'mock' && !hasPasswordProof()) resetSecurity('verify')
     passwordError.value = error.message
   } finally {
-    password.value = ''
     verifying.value = false
   }
 }
@@ -120,6 +143,9 @@ async function submitPassword() {
 
 <template>
   <MyPageLayout icon="member" title="내 정보 관리" stretch-content description="회원님의 소중한 정보를 안전하게 관리하세요.">
+    <template #overlay>
+      <NotificationToast :items="toasts" @dismiss="dismissToast" @pause="pauseToast" @resume="resumeToast" />
+    </template>
     <div class="profile-panels">
       <form class="profile-form" @submit.prevent="submitProfile">
         <section class="account-card profile-panel profile-basic" aria-labelledby="profile-basic-title">
@@ -146,13 +172,13 @@ async function submitPassword() {
             </div>
             <div class="profile-row">
               <label for="profile-birth">{{ session.source === 'api' ? '출생연도' : '생년월일' }}</label>
-              <input v-if="session.source === 'api'" id="profile-birth" v-model.number="fields.birth_year" type="number" min="1900" max="2100" step="1" :required="session.member?.birth_year != null" />
+              <input v-if="session.source === 'api'" id="profile-birth" :value="fields.birth_year" type="text" inputmode="numeric" maxlength="4" pattern="19[0-9]{2}|20[0-9]{2}|2100" title="1900년부터 2100년까지 4자리로 입력해주세요." @input="updateBirthYear" />
               <input v-else id="profile-birth" v-model="fields.birth_date" type="date" min="1900-01-01" max="2100-12-31" autocomplete="bday" :readonly="!canManageAccount" />
             </div>
             <div class="profile-row">
               <label for="profile-gender">성별</label>
               <select id="profile-gender" v-model="fields.gender" :disabled="!canManageAccount">
-                <option value="NONE" :disabled="session.source === 'api' && session.member?.gender !== 'NONE'">선택 안 함</option>
+                <option value="NONE">선택 안 함</option>
                 <option value="FEMALE">여성</option>
                 <option value="MALE">남성</option>
               </select>
@@ -180,7 +206,7 @@ async function submitPassword() {
           <p>계정을 더욱 안전하게 관리하세요.</p>
         </header>
         <div class="profile-security-body">
-          <div v-if="securityStep === 'summary'" class="profile-security-content">
+          <div v-if="securityStep === 'summary'" class="profile-security-content" :class="{ 'profile-security-content--social': !canChangePassword }">
             <div class="profile-security-symbol" aria-hidden="true">
               <svg viewBox="0 0 156 72" aria-hidden="true">
                 <path class="security-cloud" d="M2 68c3-9 12-16 22-16 4-10 12-17 22-17 7 0 13 3 17 8 5-10 14-15 24-15 11 0 20 6 24 16 10-3 20 1 24 9 9 1 16 7 19 15Z" />
@@ -191,11 +217,19 @@ async function submitPassword() {
               </svg>
             </div>
             <div class="profile-password-copy">
-              <h3>비밀번호 변경</h3>
-            <label v-if="session.source === 'api'">현재 비밀번호<input v-model="password" type="password" autocomplete="current-password" required /></label>
-              <p>주기적인 비밀번호 변경으로<br />내 계정을 안전하게 보호하세요.</p>
+              <h3>{{ canChangePassword ? '비밀번호 변경' : '소셜 로그인 계정' }}</h3>
+              <div v-if="session.source === 'api' && canChangePassword" class="profile-password-field">
+                <label for="profile-current-password">현재 비밀번호</label>
+                <div class="verify-password">
+                  <input id="profile-current-password" v-model="password" :type="showPassword ? 'text' : 'password'" autocomplete="current-password" required />
+                  <button class="verify-toggle" type="button" :aria-label="showPassword ? '현재 비밀번호 숨기기' : '현재 비밀번호 표시'" :aria-pressed="showPassword" @click="showPassword = !showPassword"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /><path v-if="!showPassword" d="m3 3 18 18" /></svg></button>
+                </div>
+              </div>
+              <p v-if="!canChangePassword" class="profile-social-notice"><strong>소셜 계정 사용자는<br />비밀번호를 변경할 수 없습니다.</strong></p>
+              <p v-else>주기적인 비밀번호 변경으로<br />내 계정을 안전하게 보호하세요.</p>
             </div>
-            <button class="account-primary profile-password-button" type="button" :disabled="!canChangePassword" @click="resetSecurity(session.source === 'api' ? 'change' : 'verify')">
+            <p v-if="passwordError" class="account-message" role="alert">{{ passwordError }}</p>
+            <button v-if="canChangePassword" class="account-primary profile-password-button" type="button" @click="startPasswordChange">
               비밀번호 변경
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
             </button>
@@ -220,9 +254,20 @@ async function submitPassword() {
       </form>
           <form v-else-if="securityStep === 'change'" class="profile-security-form password-card" @submit.prevent="submitPassword">
             <h3>비밀번호 변경</h3>
-            <label v-if="session.source === 'api'">현재 비밀번호<input v-model="password" type="password" autocomplete="current-password" required /></label>
-            <label>새 비밀번호<input v-model="newPassword" type="password" autocomplete="new-password" minlength="8" aria-describedby="profile-password-requirements" required /></label>
-            <label>새 비밀번호 확인<input v-model="confirmation" type="password" autocomplete="new-password" minlength="8" required :aria-invalid="passwordMismatch || undefined" :aria-describedby="passwordMismatch ? 'profile-password-mismatch' : undefined" /></label>
+            <div class="profile-password-field">
+              <label for="profile-new-password">새 비밀번호</label>
+              <div class="verify-password">
+                <input id="profile-new-password" v-model="newPassword" :type="showNewPassword ? 'text' : 'password'" autocomplete="new-password" minlength="8" aria-describedby="profile-password-requirements" required />
+                <button class="verify-toggle" type="button" :aria-label="showNewPassword ? '새 비밀번호 숨기기' : '새 비밀번호 표시'" :aria-pressed="showNewPassword" @click="showNewPassword = !showNewPassword"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /><path v-if="!showNewPassword" d="m3 3 18 18" /></svg></button>
+              </div>
+            </div>
+            <div class="profile-password-field">
+              <label for="profile-password-confirmation">새 비밀번호 확인</label>
+              <div class="verify-password">
+                <input id="profile-password-confirmation" v-model="confirmation" :type="showConfirmation ? 'text' : 'password'" autocomplete="new-password" minlength="8" required :aria-invalid="passwordMismatch || undefined" :aria-describedby="passwordMismatch ? 'profile-password-mismatch' : undefined" />
+                <button class="verify-toggle" type="button" :aria-label="showConfirmation ? '새 비밀번호 확인 숨기기' : '새 비밀번호 확인 표시'" :aria-pressed="showConfirmation" @click="showConfirmation = !showConfirmation"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /><path v-if="!showConfirmation" d="m3 3 18 18" /></svg></button>
+              </div>
+            </div>
             <p v-if="passwordMismatch" id="profile-password-mismatch" class="account-message password-mismatch" aria-live="polite">새 비밀번호가 일치하지 않습니다.</p>
             <small id="profile-password-requirements" class="password-requirements">{{ passwordRequirements }}</small>
             <p v-if="passwordError" class="account-message" role="alert">{{ passwordError }}</p>

@@ -14,6 +14,9 @@ button, input, select, textarea {
 
 small { font-size: var(--font-size-label); }
 
+dialog:modal { overscroll-behavior: contain; }
+dialog::backdrop { overflow: hidden; overscroll-behavior: contain; }
+
 /* 링크 기본 스타일 */
 a {
   color: inherit;

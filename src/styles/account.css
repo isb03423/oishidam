@@ -105,8 +105,10 @@
 .profile-security-form .account-message { color: var(--color-primary); }
 
 .verify-password { position: relative; }
-.profile-security-form .verify-password input { min-height: 40px; padding-inline-end: 42px; }
-.profile-security-form .verify-toggle {
+.profile-security-form .verify-password input,
+.profile-password-copy .verify-password input { min-height: 40px; padding-inline-end: 42px; }
+.profile-security-form .verify-toggle,
+.profile-password-copy .verify-toggle {
   position: absolute;
   inset: 0 4px 0 auto;
   display: grid;
@@ -130,6 +132,7 @@
 }
 .password-card .password-mismatch { margin: 0; text-align: left; }
 .password-card .password-requirements { color: #71666b; text-align: left; }
+#profile-password-requirements { font-size: var(--font-size-caption); letter-spacing: -.02em; }
 .password-card input[aria-invalid="true"] { border-color: var(--color-primary); }
 
 @media (max-width: 600px) {
@@ -244,8 +247,21 @@
 .security-shield { fill: #fff; stroke-width: 2.5; }
 .security-rays { stroke: #ed7778; }
 
-.profile-password-copy h3 { margin: 0 0 4px; font-size: var(--font-size-body); font-weight: 700; }
+.profile-password-copy { display: grid; width: 100%; gap: 12px; }
+.profile-password-copy h3 { margin: 0; font-size: var(--font-size-body); font-weight: 700; }
+.profile-password-field { display: grid; gap: 8px; text-align: left; }
 .profile-password-copy p { margin: 0; color: #71666b; font-size: var(--font-size-label); line-height: 1.5; }
+
+.profile-security-content--social .profile-password-copy h3 {
+  color: var(--color-primary);
+  font-size: var(--font-size-body);
+}
+.profile-password-copy .profile-social-notice {
+  font-size: var(--font-size-table);
+  line-height: 1.8;
+  word-break: keep-all;
+}
+.profile-social-notice strong { color: var(--color-text); }
 
 .profile-security-content .profile-password-button {
   width: 100%;

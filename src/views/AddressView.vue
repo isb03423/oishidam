@@ -1,5 +1,7 @@
 <script setup>
 import AddressForm from '../components/common/AddressForm.vue'
+import AlertDialog from '../components/common/AlertDialog.vue'
+import DeleteConfirmationDialog from '../components/DeleteConfirmationDialog.vue'
 import { deleteAddress, getAddresses, saveAddress as saveRemoteAddress, setDefaultAddress } from '../services/addresses.js'
 import { formatPhone, phoneDigits } from '../services/phone.js'
 import { computed, ref, watch } from 'vue'
@@ -14,10 +16,13 @@ const editingId = ref(null)
 const showForm = ref(false)
 const error = ref('')
 const busy = ref(false)
+const deleteDialog = ref(null)
+const pendingDefaultId = ref(null)
 const live = computed(() => session.source === 'api')
 let addressRequest
 
 watch(shoppingOwner, async (_, __, onCleanup) => {
+  pendingDefaultId.value = null
   busy.value = false
   closeForm()
   addresses.value = []
@@ -146,9 +151,17 @@ async function setDefault(id) {
   persist(addresses.value.map((address) => ({ ...address, isDefault: address.id === id })))
 }
 
-async function removeAddress(address) {
+async function confirmDefaultAddress() {
+  const id = pendingDefaultId.value
+  pendingDefaultId.value = null
+  if (busy.value || !addresses.value.some((address) => address.id === id)) return
+  await setDefault(id)
+}
+
+async function removeAddress([addressId]) {
   if (busy.value) return
-  if (!window.confirm('‘' + address.name + '’ 배송지를 삭제할까요?')) return
+  const address = addresses.value.find(({ id }) => id === addressId)
+  if (!address) return
   if (live.value) {
     await changeRemoteAddresses(async (signal) => {
       await deleteAddress(address.id, signal)
@@ -185,9 +198,9 @@ async function removeAddress(address) {
             <span v-if="address.isDefault" class="address-default">기본 배송지</span>
           </div>
           <div class="account-actions address-actions">
-            <button v-if="!address.isDefault" type="button" :disabled="busy" @click="setDefault(address.id)">기본 배송지 설정</button>
+            <button v-if="!address.isDefault" type="button" :disabled="busy" @click="pendingDefaultId = address.id">기본 배송지 설정</button>
             <button type="button" :disabled="busy" @click="openForm(address)">수정</button>
-            <button type="button" :disabled="busy" @click="removeAddress(address)">삭제</button>
+            <button type="button" :disabled="busy" @click="deleteDialog.open([address.id])">삭제</button>
           </div>
         </header>
         <dl class="address-details">
@@ -214,6 +227,8 @@ async function removeAddress(address) {
         </dl>
       </article>
     </div>
+    <DeleteConfirmationDialog :key="shoppingOwner" ref="deleteDialog" description="선택한 배송지를 삭제합니다." @confirm="removeAddress" />
+    <AlertDialog :message="pendingDefaultId != null ? '기본 배송지로 설정하시겠습니까?' : ''" title="기본 배송지 설정" cancel-label="취소" @confirm="confirmDefaultAddress" @close="pendingDefaultId = null" />
   </MyPageLayout>
 </template>
 

@@ -1,0 +1,44 @@
+# Python 캐시
+__pycache__/
+*.py[cod]
+
+# 가상환경
+.venv/
+venv/
+env/
+
+# 환경변수·비밀정보
+.env
+.env.*
+!.env.example
+
+# 검사·테스트 캐시
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# 빌드 결과
+build/
+dist/
+*.egg-info/
+
+# 로그
+*.log
+
+# IDE·운영체제
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# 자동 생성 차트
+/charts/
+/app/charts/
+
+# 테스트 소스: 프로젝트 정책
+tests/
+test_*.py
+*_test.py

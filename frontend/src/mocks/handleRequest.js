@@ -24,11 +24,12 @@ export function handleMockRequest({ method = 'GET', path, params = {}, data, sce
   if (method.toUpperCase() !== 'GET') fail(501, 'MOCK_NOT_IMPLEMENTED', '아직 구현하지 않은 mock API입니다.')
   if (path === '/categories') return { items: scenario === 'empty' ? [] : structuredClone(categories) }
   if (path === '/recommendations/products') {
+    if (scenario === 'empty' || params.type === 'personalized') return { items: [], source: 'DEFAULT' }
     const items = recommendedProductIds
       .map((id) => products.find((product) => product.product_id === id))
       .filter((product) => product && !product.deleted_at && product.sale_status === 'ON_SALE')
       .map(summarize)
-    return structuredClone({ items: scenario === 'empty' ? [] : items, source: 'DEFAULT' })
+    return structuredClone({ items: items.slice(0, Number(params.limit ?? 3)), source: 'DEFAULT' })
   }
   if (path === '/products') {
     const keyword = String(params.keyword ?? '').trim().toLocaleLowerCase('ko-KR')
@@ -38,7 +39,7 @@ export function handleMockRequest({ method = 'GET', path, params = {}, data, sce
       .map((category) => category.category_id)]
     let items = products.filter((product) => !product.deleted_at && product.sale_status === 'ON_SALE')
       .filter((product) => !categoryId || categoryIds.includes(product.category_id))
-      .filter((product) => `${product.name} ${product.brand} ${product.description}`.toLocaleLowerCase('ko-KR').includes(keyword))
+      .filter((product) => `${product.name} ${product.description}`.toLocaleLowerCase('ko-KR').includes(keyword))
       .map(summarize)
     if (scenario === 'empty') items = []
     const sort = params.sort ?? 'new'

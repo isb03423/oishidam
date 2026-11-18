@@ -1,10 +1,12 @@
 <script setup>
-import { onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { computed, inject, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import AlertDialog from '../common/AlertDialog.vue'
-import DeleteConfirmationDialog from '../DeleteConfirmationDialog.vue'
-import { deleteAdminImage, getAdminDetail, saveAdminImage, uploadAdminImage } from '../../services/admin.js'
+import DeleteConfirmationDialog from './AdminDeleteDialog.vue'
+import * as adminApi from '../../services/admin.js'
 import { getSessionRevision, shoppingOwner } from '../../stores/session.js'
 
+const productApi = inject('adminProductApi', null)
+const backend = () => productApi?.value || adminApi
 const props = defineProps({ productId: { type: [Number, String], required: true }, disabled: Boolean })
 const emit = defineEmits(['busy'])
 const images = ref([])
@@ -18,6 +20,9 @@ const file = ref(null)
 const fileInput = ref(null)
 const deletion = ref(null)
 const draft = reactive({ imageId: null, storageKey: '', altText: '', sortOrder: 0, isPrimary: false })
+const baseline = ref('')
+const hasChanges = computed(() => Boolean(file.value) || (baseline.value && JSON.stringify(draft) !== baseline.value))
+defineExpose({ hasChanges, reset })
 let version = 0
 let disposed = false
 onBeforeUnmount(() => { disposed = true; emit('busy', false) })
@@ -27,6 +32,7 @@ function reset() {
   mode.value = 'file'
   file.value = null
   if (fileInput.value) fileInput.value.value = ''
+  baseline.value = JSON.stringify(draft)
 }
 
 watch([() => props.productId, shoppingOwner, retry], async (_, __, onCleanup) => {
@@ -38,7 +44,7 @@ watch([() => props.productId, shoppingOwner, retry], async (_, __, onCleanup) =>
   loadError.value = ''
   loading.value = true
   try {
-    const result = await getAdminDetail('products', props.productId, controller.signal)
+    const result = await backend().getAdminDetail('products', props.productId, controller.signal)
     if (!controller.signal.aborted && current === version && revision === getSessionRevision()) { images.value = result.images; reset() }
   } catch (failure) {
     if (!controller.signal.aborted && revision === getSessionRevision()) { loadError.value = failure.message; notice.value = failure.message }
@@ -51,6 +57,7 @@ function edit(image) {
   Object.assign(draft, image)
   mode.value = 'url'
   file.value = null
+  baseline.value = JSON.stringify(draft)
 }
 
 async function change(action) {
@@ -62,7 +69,7 @@ async function change(action) {
   try {
     await action()
     if (disposed || current !== version || revision !== getSessionRevision()) return
-    const result = await getAdminDetail('products', props.productId)
+    const result = await backend().getAdminDetail('products', props.productId)
     if (disposed || current !== version || revision !== getSessionRevision()) return
     images.value = result.images
     reset()
@@ -82,10 +89,10 @@ function save() {
       notice.value = '10MB 이하의 JPEG, PNG, GIF 또는 WebP 이미지를 선택해 주세요.'
       return
     }
-    change(() => uploadAdminImage(props.productId, file.value, data))
+    change(() => backend().uploadAdminImage(props.productId, file.value, data))
   } else {
     if (!/^https:\/\//i.test(data.storageKey)) { notice.value = 'HTTPS 이미지 주소를 입력해 주세요.'; return }
-    change(() => saveAdminImage(props.productId, draft.imageId, data))
+    change(() => backend().saveAdminImage(props.productId, draft.imageId, data))
   }
 }
 </script>
@@ -112,9 +119,7 @@ function save() {
       <label class="check"><input v-model="draft.isPrimary" type="checkbox" :disabled="busy || disabled" /> 대표 이미지</label>
       <div class="actions"><button type="submit" :disabled="busy || disabled">{{ busy ? '저장 중…' : '이미지 저장' }}</button><button type="button" :disabled="busy || disabled" @click="reset">새 이미지 추가</button></div>
     </form>
-    <DeleteConfirmationDialog ref="deletion" description="선택한 상품 이미지를 삭제합니다." @confirm="([id]) => change(() => deleteAdminImage(productId, id))" />
+    <DeleteConfirmationDialog ref="deletion" description="선택한 상품 이미지를 삭제합니다." @confirm="([id]) => change(() => backend().deleteAdminImage(productId, id))" />
     <AlertDialog :message="notice" @close="notice = ''" />
   </section>
 </template>
-
-<style scoped src="../../styles/admin-management.css"></style>

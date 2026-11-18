@@ -18,9 +18,10 @@ public record AdminReviewResponse(
         String answerContent,
         Long answeredBy,
         LocalDateTime answeredAt,
-        LocalDateTime answerUpdatedAt
+        LocalDateTime answerUpdatedAt,
+        String sentiment
 ) {
-    public static AdminReviewResponse from(Review review, Long productId) {
+    public static AdminReviewResponse from(Review review, Long productId, String sentiment) {
         return new AdminReviewResponse(
                 review.getId(),
                 review.getOrderItem().getId(),
@@ -35,7 +36,8 @@ public record AdminReviewResponse(
                 review.getAnswerContent(),
                 review.getAnsweredBy() == null ? null : review.getAnsweredBy().getId(),
                 review.getAnsweredAt(),
-                review.getAnswerUpdatedAt()
+                review.getAnswerUpdatedAt(),
+                sentiment
         );
     }
 }

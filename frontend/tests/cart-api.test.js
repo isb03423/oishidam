@@ -15,6 +15,9 @@ const backend = createHttpServer(async (req, res) => {
   const data = chunks.length ? JSON.parse(Buffer.concat(chunks)) : null
   requests.push({ method: req.method, url: req.url, data, token: req.headers.authorization })
   const send = (status, body) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)) }
+  if (req.url.startsWith('/direct/api/ai/recommend/products')) {
+    return send(200, { data: { products: [{ productId: 42, categoryId: 7 }], recommendationType: 'DEMOGRAPHIC' } })
+  }
   if (req.url.startsWith('/api/recommendations/products')) {
     const params = new URL(req.url, 'http://localhost').searchParams
     return send(200, { data: { products: [], recommendationType: params.get('type')?.toUpperCase() ?? 'BEST' } })
@@ -55,6 +58,7 @@ const backend = createHttpServer(async (req, res) => {
 })
 await new Promise((resolve) => backend.listen(0, '127.0.0.1', resolve))
 process.env.VITE_API_BASE_URL = `http://127.0.0.1:${backend.address().port}/api`
+process.env.VITE_AI_API_BASE_URL = `http://127.0.0.1:${backend.address().port}/direct`
 process.env.VITE_MOCK_ENABLED = 'false'
 const vite = await createServer({ configFile: false, server: { middlewareMode: true, watch: null }, appType: 'custom', logLevel: 'silent' })
 after(async () => { await vite.close(); backend.closeAllConnections(); await new Promise((resolve) => backend.close(resolve)) })
@@ -71,6 +75,21 @@ async function login(id) {
   session.setSession({ member_id: id, name: '회원', role: 'USER' }, { tokens: { accessToken: `token-${id}` } })
   await settled()
 }
+
+test('개인화 추천을 로그인 토큰과 함께 FastAPI 주소로 직접 요청한다', async () => {
+  session.setSession({ member_id: 5, name: '회원', role: 'USER' }, { tokens: { accessToken: 'token-5' } })
+  try {
+    const result = await catalog.getRecommendations({ limit: 3, type: 'personalized' })
+    assert.equal(result.source, 'DEMOGRAPHIC')
+    assert.equal(result.items[0].product_id, '42')
+    assert.ok(requests.some((request) => request.method === 'GET'
+      && request.url === '/direct/api/ai/recommend/products?limit=3'
+      && request.token === 'Bearer token-5'))
+  } finally {
+    session.clearSession()
+    await settled()
+  }
+})
 
 test('상품 Page 응답과 상품별 가격·재고·대표 이미지를 화면에 맞춘다', async () => {
   const page = await catalog.getProducts({ page: 1 })

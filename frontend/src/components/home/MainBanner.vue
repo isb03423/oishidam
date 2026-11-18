@@ -145,7 +145,7 @@ function formatSlideNumber(index) {
 
 .banner-title {
   margin: 0;
-  font-size: clamp(34px, 3.15vw, 54px);
+  font-size: clamp(2.125rem, 3.15vw, 3.375rem);
   font-weight: 700;
   line-height: 1.4;
   letter-spacing: -.045em;
@@ -156,7 +156,7 @@ function formatSlideNumber(index) {
 .banner-description {
   margin: 18px 0 24px;
   color: var(--banner-muted);
-  font-size: clamp(14px, 1.1vw, 17px);
+  font-size: clamp(1rem, 1.1vw, 1.125rem);
   line-height: 1.7;
   word-break: keep-all;
 }
@@ -172,7 +172,7 @@ function formatSlideNumber(index) {
   border-radius: 7px;
   background: var(--banner-ink);
   color: #fff;
-  font-size: 14px;
+  font-size: var(--font-size-body);
   font-weight: 500;
   transition: background .18s ease;
 }
@@ -183,7 +183,7 @@ function formatSlideNumber(index) {
 }
 
 .banner-cta span {
-  font-size: 19px;
+  font-size: 1.1875rem;
   line-height: 1;
 }
 
@@ -263,7 +263,7 @@ function formatSlideNumber(index) {
   gap: 5px;
   margin: 0;
   color: rgb(52 69 47 / 65%);
-  font-size: 12px;
+  font-size: var(--font-size-label);
   font-variant-numeric: tabular-nums;
 }
 
@@ -303,7 +303,7 @@ function formatSlideNumber(index) {
   }
 
   .banner-title {
-    font-size: 36px;
+    font-size: 2.25rem;
   }
 
   .banner-shade {
@@ -338,19 +338,19 @@ function formatSlideNumber(index) {
   }
 
   .banner-title {
-    font-size: 32px;
+    font-size: 2rem;
     line-height: 1.4;
   }
 
   .banner-description {
     max-width: 290px;
     margin: 12px 0 16px;
-    font-size: 13px;
+    font-size: var(--font-size-table);
   }
 
   .banner-cta {
     min-height: 38px;
-    font-size: 13px;
+    font-size: var(--font-size-table);
   }
 
   .banner-controls {

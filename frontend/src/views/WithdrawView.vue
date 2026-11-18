@@ -91,12 +91,12 @@ async function confirmWithdrawal() {
   display: grid;
   gap: 18px;
   padding: clamp(16px, 3vw, 26px);
-  font-size: 14px;
+  font-size: var(--font-size-body);
 }
 
 .withdraw-intro { display: grid; justify-items: center; gap: 6px; padding-block: 8px; text-align: center; }
 .withdraw-intro img { width: 64px; height: 64px; padding: 10px; border-radius: 50%; background: var(--color-background); }
-.withdraw-intro h2 { font-size: 22px; font-weight: 700; }
+.withdraw-intro h2 { font-size: 1.375rem; font-weight: 700; }
 .withdraw-notice { display: grid; gap: 10px; padding: 16px; border-radius: 10px; background: var(--color-background); }
 .withdraw-notice h3 { color: var(--color-primary); font-weight: 700; }
 .withdraw-notice ul { display: grid; gap: 8px; padding-inline-start: 20px; list-style: disc; }
@@ -115,15 +115,15 @@ async function confirmWithdrawal() {
   border-radius: 12px;
   background: var(--color-white);
   color: var(--color-text);
-  font-size: 14px;
+  font-size: var(--font-size-body);
 }
 
 .withdraw-dialog::backdrop { background: rgb(57 44 50 / 50%); }
 .withdraw-dialog-heading { display: flex; align-items: center; justify-content: space-between; }
-.withdraw-dialog-heading h2 { font-size: 17px; font-weight: 700; }
-.withdraw-close { border: 0; background: transparent; color: var(--color-primary); font-size: 24px; line-height: 1; cursor: pointer; }
+.withdraw-dialog-heading h2 { font-size: var(--font-size-section); font-weight: 700; }
+.withdraw-close { border: 0; background: transparent; color: var(--color-primary); font-size: 1.5rem; line-height: 1; cursor: pointer; }
 .withdraw-dialog-message { display: grid; justify-items: center; gap: 9px; padding: 18px 0 24px; text-align: center; }
 .withdraw-dialog-message svg { width: 50px; height: 50px; padding: 10px; border-radius: 50%; background: var(--color-background); fill: none; stroke: var(--color-primary); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-.withdraw-dialog-message strong { font-size: 16px; }
+.withdraw-dialog-message strong { font-size: var(--font-size-body); }
 .withdraw-error { margin-bottom: 12px; color: var(--color-primary); }
 </style>

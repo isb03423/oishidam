@@ -2,6 +2,7 @@ package com.oishidam.admin.dashboard.dto;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 public record DashboardOperationsResponse(
@@ -18,6 +19,9 @@ public record DashboardOperationsResponse(
         List<DashboardRecentOrderResponse> recentOrders,
         List<DashboardAlertResponse> stockAlerts,
         List<DashboardAlertResponse> pendingInquiries,
-        List<DashboardAlertResponse> unansweredReviews
+        List<DashboardAlertResponse> unansweredReviews,
+        DashboardSalesComparisonResponse previous,
+        List<DashboardHourResponse> hourly,
+        LocalDateTime asOf
 ) {
 }

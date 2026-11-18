@@ -4,6 +4,8 @@ import com.oishidam.member.entity.Member;
 import com.oishidam.member.enums.MemberGender;
 import com.oishidam.member.enums.MemberRole;
 
+import java.time.LocalDateTime;
+
 public record MemberResponse(
         Long memberId,
         String email,
@@ -11,7 +13,8 @@ public record MemberResponse(
         String phone,
         Integer birthYear,
         MemberGender gender,
-        MemberRole role
+        MemberRole role,
+        LocalDateTime createdAt
 ) {
     public static MemberResponse from(Member member) {
         return new MemberResponse(
@@ -21,7 +24,8 @@ public record MemberResponse(
                 member.getPhone(),
                 member.getBirthYear(),
                 member.getGender(),
-                member.getRole()
+                member.getRole(),
+                member.getCreatedAt()
         );
     }
 }

@@ -50,7 +50,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  font-size: 12px;
+  font-size: var(--font-size-label);
   line-height: 1.7;
 }
 
@@ -78,7 +78,7 @@
 
 .footer-copyright {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--font-size-label);
   line-height: 1.7;
 }
 

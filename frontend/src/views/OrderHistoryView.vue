@@ -9,6 +9,7 @@ import { getProduct } from '../services/catalog.js'
 import { cartLine } from '../stores/cart.js'
 import { startCheckout } from '../stores/checkout.js'
 import Pagination from '../components/common/Pagination.vue'
+import { orderStatuses, statusCode } from '../utils/adminStatus.js'
 
 const today = new Date()
 const orders = ref([])
@@ -20,17 +21,23 @@ const purchasing = ref(false)
 let revision = 0
 const pageSize = 3
 const months = ref(3)
+const status = ref('')
+const mockOrderStatuses = { 배송중: 'DOMESTIC_SHIPPING', 배송완료: 'DELIVERED' }
 const search = ref('')
 const keyword = ref('')
 const page = ref(1)
 const dialog = ref(null)
 const selectedOrder = ref(null)
-const isRepurchase = ref(false)
+const repurchaseItemsExpanded = ref(false)
+const visibleRepurchaseItems = computed(() => {
+  const items = selectedOrder.value?.items ?? []
+  return repurchaseItemsExpanded.value ? items : items.slice(0, 1)
+})
 const router = useRouter()
 const currency = new Intl.NumberFormat('ko-KR')
 const won = (price) => `${currency.format(price)}원`
 
-watch([shoppingOwner, page, months, keyword], async () => {
+watch([shoppingOwner, page, months, keyword, status], async () => {
   const current = ++revision
   error.value = ''
   if (session.source === 'mock') { orders.value = getExampleOrders(new Date()); loading.value = false; return }
@@ -42,7 +49,13 @@ watch([shoppingOwner, page, months, keyword], async () => {
     start.setMonth(start.getMonth() - months.value, 1)
     start.setDate(Math.min(new Date().getDate(), new Date(start.getFullYear(), start.getMonth() + 1, 0).getDate()))
     const from = [start.getFullYear(), String(start.getMonth() + 1).padStart(2, '0'), String(start.getDate()).padStart(2, '0')].join('-')
-    const result = await getOrders(page.value - 1, { size: pageSize, from, keyword: keyword.value || undefined, excludePending: true })
+    const result = await getOrders(page.value - 1, {
+      size: pageSize,
+      from,
+      keyword: keyword.value || undefined,
+      status: status.value || undefined,
+      excludePending: status.value !== 'PAYMENT_PENDING',
+    })
     const details = await Promise.all(result.content.map((summary) => getOrder(summary.orderId)))
     const mapped = await Promise.all(details.map(async (data) => {
       const items = await Promise.all(data.items.map(async (item) => {
@@ -66,6 +79,7 @@ const filteredOrders = computed(() => {
 
   return orders.value.filter((order) =>
     order.date >= start &&
+    (!status.value || (mockOrderStatuses[order.status] ?? statusCode(order.status, orderStatuses)) === status.value) &&
     (order.id.toLowerCase().includes(keyword.value) ||
       order.items.some((item) => item.name.toLowerCase().includes(keyword.value))),
   )
@@ -81,9 +95,9 @@ function applySearch() {
   page.value = 1
 }
 
-async function showOrder(order, repurchase = false) {
+async function showRepurchase(order) {
   selectedOrder.value = order
-  isRepurchase.value = repurchase
+  repurchaseItemsExpanded.value = false
   purchaseError.value = ''
   await nextTick()
   dialog.value.showModal()
@@ -114,6 +128,10 @@ async function repurchase() {
     stretch-content
   >
     <form class="order-filter" role="search" aria-label="주문 검색" @submit.prevent="applySearch">
+      <select v-model="status" aria-label="주문 상태" @change="page = 1">
+        <option value="">전체 상태</option>
+        <option v-for="[code, label] in orderStatuses" :key="code" :value="code">{{ label }}</option>
+      </select>
       <select v-model.number="months" aria-label="주문 조회 기간" @change="page = 1">
         <option :value="1">최근 1개월</option>
         <option :value="3">최근 3개월</option>
@@ -145,7 +163,7 @@ async function repurchase() {
               :aria-label="order.items[0].name + ' 상품 상세보기'"
             >
               <img v-if="order.items[0].imageUrl" :src="order.items[0].imageUrl" alt="" loading="lazy" />
-              <span v-else>{{ order.items[0].brand || '상품' }}</span>
+              <span v-else>상품</span>
             </RouterLink>
             <div>
               <h2>{{ order.items[0]?.name ?? '상품 정보 없음' }}<template v-if="order.items.length > 1"> 외 {{ order.items.length - 1 }}건</template></h2>
@@ -158,7 +176,7 @@ async function repurchase() {
               <svg v-else viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="m8 12 3 3 5-6" /></svg>
               {{ order.status }}
             </span>
-            <button type="button" :disabled="!order.items.length" @click="showOrder(order, true)">바로 구매하기</button>
+            <button type="button" :disabled="!order.items.length" @click="showRepurchase(order)">바로 구매하기</button>
             <button type="button" @click="router.push({ name: 'MyPageOrderDetail', params: { orderId: order.orderId ?? order.id } })">
               주문 상세보기
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
@@ -173,21 +191,81 @@ async function repurchase() {
       <Pagination v-model="page" :page-count="pageCount" label="주문 목록 페이지" />
     </template>
 
-    <dialog ref="dialog" class="order-dialog" aria-labelledby="order-dialog-title">
+    <dialog
+      ref="dialog"
+      class="order-dialog"
+      aria-labelledby="order-dialog-title"
+      aria-describedby="order-dialog-description"
+      @cancel="purchasing && $event.preventDefault()"
+    >
       <template v-if="selectedOrder">
-        <h2 id="order-dialog-title">{{ isRepurchase ? '재구매 상품 확인' : '주문 상세보기' }}</h2>
-        <p v-if="isRepurchase && session.source === 'mock'">예시 주문입니다. 실제 결제는 준비 중입니다.</p>
-        <p v-else-if="isRepurchase">현재 판매 가격과 재고를 확인한 뒤 주문서로 이동합니다.</p>
-        <p v-else>{{ selectedOrder.id }} · {{ selectedOrder.status }}</p>
-        <ul>
-          <li v-for="item in selectedOrder.items" :key="item.name">
-            <span>{{ item.name }} × {{ item.quantity }}</span>
-            <strong>{{ won(item.price * item.quantity) }}</strong>
+        <header class="repurchase-header">
+          <h2 id="order-dialog-title">상품을 다시 구매하시겠어요?</h2>
+          <button
+            class="repurchase-close"
+            type="button"
+            aria-label="닫기"
+            :disabled="purchasing"
+            @click="dialog.close()"
+          >×</button>
+        </header>
+        <p id="order-dialog-description" class="repurchase-description">
+          {{ session.source === 'mock' ? '예시 주문입니다. 실제 결제는 준비 중입니다.' : '현재 판매 정보로 주문서를 준비합니다.' }}
+        </p>
+        <ul
+          id="repurchase-items"
+          class="repurchase-items"
+          aria-label="재구매 상품 목록"
+          :tabindex="repurchaseItemsExpanded ? 0 : undefined"
+        >
+          <li v-for="item in visibleRepurchaseItems" :key="item.product_id" class="repurchase-item">
+            <div class="repurchase-thumbnail" :class="item.tone" aria-hidden="true">
+              <img v-if="item.imageUrl" :src="item.imageUrl" alt="" />
+              <span v-else>{{ item.brand || '상품' }}</span>
+            </div>
+            <div class="repurchase-item-details">
+              <p>{{ item.name }}</p>
+              <span>수량 {{ item.quantity }}개</span>
+              <strong>{{ won(item.price * item.quantity) }}</strong>
+            </div>
           </li>
         </ul>
-        <p>{{ isRepurchase ? '이전 주문 금액' : '주문 금액' }} <strong>{{ won(selectedOrder.total) }}</strong></p>
-        <p v-if="purchaseError" role="alert">{{ purchaseError }}</p>
-        <form method="dialog"><button autofocus :disabled="purchasing">닫기</button> <button v-if="session.source !== 'mock' && isRepurchase" class="primary-button" type="button" :disabled="purchasing" @click="repurchase">주문서로 이동</button></form>
+        <button
+          v-if="selectedOrder.items.length > 1"
+          type="button"
+          class="repurchase-toggle"
+          :aria-expanded="repurchaseItemsExpanded"
+          aria-controls="repurchase-items"
+          @click="repurchaseItemsExpanded = !repurchaseItemsExpanded"
+        >
+          {{ repurchaseItemsExpanded ? '상품 접기' : `나머지 상품 ${selectedOrder.items.length - 1}개 더 보기` }}
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <path d="m4 6 4 4 4-4" />
+          </svg>
+        </button>
+        <dl class="repurchase-total">
+          <dt>이전 주문 금액</dt>
+          <dd>{{ won(selectedOrder.total) }}</dd>
+        </dl>
+        <p class="repurchase-note">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+            <circle cx="10" cy="10" r="7.2" />
+            <path d="M10 9v5" />
+            <circle cx="10" cy="6.7" r=".8" fill="currentColor" stroke="none" />
+          </svg>
+          <span>상품 가격 및 재고는 현재 판매 기준으로 적용되며, 주문서에서 최종 확인할 수 있습니다.</span>
+        </p>
+        <p v-if="purchaseError" class="repurchase-error" role="alert">{{ purchaseError }}</p>
+        <form method="dialog" class="repurchase-actions">
+          <button autofocus :disabled="purchasing">취소</button>
+          <button
+            v-if="session.source !== 'mock'"
+            class="primary-button"
+            type="button"
+            :disabled="purchasing"
+            @click="repurchase"
+          >{{ purchasing ? '상품 확인 중…' : '주문서로 이동' }}</button>
+        </form>
       </template>
     </dialog>
   </MyPageLayout>
@@ -201,6 +279,7 @@ async function repurchase() {
 
 .order-filter {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   padding: 14px 16px;
   margin-bottom: 14px;
@@ -215,11 +294,28 @@ select, input, button {
   background: #fff;
   color: var(--color-text);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--font-size-control);
 }
 
 select, input {
   padding: 0 10px;
+}
+
+.order-filter select {
+  appearance: none;
+  padding-inline-end: 36px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23392c32' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 14px;
+}
+
+@media (forced-colors: active) {
+  .order-filter select {
+    appearance: auto;
+    padding-inline-end: 10px;
+    background-image: none;
+  }
 }
 
 button {
@@ -253,7 +349,7 @@ button:disabled {
 
 .search-field {
   display: flex;
-  flex: 1;
+  flex: 1 1 190px;
   min-width: 0;
 }
 
@@ -302,7 +398,7 @@ svg {
   flex-wrap: wrap;
   gap: 4px 18px;
   background: #f8f3f5;
-  font-size: 12px;
+  font-size: var(--font-size-label);
 }
 
 .order-meta strong {
@@ -321,7 +417,7 @@ svg {
 
 .order-product h2 {
   margin: 0 0 4px;
-  font-size: 15px;
+  font-size: var(--font-size-section);
   font-weight: 500;
   overflow-wrap: anywhere;
 }
@@ -329,7 +425,7 @@ svg {
 .order-product p {
   margin: 0;
   color: #71666b;
-  font-size: 13px;
+  font-size: var(--font-size-table);
 }
 
 .order-product p span {
@@ -347,7 +443,7 @@ svg {
   height: 53px;
   border-radius: 4px;
   color: #fff;
-  font-size: 9px;
+  font-size: var(--font-size-caption);
   font-weight: 700;
 }
 
@@ -364,7 +460,7 @@ svg {
   border-radius: 999px;
   background: #f7e7eb;
   color: #794153;
-  font-size: 13px;
+  font-size: var(--font-size-table);
   font-weight: 600;
   white-space: nowrap;
 }
@@ -376,38 +472,239 @@ svg {
 }
 
 .order-dialog {
-  width: min(400px, calc(100% - 32px));
+  width: min(460px, calc(100% - 32px));
+  max-height: calc(100dvh - 32px);
+  overflow: hidden;
   box-sizing: border-box;
-  padding: 22px;
-  border: 1px solid var(--color-border);
-  border-radius: 14px;
-  color: var(--color-text);
+  padding: 20px;
+  border: 1px solid #d8d8d8;
+  border-radius: 24px;
+  background: #f2f2f2;
+  color: #171717;
+}
+
+.order-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.order-dialog > :not(.repurchase-items) {
+  flex: none;
 }
 
 .order-dialog::backdrop {
   background: rgb(57 44 50 / 45%);
 }
 
-.order-dialog h2 {
-  margin: 0;
-  font-size: 19px;
+.repurchase-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
 }
 
-.order-dialog ul {
+.repurchase-header h2 {
+  margin: 0;
+  font-size: var(--font-size-section);
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.repurchase-close {
+  flex: 0 0 28px;
+  min-height: 32px;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  color: #5d5d5d;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.repurchase-description {
+  margin: 12px 0 14px;
+  color: #616161;
+  font-size: 18px;
+  line-height: 1.5;
+}
+
+.repurchase-items {
+  display: grid;
+  align-content: start;
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: 248px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  gap: 6px;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.order-dialog li {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 7px 0;
-  border-bottom: 1px solid var(--color-border);
+.repurchase-items:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
 }
 
-.order-dialog form {
-  text-align: right;
+.repurchase-item {
+  display: grid;
+  grid-template-columns: clamp(52px, 16vw, 72px) minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 16px;
+  background: #fafafa;
+}
+
+.repurchase-thumbnail {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 1px solid #e9e9e9;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.repurchase-thumbnail img {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  object-fit: contain;
+  background: #fff;
+}
+
+.repurchase-thumbnail span {
+  padding: 4px;
+  text-align: center;
+}
+
+.repurchase-thumbnail:is(.berry, .matcha, .potato, .cocoa) {
+  color: #fff;
+}
+
+.repurchase-item-details {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.repurchase-item-details p {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.repurchase-item-details span {
+  color: #616161;
+  font-size: 15px;
+}
+
+.repurchase-item-details strong {
+  color: inherit;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.repurchase-toggle {
+  width: 100%;
+  margin-top: 8px;
+  gap: 6px;
+  border-color: #d8d8d8;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.repurchase-toggle svg {
+  width: 16px;
+  height: 16px;
+}
+
+.repurchase-toggle[aria-expanded='true'] svg {
+  transform: rotate(180deg);
+}
+
+.repurchase-total {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  padding: 17px 0 27px;
+  border-bottom: 1px solid #e1e1e1;
+  font-size: 18px;
+}
+
+.repurchase-total dt {
+  color: #616161;
+}
+
+.repurchase-total dd {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.repurchase-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 24px 0 16px;
+  color: #616161;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.repurchase-note svg {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+}
+
+.repurchase-error {
+  margin: 0 0 12px;
+  color: #9b2944;
+  font-size: 15px;
+}
+
+.repurchase-actions {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  gap: 10px;
+}
+
+.repurchase-actions button {
+  min-height: 44px;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.repurchase-actions button:not(.primary-button) {
+  border-color: #d8d8d8;
+  background: transparent;
+  color: inherit;
+}
+
+.repurchase-actions button:not(.primary-button):hover:not(:disabled) {
+  border-color: #999;
+}
+
+@media (max-height: 480px) {
+  .order-dialog { padding: 12px; }
+  .repurchase-description { margin: 6px 0 8px; }
+  .repurchase-total { padding: 8px 0; }
+  .repurchase-note { margin: 8px 0; }
+}
+
+@media (max-height: 360px) {
+  .order-dialog { overflow-y: auto; }
+  .repurchase-items { min-height: min(90px, 30dvh); }
 }
 
 @media (min-width: 861px) {
@@ -442,13 +739,16 @@ svg {
     padding: 10px;
   }
 
+  .order-filter select { flex: 1 1 0; min-width: 0; }
+  .order-filter .search-field { flex-basis: 100%; }
+
   .order-actions {
     margin-left: 0;
     gap: 5px;
   }
 
   .order-actions button, .order-status {
-    font-size: 12px;
+    font-size: var(--font-size-control);
   }
 }
 </style>

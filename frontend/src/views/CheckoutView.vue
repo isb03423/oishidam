@@ -3,6 +3,7 @@ import { computed, nextTick, reactive, ref, watch, onMounted, onBeforeUnmount } 
 import PhoneInput from '../components/common/PhoneInput.vue'
 import AddressForm from '../components/common/AddressForm.vue'
 import AlertDialog from '../components/common/AlertDialog.vue'
+import DeleteConfirmationDialog from '../components/DeleteConfirmationDialog.vue'
 import { development } from '../config/development.js'
 import { deleteAddress, getAddresses, saveAddress } from '../services/addresses.js'
 import { formatPhone, phoneDigits } from '../services/phone.js'
@@ -17,6 +18,7 @@ const memoChoice = ref('')
 const previousInputs = restoreCheckout()
 const addresses = ref([])
 const addressDialog = ref(null)
+const deleteAddressDialog = ref(null)
 const addressError = ref('')
 const addressLoading = ref(false)
 const addressBusy = ref(false)
@@ -119,8 +121,10 @@ async function saveDraftAddress(value) {
   finally { if (owner === shoppingOwner.value) addressBusy.value = false }
 }
 
-async function removeSavedAddress(address) {
-  if (addressBusy.value || !window.confirm(`‘${address.name}’ 배송지를 삭제할까요?`)) return
+async function removeSavedAddress([addressId]) {
+  if (addressBusy.value) return
+  const address = addresses.value.find(({ id }) => id === addressId)
+  if (!address) return
   const owner = shoppingOwner.value
   addressBusy.value = true
   addressError.value = ''
@@ -294,6 +298,7 @@ async function requestPayment(orderNumber) {
 <template>
   <div class="checkout-page">
     <AlertDialog :message="notice" @close="notice = ''" />
+    <DeleteConfirmationDialog :key="shoppingOwner" ref="deleteAddressDialog" description="선택한 배송지를 삭제합니다." @confirm="removeSavedAddress" />
     <main class="site-container checkout-content">
       <header class="checkout-header">
         <div><h1>주문서</h1><p>주문 정보를 확인하고 주문을 완료해 주세요.</p></div>
@@ -350,7 +355,7 @@ async function requestPayment(orderNumber) {
                     </div>
                     <p class="address-phone">{{ formatPhone(address.phone) }}</p>
                     <p class="address-lines">{{ address.address }} {{ address.detail }} <span>({{ address.postalCode }})</span></p>
-                    <div class="address-actions"><button type="button" :disabled="addressBusy" @click="editAddress(address)">수정</button><button type="button" :disabled="addressBusy" @click="removeSavedAddress(address)">삭제</button></div>
+                    <div class="address-actions"><button type="button" :disabled="addressBusy" @click="editAddress(address)">수정</button><button type="button" :disabled="addressBusy" @click="deleteAddressDialog.open([address.id])">삭제</button></div>
                   </li>
                 </ul>
               </template>
@@ -424,40 +429,40 @@ async function requestPayment(orderNumber) {
 .checkout-page { background: var(--color-background); color: var(--color-text); }
 .checkout-content { padding-block: 32px 56px; }
 .checkout-header { margin-bottom: 25px; }
-h1 { font-size: clamp(1.35rem, 3vw, 1.65rem); font-weight: 800; }
+h1 { font-size: clamp(1.5rem, 3vw, 1.75rem); font-weight: 800; }
 .checkout-header p { margin-top: 4px; color: var(--color-secondary); }
 .checkout-grid { display: grid; grid-template-columns: minmax(0, 1.75fr) minmax(0, 1fr); gap: 16px; align-items: start; }
 .checkout-fields { display: grid; gap: 14px; }
 fieldset.checkout-fields { min-width: 0; margin: 0; padding: 0; border: 0; }
 .payment-card { scroll-margin-top: 16px; }
-.payment-help { margin: 10px 0; color: var(--color-secondary); font-size: .88rem; }
+.payment-help { margin: 10px 0; color: var(--color-secondary); font-size: var(--font-size-body); }
 .checkout-card { min-width: 0; padding: 18px 20px; border: 1px solid var(--color-border); border-radius: 14px; background: var(--color-white); }
 .card-heading { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; padding-bottom: 12px; margin-bottom: 14px; border-bottom: 1px solid var(--color-border); }
-h2 { color: var(--color-text); font-size: 1.15rem; font-weight: 800; }
-.checkout-button { display: inline-flex; align-items: center; justify-content: center; padding: 7px 12px; border: 1px solid var(--color-primary); border-radius: 8px; color: var(--color-primary); background: var(--color-white); font: inherit; font-weight: 700; cursor: pointer; }
-.address-list-button { padding: 5px 10px; font-size: .875rem; }
+h2 { color: var(--color-text); font-size: var(--font-size-section); font-weight: 800; }
+.checkout-button { display: inline-flex; align-items: center; justify-content: center; padding: 7px 12px; border: 1px solid var(--color-primary); border-radius: 8px; color: var(--color-primary); background: var(--color-white); font: inherit; font-size: var(--font-size-control); font-weight: 700; cursor: pointer; }
+.address-list-button { padding: 5px 10px; font-size: var(--font-size-control); }
 .checkout-button.primary { color: var(--color-white); background: var(--color-primary); }
 .form-fields { display: grid; gap: 10px; }
-.form-fields > label, .form-row { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 10px; align-items: center; font-size: .9rem; }
+.form-fields > label, .form-row { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 10px; align-items: center; font-size: var(--font-size-body); }
 .form-fields b { color: var(--color-primary); }
 .postcode-field { display: flex; align-items: stretch; gap: 8px; }
 .postcode-field input { max-width: 160px; }
 .postcode-field button { white-space: nowrap; }
 .postcode-panel { min-height: 360px; }
-.form-fields :deep(input), textarea { width: 100%; min-width: 0; padding: 8px 10px; border: 1px solid var(--color-border); border-radius: 8px; color: inherit; background: var(--color-white); font: inherit; }
-.guide-link { color: var(--color-primary); text-decoration: underline; font-size: .82rem; }
-.checkout-note { margin-top: 12px; padding: 12px; border-radius: 8px; background: var(--color-background); color: var(--color-secondary); font-size: .88rem; }
+.form-fields :deep(input), textarea { width: 100%; min-width: 0; padding: 8px 10px; border: 1px solid var(--color-border); border-radius: 8px; color: inherit; background: var(--color-white); font: inherit; font-size: var(--font-size-control); }
+.guide-link { color: var(--color-primary); text-decoration: underline; font-size: var(--font-size-body); }
+.checkout-note { margin-top: 12px; padding: 12px; border-radius: 8px; background: var(--color-background); color: var(--color-secondary); font-size: var(--font-size-label); }
 .order-items li { display: grid; grid-template-columns: 58px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding-block: 10px; }
 .order-items li + li { border-top: 1px solid var(--color-border); }
-.order-items p { color: var(--color-secondary); font-size: .84rem; }
-.order-image { display: grid; place-items: center; width: 58px; aspect-ratio: 1; overflow: hidden; border-radius: 8px; background: var(--color-background); color: var(--color-secondary); text-align: center; font-size: .65rem; }
+.order-items p { color: var(--color-secondary); font-size: var(--font-size-body); }
+.order-image { display: grid; place-items: center; width: 58px; aspect-ratio: 1; overflow: hidden; border-radius: 8px; background: var(--color-background); color: var(--color-secondary); text-align: center; font-size: var(--font-size-caption); }
 .order-image img { width: 100%; height: 100%; object-fit: contain; }
 .line-price { white-space: nowrap; }
-.item-count { margin-left: 4px; color: var(--color-secondary); font-size: .875rem; font-weight: 400; }
-.items-toggle { display: flex; justify-content: center; align-items: center; gap: 8px; width: 100%; margin-top: 16px; padding: 11px 16px; border: 1px solid var(--color-primary); border-radius: 999px; background: var(--color-white); color: var(--color-primary); font: inherit; font-size: .9rem; font-weight: 700; cursor: pointer; }
+.item-count { margin-left: 4px; color: var(--color-secondary); font-size: var(--font-size-label); font-weight: 400; }
+.items-toggle { display: flex; justify-content: center; align-items: center; gap: 8px; width: 100%; margin-top: 16px; padding: 11px 16px; border: 1px solid var(--color-primary); border-radius: 999px; background: var(--color-white); color: var(--color-primary); font: inherit; font-size: var(--font-size-body); font-weight: 700; cursor: pointer; }
 .items-toggle svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; }
 .items-toggle svg.expanded { transform: rotate(180deg); }
-.memo-options { display: flex; flex-wrap: wrap; gap: 10px 16px; font-size: .86rem; }
+.memo-options { display: flex; flex-wrap: wrap; gap: 10px 16px; font-size: var(--font-size-body); }
 .memo-options label { display: flex; align-items: center; gap: 4px; }
 .memo-options input { accent-color: var(--color-primary); }
 textarea { margin-top: 12px; }
@@ -469,20 +474,20 @@ textarea { margin-top: 12px; }
 .address-dialog { position: fixed; inset: 0; width: min(520px, calc(100% - 32px)); max-height: min(80vh, 760px); margin: auto; padding: 24px; overflow: auto; }
 .address-dialog::backdrop { background: rgb(57 44 50 / 45%); }
 .address-dialog-heading { position: relative; display: flex; justify-content: center; align-items: center; margin-bottom: 22px; }
-.address-close { position: absolute; right: 0; border: 0; background: transparent; color: var(--color-secondary); font-size: 28px; line-height: 1; cursor: pointer; }
-.address-add { width: 100%; padding: 13px; border: 1px solid var(--color-border); border-radius: 8px; background: #fff; color: var(--color-text); font: inherit; cursor: pointer; }
+.address-close { position: absolute; right: 0; border: 0; background: transparent; color: var(--color-secondary); font-size: 1.75rem; line-height: 1; cursor: pointer; }
+.address-add { width: 100%; padding: 13px; border: 1px solid var(--color-border); border-radius: 8px; background: #fff; color: var(--color-text); font: inherit; font-size: var(--font-size-control); cursor: pointer; }
 .address-list { margin-top: 14px; }
 .address-item { padding: 17px 0; border-top: 1px solid var(--color-border); }
 .address-item-heading { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
 .address-item-heading strong { color: var(--color-text); font-weight: 800; }
 .address-item-heading strong.is-selected, .address-selected { color: var(--color-primary); }
-.address-badge { display: inline-block; padding: 2px 6px; border-radius: 4px; background: var(--color-background); color: var(--color-secondary); font-size: .75rem; }
-.address-selected { flex-shrink: 0; font-weight: 700; font-size: .875rem; }
-.address-select { flex-shrink: 0; padding: 5px 11px; border: 0; border-radius: 6px; background: var(--color-accent); color: var(--color-primary); font: inherit; font-size: .875rem; font-weight: 700; cursor: pointer; }
+.address-badge { display: inline-block; padding: 2px 6px; border-radius: 4px; background: var(--color-background); color: var(--color-secondary); font-size: var(--font-size-label); }
+.address-selected { flex-shrink: 0; font-weight: 700; font-size: var(--font-size-body); }
+.address-select { flex-shrink: 0; padding: 5px 11px; border: 0; border-radius: 6px; background: var(--color-accent); color: var(--color-primary); font: inherit; font-size: var(--font-size-control); font-weight: 700; cursor: pointer; }
 .address-phone { margin-top: 4px; color: var(--color-secondary); }
 .address-lines { margin-top: 10px; overflow-wrap: anywhere; }
 .address-actions { display: flex; gap: 8px; margin-top: 12px; }
-.address-actions > button:not(.checkout-button) { padding: 5px 10px; border: 1px solid var(--color-border); border-radius: 6px; background: #fff; color: var(--color-text); font: inherit; font-size: .875rem; cursor: pointer; }
+.address-actions > button:not(.checkout-button) { padding: 5px 10px; border: 1px solid var(--color-border); border-radius: 6px; background: #fff; color: var(--color-text); font: inherit; font-size: var(--font-size-control); cursor: pointer; }
 .address-message { padding: 20px 0 4px; color: var(--color-secondary); }
 .address-error { color: var(--color-primary); }
 .checkout-state { text-align: center; padding-block: 48px; }

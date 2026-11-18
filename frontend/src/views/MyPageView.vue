@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { RouterLink } from 'vue-router'
 import MyPageLayout from '../components/MyPageLayout.vue'
 import ProductCard from '../components/product/ProductCard.vue'
 import { getExampleOrders } from '../mocks/orders.js'
@@ -20,7 +21,10 @@ const deliveryOrder = computed(() => {
 const deliveryStep = computed(() => orderDeliveryStep(deliveryOrder.value?.status))
 const orderLoading = ref(session.source === 'api')
 const orderError = ref(false)
-const recommended = reactive({ items: [] })
+const recommended = reactive({ items: [], loading: true, error: false })
+const aiRecommendationRoute = computed(() => session.member?.role === 'USER'
+  ? { name: 'Products', query: { recommend: 'ai' } }
+  : undefined)
 const failedImages = reactive(new Set())
 const wishlistPreview = computed(() => wishedProducts.value.slice(0, 4).map((product) => {
   const image = product.images?.find((item) => item.is_primary && item.url)
@@ -29,10 +33,8 @@ const wishlistPreview = computed(() => wishedProducts.value.slice(0, 4).map((pro
 }))
 let controller
 
-onMounted(async () => {
-  controller = new AbortController()
+async function loadLatestOrder(revision) {
   if (session.source === 'api') {
-    const revision = getSessionRevision()
     try {
       const orders = await getOrders(0, { excludePending: true, size: 1 })
       if (controller.signal.aborted || revision !== getSessionRevision()) return
@@ -42,12 +44,25 @@ onMounted(async () => {
     } catch { if (!controller.signal.aborted && revision === getSessionRevision()) orderError.value = true }
     finally { if (!controller.signal.aborted && revision === getSessionRevision()) orderLoading.value = false }
   }
+}
+
+async function loadRecommendations(revision) {
   try {
-    const response = await getRecommendations({ signal: controller.signal, limit: 3 })
-    recommended.items = Array.isArray(response?.items) ? response.items.slice(0, 3) : []
+    const type = session.member?.role === 'USER' ? 'personalized' : 'best'
+    const response = await getRecommendations({ signal: controller.signal, limit: 3, type })
+    if (!controller.signal.aborted && revision === getSessionRevision()) recommended.items = response.items
   } catch {
-    recommended.items = []
+    if (!controller.signal.aborted && revision === getSessionRevision()) recommended.error = true
+  } finally {
+    if (!controller.signal.aborted && revision === getSessionRevision()) recommended.loading = false
   }
+}
+
+onMounted(() => {
+  controller = new AbortController()
+  const revision = getSessionRevision()
+  loadLatestOrder(revision)
+  loadRecommendations(revision)
 })
 
 onBeforeUnmount(() => controller?.abort())
@@ -112,22 +127,31 @@ onBeforeUnmount(() => controller?.abort())
         <p v-else class="delivery-empty">최근 주문한 내역이 없습니다.</p>
       </article>
 
-      <article class="dashboard-card ai-card">
-        <h2>
+      <component
+        :is="aiRecommendationRoute ? RouterLink : 'article'"
+        :to="aiRecommendationRoute"
+        class="dashboard-card ai-card"
+        aria-labelledby="ai-recommendation-title"
+      >
+        <h2 id="ai-recommendation-title">
           AI 추천 컬렉션
           <svg class="ai-title-sparkles" viewBox="62 6 16 16" aria-hidden="true">
             <path d="M67 7.75C67.35 7.75 67.6 8 67.7 8.35L68.1 9.9L69.65 10.3C70 10.4 70.25 10.65 70.25 11C70.25 11.35 70 11.6 69.65 11.7L68.1 12.1L67.7 13.65C67.6 14 67.35 14.25 67 14.25C66.65 14.25 66.4 14 66.3 13.65L65.9 12.1L64.35 11.7C64 11.6 63.75 11.35 63.75 11C63.75 10.65 64 10.4 64.35 10.3L65.9 9.9L66.3 8.35C66.4 8 66.65 7.75 67 7.75Z" />
             <path fill-rule="evenodd" clip-rule="evenodd" d="M72.5 11.25C72.85 11.25 73.1 11.45 73.25 11.8L74.25 14.75L77.2 15.75C77.55 15.9 77.75 16.15 77.75 16.5C77.75 16.85 77.55 17.1 77.2 17.25L74.25 18.25L73.25 21.2C73.1 21.55 72.85 21.75 72.5 21.75C72.15 21.75 71.9 21.55 71.75 21.2L70.75 18.25L67.8 17.25C67.45 17.1 67.25 16.85 67.25 16.5C67.25 16.15 67.45 15.9 67.8 15.75L70.75 14.75L71.75 11.8C71.9 11.45 72.15 11.25 72.5 11.25ZM72.5 14.9L71.925 16.5L72.5 18.1L73.075 16.5L72.5 14.9Z" />
           </svg>
         </h2>
-        <div class="recommendation-items" aria-label="추천 상품 예시">
+        <p v-if="recommended.loading" role="status">추천 상품을 불러오는 중입니다.</p>
+        <p v-else-if="recommended.error" role="status">추천 상품을 불러오지 못했습니다.</p>
+        <p v-else-if="!recommended.items.length">추천할 상품이 없습니다.</p>
+        <div v-else class="recommendation-items" aria-label="추천 상품">
           <ProductCard
             v-for="product in recommended.items"
             :key="product.product_id"
             :product="product"
+            :interactive="!aiRecommendationRoute"
           />
         </div>
-      </article>
+      </component>
 
       <RouterLink :to="{ name: 'MyPageWishlist' }" class="dashboard-card wishlist-card">
         <h2>찜한 상품</h2>
@@ -171,7 +195,6 @@ onBeforeUnmount(() => controller?.abort())
 
 <style scoped>
 .mypage-overview {
-  --mypage-title-size-adjustment: 1px;
 }
 
 .member-welcome {
@@ -194,7 +217,7 @@ onBeforeUnmount(() => controller?.abort())
   box-sizing: border-box;
   background: linear-gradient(135deg, #c98d99, #ad6477);
   color: #fff;
-  font-size: 19px;
+  font-size: 1.1875rem;
   font-weight: 500;
   letter-spacing: .04em;
   line-height: 1.35;
@@ -208,13 +231,13 @@ onBeforeUnmount(() => controller?.abort())
 .member-message p {
   margin: 0;
   color: #685f63;
-  font-size: 14px;
+  font-size: var(--font-size-body);
 }
 
 .member-message h2 {
   margin: 8px 0 10px;
   color: #21191c;
-  font-size: 25px;
+  font-size: 1.5625rem;
   line-height: 1.2;
 }
 
@@ -230,7 +253,7 @@ onBeforeUnmount(() => controller?.abort())
   border-radius: 99px;
   background: #ca929c;
   color: #fff;
-  font-size: 12px;
+  font-size: var(--font-size-label);
   font-weight: 600;
 }
 
@@ -271,19 +294,19 @@ onBeforeUnmount(() => controller?.abort())
 .summary-card p {
   margin: 0 0 4px;
   color: #5f5559;
-  font-size: 13px;
+  font-size: var(--font-size-table);
   font-weight: 600;
 }
 
 .summary-card strong {
   color: #21191c;
-  font-size: 24px;
+  font-size: 1.5rem;
   line-height: 1;
 }
 
 .summary-card > span {
   color: var(--color-text);
-  font-size: 29px;
+  font-size: 1.8125rem;
   font-weight: 300;
   line-height: 1;
 }
@@ -328,7 +351,7 @@ onBeforeUnmount(() => controller?.abort())
 .member-message h2 {
   margin: 0 0 10px;
   color: var(--color-primary);
-  font-size: 23px;
+  font-size: 1.4375rem;
 }
 
 .member-message p {
@@ -360,7 +383,7 @@ onBeforeUnmount(() => controller?.abort())
 .dashboard-card h2 {
   margin: 0 0 10px;
   color: var(--color-text);
-  font-size: 16px;
+  font-size: var(--font-size-section);
   font-weight: 500;
   line-height: 1.2;
 }
@@ -392,7 +415,7 @@ onBeforeUnmount(() => controller?.abort())
   align-items: center;
   gap: 4px;
   color: #807579;
-  font-size: 10px;
+  font-size: var(--font-size-caption);
   font-weight: 500;
   white-space: nowrap;
 }
@@ -475,7 +498,7 @@ onBeforeUnmount(() => controller?.abort())
   border-radius: 8px;
   background: #fff;
   color: var(--color-text);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   line-height: 1.5;
   text-align: left;
 }
@@ -484,6 +507,12 @@ onBeforeUnmount(() => controller?.abort())
   border-radius: 16px;
   background: var(--ai-recommend-background);
   color: #fff;
+  text-decoration: none;
+}
+
+.ai-card:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
 }
 
 .ai-card h2 {
@@ -527,12 +556,12 @@ onBeforeUnmount(() => controller?.abort())
 
 .recommendation-items :deep(.product-name) {
   margin-bottom: 2px;
-  font-size: 10px;
+  font-size: var(--font-size-caption);
   -webkit-line-clamp: 1;
 }
 
 .recommendation-items :deep(.product-price) {
-  font-size: 11px;
+  font-size: var(--font-size-caption);
 }
 
 .recommendation-item {
@@ -544,7 +573,7 @@ onBeforeUnmount(() => controller?.abort())
   padding: 7px;
   border-radius: 9px;
   color: var(--color-text);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
   line-height: 1.3;
   box-sizing: border-box;
 }
@@ -609,7 +638,7 @@ onBeforeUnmount(() => controller?.abort())
   padding-inline: 4px;
   overflow: hidden;
   color: #71666b;
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -620,7 +649,7 @@ onBeforeUnmount(() => controller?.abort())
   flex: 1;
   place-items: center;
   color: #71666b;
-  font-size: 13px;
+  font-size: var(--font-size-table);
 }
 
 .activity-bar {
@@ -637,7 +666,7 @@ onBeforeUnmount(() => controller?.abort())
 .activity-bar strong {
   margin-right: 0;
   color: var(--color-text);
-  font-size: 16px;
+  font-size: var(--font-size-body);
   font-weight: 500;
 }
 
@@ -650,7 +679,7 @@ onBeforeUnmount(() => controller?.abort())
   background: transparent;
   color: var(--color-text);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--font-size-control);
   cursor: pointer;
 }
 
@@ -716,7 +745,7 @@ onBeforeUnmount(() => controller?.abort())
   }
 
   .member-message h2 {
-    font-size: 21px;
+    font-size: 1.3125rem;
   }
 
   .member-grade {

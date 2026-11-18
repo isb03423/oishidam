@@ -69,6 +69,7 @@ export function normalizeMember(member = {}) {
     email: member.email,
     phone: member.phone,
     birth_year: member.birthYear,
+    joined_at: member.createdAt?.slice(0, 10) ?? '',
     gender: { M: 'MALE', F: 'FEMALE', 남성: 'MALE', 여성: 'FEMALE' }[member.gender] || 'NONE',
     role: { 관리자: 'ADMIN', '일반 회원': 'USER' }[member.role] || member.role,
     status: member.isActive === false ? 'INACTIVE' : 'ACTIVE',

@@ -1,0 +1,120 @@
+name: oishidam
+
+services:
+  db:
+    image: postgres:17-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: oishidam
+      POSTGRES_USER: oishidam
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      TZ: Asia/Seoul
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/src/main/resources/sql/schema.sql:/docker-entrypoint-initdb.d/00-schema.sql:ro
+      - ./scripts/seed/init-dev-data.sql:/docker-entrypoint-initdb.d/10-dev-data.sql:ro
+      - ./scripts/seed/docker-dev.sql:/opt/oishidam/seed/docker-dev.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/oishidam
+      SPRING_DATASOURCE_USERNAME: oishidam
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      FRONTEND_URL: ${APP_URL:-http://localhost}
+      SUCCESS_REDIRECT: ${APP_URL:-http://localhost}/oauth/callback
+      SERVER_FORWARD_HEADERS_STRATEGY: framework
+      AI_SERVICE_URL: http://ai-service:8000
+      KAKAO_LOGIN_ENABLED: ${KAKAO_LOGIN_ENABLED:-false}
+      KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID:-}
+      KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET:-}
+      IMAGEKIT_PRIVATE_KEY: ${IMAGEKIT_PRIVATE_KEY:-}
+      TOSS_TEST_CLIENT_KEY: ${TOSS_TEST_CLIENT_KEY:-}
+      TOSS_TEST_SECRET_KEY: ${TOSS_TEST_SECRET_KEY:-}
+      TZ: Asia/Seoul
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/api/categories"]
+      interval: 10s
+      timeout: 5s
+      start_period: 60s
+      retries: 12
+
+  ai-service:
+    build: ./ai-service
+    restart: unless-stopped
+    environment:
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_NAME: oishidam
+      DB_USER: oishidam
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      SPRING_API_URL: http://backend:8080/api
+      FRONTEND_ORIGINS: ${APP_URL:-http://localhost}
+      CHART_DIR: /app/charts
+      HF_HOME: /app/model-cache
+      MPLBACKEND: Agg
+      TZ: Asia/Seoul
+    volumes:
+      - ai_models:/app/model-cache
+      - ai_charts:/app/charts
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      # /health에도 기존 JWT 인증이 적용되므로 비로그인 요청의 401로 응답 여부를 확인한다.
+      test: ["CMD", "python", "-c", "import http.client; c = http.client.HTTPConnection('localhost', 8000, timeout=3); c.request('GET', '/health'); assert c.getresponse().status == 401"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 12
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: /api
+        VITE_AI_API_BASE_URL: ${APP_URL:-http://localhost}
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+      ai-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:8080/"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      APP_URL: ${APP_URL:-http://localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy:/etc/caddy:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      frontend:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  ai_models:
+  ai_charts:
+  caddy_data:
+  caddy_config:

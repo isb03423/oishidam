@@ -8,7 +8,9 @@
 - 개발 모드에서 모의 데이터 사용을 끄면 실제 서버를 호출합니다. 회원정보·배송지 변경은 로그인 응답의 액세스 토큰을 Bearer 헤더로 전달합니다.
 - 성공 응답은 `data`를 사용하고 상품 목록의 Spring Page 응답은 `data.content`, `data.totalElements`, `data.number`, `data.size`로 읽습니다. 페이지 번호는 0부터 시작합니다. 204 응답은 본문 없이 처리합니다. 오류는 서버의 `code`, `message`, `details`를 전달합니다.
 - enum 응답은 한글 표시명입니다. 예: 주문 `결제 완료`, 판매 상태 `판매 중`, 권한 `관리자`·`일반 회원`, 성별 `남성`·`여성`, 결제사 `토스페이먼츠`. 요청 본문과 주문 상태 필터는 기존 코드와 한글 표시명을 모두 허용합니다. 프론트 내부의 권한·성별 비교에는 회원 정보 변환 함수가 기존 코드를 유지합니다.
-- 프런트는 Spring Boot의 공개 API를 호출합니다. 추천 계산 및 감정 분석용 `/internal/*`는 Spring Boot에서 FastAPI로 호출하는 내부 경로입니다.
+- AI 추천 메뉴와 마이페이지는 `VITE_AI_API_BASE_URL`의 FastAPI에 `GET /api/ai/recommend/products`를 직접 호출합니다. FastAPI는 기존 로그인 토큰을 Spring Boot의 `/api/members/me`로 확인한 뒤 추천 상품을 반환합니다. 이 흐름은 로그인 액세스 토큰을 사용합니다.
+- AI 서비스의 DB 설정은 Spring Boot와 같은 PostgreSQL을 가리켜야 합니다. Spring Boot 주소를 바꿨다면 FastAPI의 `SPRING_API_URL`을 변경하고, 프런트 주소나 포트를 바꿨다면 `FRONTEND_ORIGINS`에 프런트 출처를 추가합니다. 로컬에서는 `ai-service`에서 `python -m uvicorn main:app --app-dir app --host 127.0.0.1 --port 8000`으로 실행할 수 있습니다.
+- 찜과 최근 180일의 구매 내역으로 개인화하고, 남는 자리는 같은 10년 단위 연령대·성별 고객의 최근 180일 판매 수량 상위 상품으로 채웁니다. 회원 정보 또는 그룹 구매 내역이 부족하면 추천 가능한 상품 수만 반환합니다.
 
 ## 현재 화면 연결
 

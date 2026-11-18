@@ -152,7 +152,7 @@ onBeforeUnmount(() => {
 
 .login-title {
   margin: 0;
-  font-size: 28px;
+  font-size: 1.75rem;
   font-weight: 700;
   line-height: 1.4;
 }
@@ -160,7 +160,7 @@ onBeforeUnmount(() => {
 .login-welcome {
   margin: 10px 0 28px;
   color: #8d7e85;
-  font-size: 13px;
+  font-size: var(--font-size-table);
 }
 
 /* 이메일 · 비밀번호 입력 */
@@ -196,7 +196,7 @@ onBeforeUnmount(() => {
   background: transparent;
   color: var(--color-text);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--font-size-control);
 }
 
 .login-field input::placeholder {
@@ -234,7 +234,7 @@ onBeforeUnmount(() => {
   gap: 12px;
   margin: 6px 0 12px;
   color: #8d7e85;
-  font-size: 12px;
+  font-size: var(--font-size-label);
 }
 
 .remember-login {
@@ -256,6 +256,7 @@ onBeforeUnmount(() => {
   background: transparent;
   color: var(--color-secondary);
   font: inherit;
+  font-size: var(--font-size-control);
   cursor: pointer;
 }
 
@@ -272,7 +273,7 @@ onBeforeUnmount(() => {
   border: 0;
   border-radius: 8px;
   font: inherit;
-  font-size: 14px;
+  font-size: var(--font-size-body);
   font-weight: 600;
   cursor: pointer;
 }
@@ -292,7 +293,7 @@ onBeforeUnmount(() => {
   gap: 12px;
   margin: 28px 0 20px;
   color: #9b8e94;
-  font-size: 11px;
+  font-size: var(--font-size-caption);
 }
 
 .login-divider::before,
@@ -308,7 +309,7 @@ onBeforeUnmount(() => {
   border: 1px solid var(--color-border);
   background: #fff;
   color: #191919;
-  font-size: 13px;
+  font-size: var(--font-size-table);
   font-weight: 500;
 }
 
@@ -341,7 +342,7 @@ onBeforeUnmount(() => {
 .login-notice {
   margin: 0;
   text-align: left;
-  font-size: 12px;
+  font-size: var(--font-size-label);
   line-height: 1.6;
   overflow-wrap: anywhere;
 }
@@ -357,7 +358,7 @@ onBeforeUnmount(() => {
 .login-signup {
   margin: 30px 0 0;
   color: #8d7e85;
-  font-size: 12px;
+  font-size: var(--font-size-label);
 }
 
 .signup-button {
@@ -368,7 +369,7 @@ onBeforeUnmount(() => {
 .login-demo-note {
   margin: 22px 0 0;
   color: #8d7e85;
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   line-height: 1.8;
 }
 

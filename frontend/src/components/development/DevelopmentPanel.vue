@@ -63,7 +63,7 @@ async function checkProducts() {
   right: 16px;
   bottom: 16px;
   z-index: 1000;
-  font: 13px/1.5 sans-serif;
+  font: 0.8125rem/1.5 sans-serif;
   color: #392c32;
 }
 
@@ -122,7 +122,7 @@ pre {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   background: #fff7f8;
-  font-size: 11px;
+  font-size: var(--font-size-caption);
 }
 
 /* 요청 중 버튼 상태 */

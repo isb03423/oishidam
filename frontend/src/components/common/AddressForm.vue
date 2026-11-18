@@ -99,13 +99,13 @@ function submit() {
 </template>
 
 <style scoped>
-.address-form { min-width: 0; overflow: hidden; border: 1px solid var(--color-border); border-radius: 12px; background: #fff; color: var(--color-text); font-size: 14px; }
+.address-form { min-width: 0; overflow: hidden; border: 1px solid var(--color-border); border-radius: 12px; background: #fff; color: var(--color-text); font-size: var(--font-size-body); }
 .address-form-heading { padding: 15px 20px; background: var(--color-accent); color: var(--color-primary); }
-.address-form-heading h2 { margin: 0; font-size: 16px; font-weight: 600; }
-.address-fields { display: grid; grid-template-columns: 108px minmax(0, 1fr); gap: 14px 16px; padding: 18px 20px; }
+.address-form-heading h2 { margin: 0; font-size: var(--font-size-section); font-weight: 600; }
+.address-fields { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 14px 16px; padding: 18px 20px; }
 .address-label { align-self: start; padding-top: 8px; font-weight: 600; }
 .address-label span, .message { color: var(--color-primary); }
-.address-form input:not([type='checkbox']), .address-form textarea { width: 100%; min-width: 0; box-sizing: border-box; min-height: 36px; padding: 7px 10px; border: 1px solid var(--color-border); border-radius: 7px; color: inherit; background: #fff; font: inherit; }
+.address-form input:not([type='checkbox']), .address-form textarea { width: 100%; min-width: 0; box-sizing: border-box; min-height: 36px; padding: 7px 10px; border: 1px solid var(--color-border); border-radius: 7px; color: inherit; background: #fff; font: inherit; font-size: var(--font-size-control); }
 .address-inputs { display: grid; gap: 8px; min-width: 0; }
 .address-inputs p { margin: 0; }
 .postcode-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
@@ -118,7 +118,7 @@ function submit() {
 .address-default-option small { color: #71666b; }
 .form-error { grid-column: 1 / -1; margin: 0; }
 .address-form-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--color-border); }
-.address-form button { min-height: 34px; padding: 5px 12px; border: 1px solid var(--color-primary); border-radius: 7px; background: #fff; color: var(--color-primary); font: inherit; cursor: pointer; }
+.address-form button { min-height: 34px; padding: 5px 12px; border: 1px solid var(--color-primary); border-radius: 7px; background: #fff; color: var(--color-primary); font: inherit; font-size: var(--font-size-control); cursor: pointer; }
 .address-form button:disabled { opacity: .55; cursor: default; }
 .address-form button.primary { background: var(--color-primary); color: #fff; }
 @media (max-width: 600px) { .address-fields { grid-template-columns: minmax(0, 1fr); gap: 8px; } .address-label { padding-top: 4px; } }

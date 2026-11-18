@@ -53,7 +53,7 @@ onMounted(() => {
 
 <style scoped>
 .payment-result { padding-block: 4rem; text-align: center; }
-h1 { font-size: 1.5rem; font-weight: 700; }
+h1 { font-size: var(--font-size-title); font-weight: 700; }
 p { margin: 1rem 0; }
 button, a { margin: .5rem; }
 </style>

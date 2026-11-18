@@ -5,6 +5,8 @@ import { clearSession, getAuthTokens, getSessionRevision, updateAuthTokens } fro
 const apiHost = (import.meta.env.VITE_API_BASE_URL || '').trim().replace(/\/+$/, '')
 const baseURL = apiHost && (apiHost.endsWith('/api') ? apiHost : apiHost + '/api')
 const liveClient = axios.create({ baseURL, timeout: 10000 })
+const aiBaseURL = (import.meta.env.VITE_AI_API_BASE_URL || '').trim().replace(/\/+$/, '')
+const aiClient = axios.create({ baseURL: aiBaseURL, timeout: 10000 })
 let renewal = null
 
 export function refreshAccessToken() {
@@ -32,7 +34,7 @@ export function refreshAccessToken() {
   return pending.promise
 }
 
-export async function apiRequest({ method = 'GET', path, params, data, signal, headers, timeout, authenticated = false, paginated = false, mock = development.mockEnabled, retryAuth = true }) {
+export async function apiRequest({ method = 'GET', path, params, data, signal, headers, timeout, authenticated = false, paginated = false, mock = development.mockEnabled, retryAuth = true, service = 'spring' }) {
   if (import.meta.env.DEV && mock) {
     const scenario = development.scenario
     const { handleMockRequest } = await import('../mocks/handleRequest.js')
@@ -40,7 +42,8 @@ export async function apiRequest({ method = 'GET', path, params, data, signal, h
     if (signal?.aborted) throw new DOMException('요청이 취소되었습니다.', 'AbortError')
     return handleMockRequest({ method, path, params, data, scenario })
   }
-  if (!baseURL) {
+  if (service === 'ai' && !aiBaseURL) throw new Error('AI 서버 주소가 없습니다. VITE_AI_API_BASE_URL을 설정해주세요.')
+  if (service === 'spring' && !baseURL) {
     const error = new Error('백엔드 주소가 없습니다. .env.local에 VITE_API_BASE_URL을 설정하고 개발 서버를 재시작하세요.')
     error.code = 'API_BASE_URL_MISSING'
     throw error
@@ -51,7 +54,8 @@ export async function apiRequest({ method = 'GET', path, params, data, signal, h
   if (authenticated && !token) throw new Error('다시 로그인해주세요.')
 
   try {
-    const response = await liveClient.request({
+    const client = service === 'ai' ? aiClient : liveClient
+    const response = await client.request({
       method, url: path, params, data, signal, timeout,
       headers: token ? { ...headers, Authorization: 'Bearer ' + token } : headers,
     })
@@ -76,10 +80,11 @@ export async function apiRequest({ method = 'GET', path, params, data, signal, h
       let current = getAuthTokens()
       if (current === credentials) current = await refreshAccessToken()
       if (!current || getAuthTokens() !== current) throw new Error('다시 로그인해주세요.')
-      return apiRequest({ method, path, params, data, signal, headers, timeout, authenticated, paginated, mock, retryAuth: false })
+      return apiRequest({ method, path, params, data, signal, headers, timeout, authenticated, paginated, mock, retryAuth: false, service })
     }
     if (response.status === 401 && authenticated && !retryAuth && getSessionRevision() === revision) clearSession()
-    const error = new Error(response.data?.message || '요청에 실패했습니다.', { cause: failure })
+    const detail = typeof response.data?.detail === 'string' ? response.data.detail : undefined
+    const error = new Error(response.data?.message || detail || '요청에 실패했습니다.', { cause: failure })
     error.status = response.status
     error.code = response.data?.code
     error.details = response.data?.details

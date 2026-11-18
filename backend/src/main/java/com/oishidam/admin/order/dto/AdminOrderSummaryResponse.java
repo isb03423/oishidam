@@ -13,9 +13,10 @@ public record AdminOrderSummaryResponse(
         String memberName,
         OrderStatus orderStatus,
         BigDecimal totalAmount,
+        long totalQuantity,
         LocalDateTime createdAt
 ) {
-    public static AdminOrderSummaryResponse from(Order order) {
+    public static AdminOrderSummaryResponse from(Order order, long totalQuantity) {
         return new AdminOrderSummaryResponse(
                 order.getId(),
                 order.getOrderNumber(),
@@ -23,6 +24,7 @@ public record AdminOrderSummaryResponse(
                 order.getMember().getName(),
                 order.getOrderStatus(),
                 order.getTotalAmount(),
+                totalQuantity,
                 order.getCreatedAt()
         );
     }

@@ -25,6 +25,7 @@ const isMock = computed(() => session.source === 'mock')
 const tab = ref('eligible')
 const editing = ref(null)
 const content = ref('')
+const rating = ref(null)
 const draftImages = ref([])
 const imageInput = ref(null)
 const imageError = ref('')
@@ -153,6 +154,7 @@ function startReview(item, isUpdate = false) {
   editing.value = item
   updating.value = isUpdate
   content.value = isUpdate ? item.content : ''
+  rating.value = isUpdate ? item.rating ?? null : null
   dialog.value.showModal()
 }
 
@@ -165,19 +167,20 @@ function closeEditor(force = false) {
   dragging.value = false
   editing.value = null
   content.value = ''
+  rating.value = null
   updating.value = false
 }
 
 async function saveReview() {
   const text = content.value.trim()
   const item = editing.value
-  if (!item || !text || busy.value) return
+  if (!item || !text || (!updating.value && rating.value == null) || busy.value) return
   if (!isMock.value) {
     const revision = getSessionRevision()
     busy.value = true
     try {
-      if (updating.value) await updateReview(item.id, text, draftImages.value)
-      else await createReview(item.orderItemId, text, draftImages.value)
+      if (updating.value) await updateReview(item.id, text, draftImages.value, rating.value ?? undefined)
+      else await createReview(item.orderItemId, text, draftImages.value, rating.value ?? undefined)
       if (revision !== getSessionRevision()) return
       closeEditor(true)
       tab.value = 'written'
@@ -198,10 +201,11 @@ async function saveReview() {
     revokeImages(item.images ?? [], images)
     item.images = images
     item.content = text
+    item.rating = rating.value
     closeEditor()
     return
   }
-  written.value.unshift({ ...item, content: text, images })
+  written.value.unshift({ ...item, content: text, rating: rating.value, images })
   eligible.value = eligible.value.filter((row) => row.id !== item.id)
   closeEditor()
   tab.value = 'written'
@@ -253,6 +257,9 @@ async function deleteReview(ids) {
       <section v-else ref="writtenHeading" class="review-list" aria-label="작성한 후기" tabindex="-1">
         <article v-for="item in written" :key="item.id" class="activity-panel review-card">
           <ReviewProduct :item="item">
+            <p v-if="item.rating != null" class="review-rating-display" :aria-label="'5점 만점에 ' + item.rating + '점'">
+              <span aria-hidden="true">{{ '★'.repeat(item.rating) }}{{ '☆'.repeat(5 - item.rating) }}</span>
+            </p>
             <p class="activity-copy review-copy">{{ item.content }}</p>
             <ul v-if="item.images?.length" class="review-images" aria-label="후기 첨부 이미지">
               <li v-for="image in item.images" :key="image.url">
@@ -280,6 +287,20 @@ async function deleteReview(ids) {
         <button type="button" class="review-close" aria-label="닫기" :disabled="busy" @click="closeEditor">×</button>
       </header>
       <div v-if="editing" class="activity-panel review-dialog-product"><ReviewProduct :item="editing" /></div>
+      <fieldset class="review-rating" aria-labelledby="review-rating-label" :disabled="busy">
+        <p id="review-rating-label" class="review-rating-label">상품은 만족스러우셨나요?</p>
+        <div class="review-rating-options">
+          <label v-for="score in 5" :key="score" class="review-rating-option" :class="{ 'is-selected': score <= rating }">
+            <input v-model="rating" type="radio" name="review-rating" :value="score" :aria-label="score + '점'" :required="!updating" />
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m12 2.5 2.9 5.9 6.5.9-4.7 4.6 1.1 6.5-5.8-3-5.8 3 1.1-6.5-4.7-4.6 6.5-.9Z" />
+            </svg>
+          </label>
+        </div>
+        <p class="review-rating-value" aria-hidden="true">
+          {{ rating ? rating + ' / 5' : '별을 눌러 평가해 주세요' }}
+        </p>
+      </fieldset>
       <label class="activity-field">
         후기 내용
         <textarea v-model="content" maxlength="5000" required :disabled="busy" placeholder="상품 후기를 입력해 주세요."></textarea>
@@ -308,7 +329,7 @@ async function deleteReview(ids) {
       </fieldset>
       <div class="activity-actions">
         <button type="button" class="activity-button" :disabled="busy" @click="closeEditor">취소</button>
-        <button type="submit" class="activity-button is-primary" :disabled="busy || !content.trim()">{{ busy ? '저장 중…' : updating ? '저장하기' : '등록하기' }}</button>
+        <button type="submit" class="activity-button is-primary" :disabled="busy || !content.trim() || (!updating && rating == null)">{{ busy ? '저장 중…' : updating ? '저장하기' : '등록하기' }}</button>
       </div>
     </form>
   </dialog>
@@ -321,14 +342,14 @@ async function deleteReview(ids) {
 <style scoped>
 .review-list { display: grid; gap: 8px; }
 .review-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 12px 14px; }
-.review-card .activity-button { min-height: 28px; border-radius: 999px; font-size: 12px; }
+.review-card .activity-button { min-height: 28px; border-radius: 999px; font-size: var(--font-size-control); }
 .review-card .review-secondary-button {
   border-color: var(--color-secondary);
   background: var(--color-secondary);
   color: var(--color-white);
 }
 
-.review-copy { font-size: 13px; }
+.review-copy { font-size: var(--font-size-table); }
 .review-actions { display: grid; justify-items: end; gap: 5px; }
 .review-actions--management { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .review-dialog {
@@ -342,15 +363,61 @@ async function deleteReview(ids) {
   border-radius: 12px;
   background: var(--color-white);
   color: var(--color-text);
-  font-size: 14px;
+  font-size: var(--font-size-body);
 }
 
 .review-dialog::backdrop { background: rgb(57 44 50 / 50%); }
 .review-dialog-heading { display: flex; align-items: center; justify-content: space-between; }
-.review-dialog-heading h2 { font-size: 17px; font-weight: 700; }
-.review-close { border: 0; background: transparent; color: var(--color-primary); font-size: 24px; line-height: 1; cursor: pointer; }
+.review-dialog-heading h2 { font-size: var(--font-size-section); font-weight: 700; }
+.review-close { border: 0; background: transparent; color: var(--color-primary); font-size: 1.5rem; line-height: 1; cursor: pointer; }
 .review-dialog textarea { resize: none; }
 .review-dialog-product { padding: 10px; background: var(--color-background); }
+
+.review-rating {
+  min-width: 0;
+  margin: 0;
+  padding: 12px 8px;
+  border: 0;
+  border-radius: 12px;
+  background: #fdf5f6;
+  text-align: center;
+}
+.review-rating-label { margin: 0; color: #795e68; font-size: 14px; }
+.review-rating-options { display: flex; justify-content: center; align-items: center; }
+.review-rating-option {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 6px;
+  color: #d3bec6;
+  cursor: pointer;
+}
+.review-rating-option svg {
+  width: 26px;
+  height: 26px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.review-rating-option.is-selected { color: var(--color-primary); }
+.review-rating-option.is-selected svg { fill: currentColor; }
+.review-rating-option input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: inherit;
+}
+.review-rating-option:hover { color: var(--color-primary); }
+.review-rating-option:focus-within { outline: 2px solid var(--color-primary); }
+.review-rating:disabled .review-rating-option { cursor: default; opacity: .6; }
+.review-rating-value { margin: 0; color: var(--color-primary); font-size: 14px; }
+.review-rating-display { margin: 0; color: var(--color-primary); letter-spacing: 2px; }
 
 .review-attachments { min-width: 0; }
 .review-attachments legend { margin-bottom: 6px; font-weight: 700; }
@@ -364,7 +431,7 @@ async function deleteReview(ids) {
   text-align: center;
 }
 .review-drop-zone.is-dragging { border-color: var(--color-primary); background: var(--color-accent); }
-.review-image-help, .review-image-error { margin-top: 6px; font-size: 12px; }
+.review-image-help, .review-image-error { margin-top: 6px; font-size: var(--font-size-label); }
 .review-image-help { color: var(--color-secondary); }
 .review-image-error { color: var(--color-primary); }
 .review-images { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 0; padding: 0; list-style: none; }
@@ -380,7 +447,7 @@ async function deleteReview(ids) {
   border-radius: 50%;
   background: var(--color-white);
   color: var(--color-text);
-  font-size: 18px;
+  font-size: var(--font-size-section);
   line-height: 1;
   cursor: pointer;
 }

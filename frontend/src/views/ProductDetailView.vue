@@ -48,9 +48,12 @@ const primaryImage = computed(() => images.value.find((image) => image.is_primar
 const currentImage = computed(() => images.value.find((image) => image.url === selectedImage.value) ?? primaryImage.value)
 const reviews = computed(() => development.mockEnabled ? product.value?.reviews ?? [] : serverReviews.value)
 const reviewCount = computed(() => development.mockEnabled ? reviews.value.length : reviewTotal.value)
-const averageRating = computed(() => reviews.value.length
-  ? (reviews.value.reduce((sum, review) => sum + review.rating, 0) / reviews.value.length).toFixed(1)
-  : null)
+const averageRating = computed(() => {
+  const ratedReviews = reviews.value.filter((review) => Number.isInteger(review.rating))
+  return ratedReviews.length
+    ? (ratedReviews.reduce((sum, review) => sum + review.rating, 0) / ratedReviews.length).toFixed(1)
+    : null
+})
 const soldOut = computed(() => product.value?.is_sold_out || !(product.value?.stock_quantity > 0))
 const maxQuantity = computed(() => soldOut.value ? 0 : product.value?.stock_quantity ?? 0)
 const lowStock = computed(() => maxQuantity.value > 0 && maxQuantity.value < 5)
@@ -373,7 +376,7 @@ async function order(buyNow) {
 <style scoped src="../styles/mypage-activity.css"></style>
 <style scoped>
 .detail-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 18px 24px; margin-top: 24px; padding: 20px; border-radius: 10px; background: var(--color-background); }
-.detail-facts dt { color: var(--color-primary); font-size: .875rem; font-weight: 700; }
+.detail-facts dt { color: var(--color-primary); font-size: var(--font-size-body); font-weight: 700; }
 .detail-facts dd { margin-top: 4px; }
 .review-summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 18px; margin-bottom: 14px; padding: 14px 16px; border-radius: 10px; background: var(--color-background); }
 .review-summary > div { display: flex; align-items: baseline; gap: 8px; }
@@ -399,9 +402,9 @@ async function order(buyNow) {
 .review-main { display: grid; gap: 6px; min-width: 0; }
 .review-card .review-main { align-content: start; }
 .review-product-name { font-weight: 700; overflow-wrap: anywhere; }
-.review-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; color: var(--color-secondary); font-size: 13px; }
+.review-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; color: var(--color-secondary); font-size: var(--font-size-label); }
 .review-stars { color: var(--color-primary); letter-spacing: .08em; }
-.review-copy { color: var(--color-text); font-size: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.review-copy { color: var(--color-text); font-size: var(--font-size-body); white-space: pre-wrap; overflow-wrap: anywhere; }
 .review-preview {
   position: relative;
   align-self: start;
@@ -419,9 +422,9 @@ async function order(buyNow) {
   border-radius: 6px 0 0;
   background: rgb(32 24 28 / 80%);
   color: #fff;
-  font-size: 12px;
+  font-size: var(--font-size-label);
 }
-.review-reply { display: grid; grid-column: 1 / -1; gap: 4px; padding: 10px 12px; border-radius: 8px; background: var(--color-background); font-size: 13px; overflow-wrap: anywhere; }
+.review-reply { display: grid; grid-column: 1 / -1; gap: 4px; padding: 10px 12px; border-radius: 8px; background: var(--color-background); font-size: var(--font-size-table); overflow-wrap: anywhere; }
 .review-reply strong { color: var(--color-secondary); }
 .review-dialog {
   position: fixed;
@@ -457,7 +460,7 @@ async function order(buyNow) {
   text-align: center;
 }
 .cart-dialog::backdrop { background: rgb(32 24 28 / 55%); }
-.cart-dialog h2 { font-size: 1.125rem; font-weight: 700; }
+.cart-dialog h2 { font-size: var(--font-size-section); font-weight: 700; }
 .cart-dialog-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 20px; }
 .cart-dialog-actions > * { flex: 1 1 auto; }
 .product-overview { display: grid; grid-template-columns: 1.04fr 1fr; align-items: start; gap: clamp(24px, 4vw, 42px); }
@@ -469,11 +472,11 @@ async function order(buyNow) {
 .thumbnails img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 5px; }
 .main-image { display: grid; place-items: center; overflow: hidden; aspect-ratio: 1; border-radius: 12px; background: var(--color-background); }
 .main-image > img { display: block; width: 100%; height: 100%; min-height: 0; object-fit: contain; }
-.image-placeholder { display: grid; justify-items: center; gap: 10px; color: var(--color-secondary); font-size: .875rem; }
+.image-placeholder { display: grid; justify-items: center; gap: 10px; color: var(--color-secondary); font-size: var(--font-size-label); }
 .image-placeholder img { width: 54px; height: 54px; object-fit: contain; }
-.category { display: inline-block; padding: 4px 10px; border-radius: 6px; background: var(--color-accent); color: var(--color-text); font-size: .8rem; font-weight: 600; }
-.summary h1, .state-message h1 { margin: 8px 0 4px; color: var(--color-text); font-size: clamp(1.55rem, 3vw, 2rem); font-weight: 800; line-height: 1.3; overflow-wrap: anywhere; }
-.summary h1 { font-size: clamp(1.25rem, 2.5vw, 1.5rem); }
+.category { display: inline-block; padding: 4px 10px; border-radius: 6px; background: var(--color-accent); color: var(--color-text); font-size: var(--font-size-table); font-weight: 600; }
+.summary h1, .state-message h1 { margin: 8px 0 4px; color: var(--color-text); font-size: clamp(1.5rem, 3vw, 1.75rem); font-weight: 800; line-height: 1.3; overflow-wrap: anywhere; }
+.summary h1 { font-size: clamp(1.5rem, 3vw, 1.75rem); }
 .price { margin: 10px 0 15px; color: var(--color-primary); font-size: 1.25rem; font-weight: 700; }
 .stock-badge {
   display: inline-block;
@@ -482,18 +485,18 @@ async function order(buyNow) {
   border-radius: 999px;
   background: var(--color-background);
   color: var(--color-primary);
-  font-size: .8rem;
+  font-size: var(--font-size-label);
   font-weight: 700;
 }
 .description { margin: 15px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; }
 .purchase-fields { display: grid; gap: 10px; margin: 22px 0 16px; }
-.field-row { display: grid; grid-template-columns: 48px minmax(0, 1fr); align-items: center; gap: 12px; font-size: .9rem; }
+.field-row { display: grid; grid-template-columns: 48px minmax(0, 1fr); align-items: center; gap: 12px; font-size: var(--font-size-body); }
 .field-row select, .quantity { min-height: 40px; border: 1px solid var(--color-border); border-radius: 8px; }
-.field-row select { width: 100%; padding: 0 10px; background: var(--color-white); color: inherit; font: inherit; }
+.field-row select { width: 100%; padding: 0 10px; background: var(--color-white); color: inherit; font: inherit; font-size: var(--font-size-control); }
 .quantity { display: grid; grid-template-columns: 38px 44px 38px; justify-self: start; align-items: stretch; overflow: hidden; text-align: center; }
-.quantity button { border: 0; background: var(--color-background); color: var(--color-text); font: inherit; cursor: pointer; }
+.quantity button { border: 0; background: var(--color-background); color: var(--color-text); font: inherit; font-size: var(--font-size-control); cursor: pointer; }
 .quantity output { align-self: center; font-weight: 600; }
-.total { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding-top: 14px; border-top: 1px solid var(--color-border); font-size: .9rem; }
+.total { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding-top: 14px; border-top: 1px solid var(--color-border); font-size: var(--font-size-body); }
 .total strong { color: var(--color-primary); font-size: 1.25rem; }
 .quantity-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .stock-remaining {
@@ -504,7 +507,7 @@ async function order(buyNow) {
   border-radius: 999px;
   background: #f7e7eb;
   color: #8b354e;
-  font-size: .8rem;
+  font-size: var(--font-size-table);
   font-weight: 700;
   white-space: nowrap;
 }
@@ -517,7 +520,7 @@ async function order(buyNow) {
   border-radius: 8px;
   background: #f7e7eb;
   color: #8b354e;
-  font-size: .875rem;
+  font-size: var(--font-size-body);
 }
 .stock-remaining svg,
 .stock-notice svg {
@@ -531,14 +534,14 @@ async function order(buyNow) {
   stroke-linejoin: round;
 }
 .purchase-actions { display: grid; grid-template-columns: auto repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
-.action { display: inline-flex; align-items: center; justify-content: center; min-height: 46px; padding: 8px 12px; border: 1px solid var(--color-primary); border-radius: 8px; font: inherit; font-weight: 700; text-align: center; cursor: pointer; }
+.action { display: inline-flex; align-items: center; justify-content: center; min-height: 46px; padding: 8px 12px; border: 1px solid var(--color-primary); border-radius: 8px; font: inherit; font-size: var(--font-size-control); font-weight: 700; text-align: center; cursor: pointer; }
 .outline { background: var(--color-white); color: var(--color-primary); }
 .wish[aria-pressed="true"] { background: var(--color-accent); }
 .primary { background: var(--color-primary); color: var(--color-white); }
 .action:disabled, .quantity button:disabled { opacity: .5; cursor: default; }
-.notice { margin-top: 10px; color: var(--color-secondary); font-size: .875rem; }
+.notice { margin-top: 10px; color: var(--color-secondary); font-size: var(--font-size-body); }
 .detail-tabs { display: flex; gap: 12px; margin-top: 38px; border-bottom: 1px solid var(--color-border); }
-.detail-tabs button { padding: 12px clamp(8px, 3vw, 26px); border: 0; border-bottom: 3px solid transparent; background: var(--color-white); color: var(--color-secondary); font: inherit; font-size: .93rem; cursor: pointer; }
+.detail-tabs button { padding: 12px clamp(8px, 3vw, 26px); border: 0; border-bottom: 3px solid transparent; background: var(--color-white); color: var(--color-secondary); font: inherit; font-size: var(--font-size-control); cursor: pointer; }
 .detail-tabs button[aria-selected="true"] { border-color: var(--color-primary); color: var(--color-primary); font-weight: 700; }
 .detail-panel { min-height: 160px; padding: 26px 0; }
 .customs-guide { display: grid; gap: 0; max-width: 720px; }
@@ -546,11 +549,11 @@ async function order(buyNow) {
 .customs-guide dt { color: var(--color-primary); font-weight: 700; }
 .customs-guide dd { margin: 4px 0 0; line-height: 1.65; }
 .detail-panel .customs-link { margin-top: 18px; }
-.detail-panel h2 { margin-bottom: 12px; font-size: 1.15rem; font-weight: 700; }
+.detail-panel h2 { margin-bottom: 12px; font-size: var(--font-size-section); font-weight: 700; }
 .detail-panel .action { margin-top: 12px; }
 .state-message { padding: 78px 0; text-align: center; }
 .state-message p { margin: 12px 0 22px; color: var(--color-secondary); }
-.loading-text { margin-bottom: 16px; color: var(--color-secondary); font-size: .875rem; }
+.loading-text { margin-bottom: 16px; color: var(--color-secondary); font-size: var(--font-size-body); }
 .skeleton { border-radius: 10px; background: var(--color-accent); animation: pulse 1.5s ease-in-out infinite alternate; }
 .skeleton-image { aspect-ratio: 1; }
 .skeleton-lines { display: grid; gap: 16px; padding-top: 12px; }
@@ -565,6 +568,6 @@ async function order(buyNow) {
   .thumbnails { grid-row: 2; display: flex; }
   .thumbnails li { flex: 0 0 54px; }
   .detail-tabs { gap: 0; }
-  .detail-tabs button { flex: 1; min-width: 0; padding-inline: 4px; font-size: .85rem; }
+  .detail-tabs button { flex: 1; min-width: 0; padding-inline: 4px; font-size: var(--font-size-control); }
 }
 </style>

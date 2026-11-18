@@ -32,9 +32,6 @@ public class Product extends BaseEntity {
     @Column(name = "description", nullable = false, columnDefinition = "text")
     private String description;
 
-    @Column(name = "brand", length = 100)
-    private String brand;
-
     @Column(nullable = false, precision = 14, scale = 0)
     private BigDecimal price;
 
@@ -51,11 +48,10 @@ public class Product extends BaseEntity {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
-    public void update(Category category, String name, String description, String brand, BigDecimal price, int stockQuantity) {
+    public void update(Category category, String name, String description, BigDecimal price, int stockQuantity) {
         this.category = category;
         this.name = name;
         this.description = description;
-        this.brand = brand;
         this.price = price;
         this.stockQuantity = stockQuantity;
     }

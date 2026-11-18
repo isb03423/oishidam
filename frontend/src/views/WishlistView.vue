@@ -1,5 +1,7 @@
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
+import NotificationToast from '../components/common/NotificationToast.vue'
+import { useToasts } from '../composables/useToasts.js'
 import DeleteConfirmationDialog from '../components/DeleteConfirmationDialog.vue'
 import MyPageLayout from '../components/MyPageLayout.vue'
 import ProductCard from '../components/product/ProductCard.vue'
@@ -14,21 +16,7 @@ const deleteDialog = ref(null)
 const sort = ref('new')
 const page = ref(1)
 const pageSize = 12
-const toasts = ref([])
-const toastTimers = new Map()
-let nextToastId = 0
-
-function dismissToast(id) {
-  clearTimeout(toastTimers.get(id))
-  toastTimers.delete(id)
-  toasts.value = toasts.value.filter((toast) => toast.id !== id)
-}
-
-function showToast(type, message) {
-  const id = nextToastId++
-  toasts.value.push({ id, type, message })
-  toastTimers.set(id, setTimeout(() => dismissToast(id), 3000))
-}
+const { toasts, showToast, dismissToast, pauseToast, resumeToast } = useToasts()
 
 async function confirmDeletion(ids) {
   const revision = getSessionRevision()
@@ -36,10 +24,6 @@ async function confirmDeletion(ids) {
   if (revision === getSessionRevision() && removed) showToast('success', `${removed}개 상품이 찜 목록에서 삭제되었습니다.`)
 }
 
-onBeforeUnmount(() => {
-  toastTimers.forEach(clearTimeout)
-  toastTimers.clear()
-})
 const allSelected = computed(() =>
   visibleProducts.value.length > 0 && visibleProducts.value.every((product) => selection.value.includes(product.product_id)),
 )
@@ -96,19 +80,7 @@ async function addSelectionToCart() {
     description="관심 있는 상품을 저장하고, 언제든지 다시 확인해보세요."
   >
     <template #overlay>
-      <div class="wishlist-cart-toast-anchor">
-        <div class="wishlist-cart-toast" :class="{ 'is-stacked': toasts.length >= 5 }" :tabindex="toasts.length >= 5 ? 0 : undefined" role="status">
-          <div v-for="(toast, index) in toasts" :key="toast.id" class="wishlist-toast-row" :class="{ 'is-deep': toasts.length - index > 5 }" :style="{ '--stack-depth': Math.min(toasts.length - index - 1, 4), '--stack-order': index }">
-            <div class="wishlist-toast-row-inner">
-              <div class="wishlist-cart-toast-content" :class="toast.type">
-                <span class="toast-icon" aria-hidden="true">{{ toast.type === 'success' ? '✓' : toast.type === 'warning' ? '!' : 'i' }}</span>
-                <p>{{ toast.message }}</p>
-                <button type="button" aria-label="알림 닫기" @click="dismissToast(toast.id)">×</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <NotificationToast :items="toasts" @dismiss="dismissToast" @pause="pauseToast" @resume="resumeToast" />
     </template>
 
     <p v-if="wishLoading" class="wishlist-empty" role="status">찜 목록을 불러오고 있어요.</p>
@@ -188,7 +160,7 @@ async function addSelectionToCart() {
   padding: 10px 12px;
   border: 1px solid var(--color-border);
   border-radius: 9px;
-  font-size: 13px;
+  font-size: var(--font-size-table);
 }
 
 .wishlist-select-all {
@@ -206,6 +178,7 @@ async function addSelectionToCart() {
   background: #fff;
   color: inherit;
   font: inherit;
+  font-size: var(--font-size-control);
 }
 
 .wishlist-selection button:enabled {
@@ -232,116 +205,6 @@ async function addSelectionToCart() {
 
 .wishlist-selection .wishlist-add-to-cart:enabled {
   color: #fff;
-}
-
-.wishlist-cart-toast-anchor {
-  position: sticky;
-  top: 10px;
-  z-index: 100;
-  height: 0;
-}
-
-.wishlist-cart-toast {
-  display: grid;
-  position: absolute;
-  inset-inline-end: 0;
-  top: 0;
-  width: min(360px, 100%);
-}
-
-.wishlist-cart-toast-content {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 14px;
-  border: 1px solid var(--color-primary);
-  border-radius: 9px;
-  background: #fff;
-  color: var(--color-text);
-  box-shadow: 0 8px 24px rgb(57 44 50 / 15%);
-  font-size: 13px;
-}
-
-.wishlist-toast-row {
-  display: grid;
-  grid-template-rows: 1fr;
-  position: relative;
-  z-index: var(--stack-order);
-  transition: grid-template-rows 250ms ease, margin-bottom 250ms ease, opacity 250ms ease;
-}
-
-.wishlist-toast-row:not(:last-child) {
-  margin-bottom: 6px;
-}
-
-.wishlist-toast-row-inner {
-  min-height: 0;
-}
-
-.wishlist-cart-toast-content {
-  transition: transform 250ms ease;
-}
-
-.wishlist-cart-toast.is-stacked:not(:hover):not(:focus-within) .wishlist-toast-row:not(:last-child) {
-  grid-template-rows: 0fr;
-}
-
-.wishlist-cart-toast.is-stacked:not(:hover):not(:focus-within) .wishlist-toast-row.is-deep {
-  margin-bottom: 0;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.wishlist-cart-toast.is-stacked:not(:hover):not(:focus-within) .wishlist-cart-toast-content {
-  transform: scale(calc(1 - var(--stack-depth) * .025));
-}
-
-.wishlist-cart-toast.is-stacked:is(:hover, :focus-within) {
-  max-height: calc(100vh - 20px);
-  overflow-y: auto;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .wishlist-toast-row,
-  .wishlist-cart-toast-content {
-    transition: none;
-  }
-}
-
-.wishlist-cart-toast p {
-  margin: 0;
-}
-
-.wishlist-cart-toast-content.success { background: #f1faec; border-color: #d7e8cd; color: #39702a; }
-.wishlist-cart-toast-content.warning { background: #fff0f2; border-color: #f2d5dc; color: #9c4f63; }
-.wishlist-cart-toast-content.info { background: #f8f3fc; border-color: #e8ddee; color: #76617e; }
-
-.toast-icon {
-  display: grid;
-  flex: 0 0 18px;
-  height: 18px;
-  place-items: center;
-  border: 1px solid currentColor;
-  border-radius: 50%;
-  font-weight: 700;
-  line-height: 1;
-}
-
-.wishlist-cart-toast-content p {
-  flex: 1;
-  color: var(--color-text);
-  font-weight: 600;
-}
-
-.wishlist-cart-toast button {
-  border: 0;
-  background: transparent;
-  color: var(--color-primary);
-  font: inherit;
-  font-size: 18px;
-  line-height: 1;
-  cursor: pointer;
 }
 
 .wishlist-grid {
@@ -381,7 +244,7 @@ input[type='checkbox'] {
   padding: 40px 12px;
   border: 1px solid var(--color-border);
   border-radius: 9px;
-  font-size: 14px;
+  font-size: var(--font-size-body);
 }
 
 .wishlist-empty p {

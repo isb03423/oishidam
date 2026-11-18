@@ -22,7 +22,7 @@ public class AdminInquiryController {
 
     @Operation(summary = "문의 목록 조회")
     @GetMapping
-    public ApiResponse<Page<InquirySummaryResponse>> list(
+    public ApiResponse<Page<AdminInquirySummaryResponse>> list(
             @RequestParam(required = false) String keyword, @RequestParam(required = false) String status,
             @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size
     ) {

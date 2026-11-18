@@ -29,16 +29,16 @@ const groups = computed(() => {
 <style scoped>
 .inquiry-chat { display: grid; gap: 24px; }
 .chat-day { display: grid; gap: 18px; min-width: 0; }
-.chat-date { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 0 0 2px; color: #a18c98; font-size: 11px; font-variant-numeric: tabular-nums; }
+.chat-date { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 0 0 2px; color: #a18c98; font-size: var(--font-size-caption); font-variant-numeric: tabular-nums; }
 .chat-date::before, .chat-date::after { content: ''; width: 42px; height: 1px; background: #e7dce2; }
 .chat-date span { white-space: nowrap; }
 .chat-message { display: grid; gap: 6px; min-width: 0; }
-.chat-sender { color: #8b7481; font-size: 12px; line-height: 1.4; }
+.chat-sender { color: #8b7481; font-size: var(--font-size-label); line-height: 1.4; }
 .chat-message-line { display: flex; align-items: flex-end; gap: 8px; min-width: 0; }
-.chat-bubble { max-width: min(80%, 510px); margin: 0; padding: 11px 15px; border: 1px solid #e8dfe4; border-radius: 4px 14px 14px; background: white; color: var(--color-text); font-size: 14px; line-height: 1.75; white-space: pre-wrap; overflow-wrap: anywhere; }
-.chat-time { flex: none; padding-bottom: 2px; color: #a18c98; font-size: 10px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.chat-bubble { max-width: min(80%, 510px); margin: 0; padding: 11px 15px; border: 1px solid #e8dfe4; border-radius: 4px 14px 14px; background: white; color: var(--color-text); font-size: var(--font-size-body); line-height: 1.75; white-space: pre-wrap; overflow-wrap: anywhere; }
+.chat-time { flex: none; padding-bottom: 2px; color: #a18c98; font-size: var(--font-size-caption); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .chat-message.is-outgoing .chat-sender { text-align: right; color: var(--color-primary); }
 .chat-message.is-outgoing .chat-message-line { flex-direction: row-reverse; }
 .chat-message.is-outgoing .chat-bubble { border-color: #ecd1da; border-radius: 14px 4px 14px 14px; background: #f6e0e8; color: #633546; }
-@media (max-width: 540px) { .chat-bubble { max-width: calc(100% - 48px); padding: 10px 12px; font-size: 13px; }.chat-message-line { gap: 6px; }.chat-time { font-size: 10px; } }
+@media (max-width: 540px) { .chat-bubble { max-width: calc(100% - 48px); padding: 10px 12px; font-size: var(--font-size-table); }.chat-message-line { gap: 6px; }.chat-time { font-size: var(--font-size-caption); } }
 </style>

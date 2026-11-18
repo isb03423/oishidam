@@ -26,7 +26,7 @@ import { wishError } from './stores/wishlist.js'
 const route = useRoute()
 const reload = () => window.location.reload()
 
-const DevelopmentPanel = import.meta.env.DEV
+const DevelopmentPanel = import.meta.env.DEV && import.meta.env.VITE_DEVTOOLS_ENABLED === 'true'
   ? defineAsyncComponent(() => import('./components/development/DevelopmentPanel.vue'))
   : null
 </script>

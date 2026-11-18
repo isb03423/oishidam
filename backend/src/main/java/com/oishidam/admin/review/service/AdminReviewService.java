@@ -1,13 +1,16 @@
 package com.oishidam.admin.review.service;
 
 import com.oishidam.admin.review.dto.AdminReviewResponse;
+import com.oishidam.admin.review.enums.ReviewSentimentFilter;
 import com.oishidam.common.exception.ApiException;
 import com.oishidam.member.entity.Member;
 import com.oishidam.member.enums.MemberRole;
 import com.oishidam.member.repository.MemberRepository;
 import com.oishidam.review.dto.ReviewContentRequest;
 import com.oishidam.review.entity.Review;
+import com.oishidam.review.entity.ReviewSentiment;
 import com.oishidam.review.repository.ReviewRepository;
+import com.oishidam.review.repository.ReviewSentimentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -26,6 +29,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AdminReviewService {
     private final ReviewRepository reviews;
+    private final ReviewSentimentRepository sentiments;
 
     private final MemberRepository members;
 
@@ -35,20 +39,28 @@ public class AdminReviewService {
     @Transactional(readOnly = true)
     public Page<AdminReviewResponse> adminList(
             Long productId,
+            String productName,
             String keyword,
             Boolean answered,
+            ReviewSentimentFilter sentiment,
             int page,
             int size
     ) {
-        if (keyword != null && keyword.length() > 100) {
+        if (keyword != null && keyword.length() > 100 || productName != null && productName.length() > 100) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_KEYWORD", "검색어는 100자 이하여야 합니다.");
         }
         String search = keyword == null || keyword.isBlank() ? "" : keyword.trim()
                 .replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+        String name = productName == null ? "" : productName.trim()
+                .replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
 
         // 조건에 맞는 리뷰와 상품 정보 조회
-        Page<Review> result = reviews.findForAdmin(productId, search, answered, pageable(page, size));
-        return result.map(review -> AdminReviewResponse.from(review, review.getOrderItem().getProductId()));
+        Page<Review> result = reviews.findForAdmin(productId, name, search, answered,
+                sentiment == null ? null : sentiment.name(), pageable(page, size));
+        Map<Long, String> results = result.isEmpty() ? Map.of() : sentiments.findCurrentByReviewIdIn(
+                result.getContent().stream().map(Review::getId).toList()).stream()
+                .collect(Collectors.toMap(ReviewSentiment::getReviewId, ReviewSentiment::getSentiment));
+        return result.map(review -> AdminReviewResponse.from(review, review.getOrderItem().getProductId(), results.get(review.getId())));
     }
 
     // 관리자: 리뷰 상세
@@ -56,7 +68,7 @@ public class AdminReviewService {
     public AdminReviewResponse adminDetail(Long reviewId) {
         Review review = reviews.findById(reviewId).filter(value -> value.getDeletedAt() == null)
                 .orElseThrow(this::notFound);
-        return AdminReviewResponse.from(review, productId(review));
+        return AdminReviewResponse.from(review, productId(review), sentiment(reviewId));
     }
 
     // 관리자: 리뷰 답변
@@ -74,7 +86,13 @@ public class AdminReviewService {
         }
         Review review = reviews.findByIdAndDeletedAtIsNull(reviewId).orElseThrow(this::notFound);
         review.answer(admin, request.content().trim(), LocalDateTime.now(clock));
-        return AdminReviewResponse.from(review, productId(review));
+        return AdminReviewResponse.from(review, productId(review), sentiment(reviewId));
+    }
+
+    // 삭제되지 않은 리뷰의 최신 감정 분석 결과를 반환한다.
+    private String sentiment(Long reviewId) {
+        return sentiments.findCurrentByReviewIdIn(List.of(reviewId)).stream()
+                .map(ReviewSentiment::getSentiment).findFirst().orElse(null);
     }
 
     // 리뷰의 상품 ID 조회

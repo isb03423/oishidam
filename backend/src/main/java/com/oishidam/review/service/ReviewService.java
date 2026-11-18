@@ -10,11 +10,7 @@ import com.oishidam.order.enums.OrderStatus;
 import com.oishidam.order.repository.OrderItemRepository;
 import com.oishidam.order.repository.OrderStatusHistoryRepository;
 import com.oishidam.product.service.ProductService;
-import com.oishidam.review.dto.PublicReviewResponse;
-import com.oishidam.review.dto.ReviewContentRequest;
-import com.oishidam.review.dto.ReviewEligibilityResponse;
-import com.oishidam.review.dto.ReviewResponse;
-import com.oishidam.review.dto.ReviewUpdateRequest;
+import com.oishidam.review.dto.*;
 import com.oishidam.review.entity.Review;
 import com.oishidam.review.repository.ReviewRepository;
 import lombok.RequiredArgsConstructor;
@@ -51,6 +47,8 @@ public class ReviewService {
     private final Clock clock;
 
     private final ImageKitService imageKitService;
+
+    private final ReviewSentimentService sentiments;
 
     // 상품 리뷰 목록
     @Transactional(readOnly = true)
@@ -108,16 +106,16 @@ public class ReviewService {
             throw new ApiException(HttpStatus.CONFLICT, "REVIEW_ALREADY_EXISTS", "이미 리뷰를 작성한 주문 상품입니다.");
         }
         List<String> urls = uploadImages(files, 0);
-        return ReviewResponse.from(
-                reviews.saveAndFlush(
-                        Review.builder()
-                                .orderItem(item)
-                                .member(member)
-                                .content(request.content().trim())
-                                .imageUrls(new ArrayList<>(urls))
-                                .build()
-                )
+        Review review = reviews.saveAndFlush(
+                Review.builder()
+                        .orderItem(item)
+                        .member(member)
+                        .content(request.content().trim())
+                        .imageUrls(new ArrayList<>(urls))
+                        .build()
         );
+        sentiments.analyzeAfterCommit(review.getId());
+        return ReviewResponse.from(review);
     }
 
     // 리뷰 수정
@@ -132,6 +130,7 @@ public class ReviewService {
         validateEditable(review);
         review.updateContent(request.content().trim());
         reviews.flush();
+        sentiments.analyzeAfterCommit(review.getId());
         return ReviewResponse.from(review);
     }
 
@@ -170,7 +169,8 @@ public class ReviewService {
         lockMember(memberId);
         Review review = ownReview(reviewId, memberId);
         validateEditable(review);
-        List<String> retained = request.retainedImageUrls() == null ? List.copyOf(review.getImageUrls()) : request.retainedImageUrls();
+        List<String> retained =
+                request.retainedImageUrls() == null ? List.copyOf(review.getImageUrls()) : request.retainedImageUrls();
         if (retained.size() > 5 || retained.stream().distinct().count() != retained.size()
                 || !review.getImageUrls().containsAll(retained)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_REVIEW_IMAGES", "기존 첨부 이미지를 확인해 주세요.");
@@ -180,6 +180,7 @@ public class ReviewService {
         review.updateContent(request.content().trim());
         review.updateImages(urls);
         reviews.flush();
+        sentiments.analyzeAfterCommit(review.getId());
         return ReviewResponse.from(review);
     }
 

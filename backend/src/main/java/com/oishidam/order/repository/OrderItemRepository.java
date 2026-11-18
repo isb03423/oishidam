@@ -1,5 +1,6 @@
 package com.oishidam.order.repository;
 
+import com.oishidam.order.dto.OrderQuantityResponse;
 import com.oishidam.order.entity.OrderItem;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -32,6 +33,12 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
     Page<OrderItem> findEligibleForReview(@Param("memberId") Long memberId, @Param("cutoff") LocalDateTime cutoff, Pageable pageable);
 
     List<OrderItem> findByOrderIdOrderByProductIdAsc(Long orderId);
+
+    @Query("""
+            SELECT new com.oishidam.order.dto.OrderQuantityResponse(i.order.id, SUM(i.quantity))
+            FROM OrderItem i WHERE i.order.id IN :orderIds GROUP BY i.order.id
+            """)
+    List<OrderQuantityResponse> findQuantitiesByOrderIds(@Param("orderIds") List<Long> orderIds);
 
     Optional<OrderItem> findByIdAndOrderMemberId(Long id, Long memberId);
 }

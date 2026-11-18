@@ -1,5 +1,7 @@
 <script setup>
 import AddressForm from '../components/common/AddressForm.vue'
+import AlertDialog from '../components/common/AlertDialog.vue'
+import DeleteConfirmationDialog from '../components/DeleteConfirmationDialog.vue'
 import { deleteAddress, getAddresses, saveAddress as saveRemoteAddress, setDefaultAddress } from '../services/addresses.js'
 import { formatPhone, phoneDigits } from '../services/phone.js'
 import { computed, ref, watch } from 'vue'
@@ -14,10 +16,13 @@ const editingId = ref(null)
 const showForm = ref(false)
 const error = ref('')
 const busy = ref(false)
+const deleteDialog = ref(null)
+const pendingDefaultId = ref(null)
 const live = computed(() => session.source === 'api')
 let addressRequest
 
 watch(shoppingOwner, async (_, __, onCleanup) => {
+  pendingDefaultId.value = null
   busy.value = false
   closeForm()
   addresses.value = []
@@ -146,9 +151,17 @@ async function setDefault(id) {
   persist(addresses.value.map((address) => ({ ...address, isDefault: address.id === id })))
 }
 
-async function removeAddress(address) {
+async function confirmDefaultAddress() {
+  const id = pendingDefaultId.value
+  pendingDefaultId.value = null
+  if (busy.value || !addresses.value.some((address) => address.id === id)) return
+  await setDefault(id)
+}
+
+async function removeAddress([addressId]) {
   if (busy.value) return
-  if (!window.confirm('‘' + address.name + '’ 배송지를 삭제할까요?')) return
+  const address = addresses.value.find(({ id }) => id === addressId)
+  if (!address) return
   if (live.value) {
     await changeRemoteAddresses(async (signal) => {
       await deleteAddress(address.id, signal)
@@ -180,8 +193,15 @@ async function removeAddress(address) {
       <p v-if="!busy && !error && !orderedAddresses.length && !showForm" class="address-empty">등록된 배송지가 없습니다.</p>
       <article v-for="address in orderedAddresses" :key="address.id" class="address-card">
         <header class="address-card-heading">
-          <h2>{{ address.name }}</h2>
-          <span v-if="address.isDefault" class="address-default">기본 배송지</span>
+          <div class="address-card-title">
+            <h2>{{ address.name }}</h2>
+            <span v-if="address.isDefault" class="address-default">기본 배송지</span>
+          </div>
+          <div class="account-actions address-actions">
+            <button v-if="!address.isDefault" type="button" :disabled="busy" @click="pendingDefaultId = address.id">기본 배송지 설정</button>
+            <button type="button" :disabled="busy" @click="openForm(address)">수정</button>
+            <button type="button" :disabled="busy" @click="deleteDialog.open([address.id])">삭제</button>
+          </div>
         </header>
         <dl class="address-details">
           <div v-if="address.customs"><dt>통관번호</dt><dd>{{ address.customs.slice(0, 1) }}********{{ address.customs.slice(-4) }}</dd></div>
@@ -205,13 +225,10 @@ async function removeAddress(address) {
             <dd>{{ address.memo }}</dd>
           </div>
         </dl>
-        <div class="account-actions address-actions">
-          <button v-if="!address.isDefault" type="button" :disabled="busy" @click="setDefault(address.id)">기본 배송지 설정</button>
-          <button type="button" :disabled="busy" @click="openForm(address)">수정</button>
-          <button type="button" :disabled="busy" @click="removeAddress(address)">삭제</button>
-        </div>
       </article>
     </div>
+    <DeleteConfirmationDialog :key="shoppingOwner" ref="deleteDialog" description="선택한 배송지를 삭제합니다." @confirm="removeAddress" />
+    <AlertDialog :message="pendingDefaultId != null ? '기본 배송지로 설정하시겠습니까?' : ''" title="기본 배송지 설정" cancel-label="취소" @confirm="confirmDefaultAddress" @close="pendingDefaultId = null" />
   </MyPageLayout>
 </template>
 
@@ -224,20 +241,21 @@ async function removeAddress(address) {
 .address-card { min-width: 0; padding: 16px; border: 1px solid var(--color-border); border-radius: 12px; }
 
 .address-card-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
-.address-card-heading h2 { margin: 0; font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
+.address-card-title { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.address-card-title h2 { margin: 0; font-size: var(--font-size-section); font-weight: 600; overflow-wrap: anywhere; }
 .address-default {
   padding: 2px 8px;
   border-radius: 999px;
   background: var(--color-accent);
   color: var(--color-primary);
-  font-size: 12px;
+  font-size: var(--font-size-label);
   font-weight: 600;
 }
 
 .address-details {
   display: grid;
   gap: 8px;
-  margin: 12px 0 16px;
+  margin: 12px 0 0;
   padding-top: 12px;
   border-top: 1px solid var(--color-border);
 }
@@ -246,16 +264,16 @@ async function removeAddress(address) {
   grid-template-columns: 76px minmax(0, 1fr);
   gap: 8px;
 }
-.address-details dt { color: #71666b; font-size: 14px; font-weight: 600; }
+.address-details dt { color: #71666b; font-size: var(--font-size-body); font-weight: 600; }
 .address-details dd { margin: 0; overflow-wrap: anywhere; }
 .address-main { display: block; font-weight: 600; }
-.address-detail { display: block; margin-top: 2px; font-size: 14px; }
+.address-detail { display: block; margin-top: 2px; font-size: var(--font-size-body); }
 .address-panel > p { margin: 0; }
 .address-detail,
 .address-empty { color: #71666b; }
 .address-empty { padding: 24px 8px; text-align: center; }
 
-.address-actions { justify-content: flex-end; flex-wrap: wrap; gap: 8px; padding: 0; border: 0; }
+.address-actions { margin-inline-start: auto; justify-content: flex-end; flex-wrap: wrap; gap: 8px; padding: 0; border: 0; }
 .address-actions button { min-width: 0; padding-inline: 12px; }
 
 </style>

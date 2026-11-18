@@ -37,12 +37,14 @@ export async function getCategories(options = {}) {
 
 export async function getRecommendations({ signal, limit, type } = {}) {
   const mock = import.meta.env.DEV && development.mockEnabled
+  const direct = type === 'personalized' && !mock
   const data = await apiRequest({
-    path: '/recommendations/products',
-    params: { limit, type },
+    service: direct ? 'ai' : 'spring',
+    path: direct ? '/api/ai/recommend/products' : '/recommendations/products',
+    params: direct ? { limit } : { limit, type },
     signal,
     mock,
-    authenticated: Boolean(getAuthTokens()),
+    authenticated: direct || Boolean(getAuthTokens()),
   })
   return mock ? { ...data, items: data.items.map(mockProductForView) } : { items: data.products.map(productForView), source: data.recommendationType }
 }

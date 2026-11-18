@@ -21,7 +21,7 @@ export function confirmPayment(id, data) {
 }
 
 export function getOrders(page = 0, options = {}) {
-  return apiRequest({ path: '/orders', params: { page, size: options.size ?? 10, from: options.from, keyword: options.keyword, excludePending: options.excludePending }, authenticated: true, mock: false })
+  return apiRequest({ path: '/orders', params: { page, size: options.size ?? 10, from: options.from, keyword: options.keyword, status: options.status, excludePending: options.excludePending }, authenticated: true, mock: false })
 }
 
 export function getOrder(id) {

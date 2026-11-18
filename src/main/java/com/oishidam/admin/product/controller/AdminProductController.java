@@ -4,6 +4,7 @@ import com.oishidam.admin.product.dto.*;
 import com.oishidam.admin.product.service.AdminProductService;
 import com.oishidam.admin.product.service.ProductImageUploadService;
 import com.oishidam.common.dto.ApiResponse;
+import com.oishidam.product.enums.SaleStatus;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -25,14 +26,18 @@ public class AdminProductController {
 
     private final ProductImageUploadService imageUploadService;
 
-    @Operation(summary = "상품 목록 조회")
+    @Operation(summary = "상품 목록 조회", description = "상품명, 판매 상태, 카테고리(하위 포함), 재고 조건으로 조회합니다. 재고 비교는 GT(초과), LT(미만), EQ(같음)입니다.")
     @GetMapping
     public ApiResponse<Page<AdminProductResponse>> list(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size,
-            @RequestParam(required = false) String keyword
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) SaleStatus saleStatus,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) String stockComparison,
+            @RequestParam(required = false) Integer stockQuantity
     ) {
-        Page<AdminProductResponse> result = productService.list(page, size, keyword);
+        Page<AdminProductResponse> result = productService.list(page, size, keyword, saleStatus, categoryId, stockComparison, stockQuantity);
         return ApiResponse.ok(result);
     }
 

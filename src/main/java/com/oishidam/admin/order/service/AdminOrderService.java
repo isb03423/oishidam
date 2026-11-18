@@ -7,6 +7,7 @@ import com.oishidam.common.exception.ApiException;
 import com.oishidam.member.entity.Member;
 import com.oishidam.member.enums.MemberRole;
 import com.oishidam.member.repository.MemberRepository;
+import com.oishidam.order.dto.OrderQuantityResponse;
 import com.oishidam.order.entity.Order;
 import com.oishidam.order.entity.OrderStatusHistory;
 import com.oishidam.order.enums.OrderStatus;
@@ -28,6 +29,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -99,7 +101,11 @@ public class AdminOrderService {
             return cb.and(predicates.toArray(Predicate[]::new));
         };
         var pageable = PageRequest.of(page, size, Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")));
-        return orders.findAll(spec, pageable).map(AdminOrderSummaryResponse::from);
+        Page<Order> result = orders.findAll(spec, pageable);
+        Map<Long, Long> quantities = result.isEmpty() ? Map.of() : items.findQuantitiesByOrderIds(
+                result.getContent().stream().map(Order::getId).toList()
+        ).stream().collect(Collectors.toMap(OrderQuantityResponse::orderId, OrderQuantityResponse::quantity));
+        return result.map(order -> AdminOrderSummaryResponse.from(order, quantities.getOrDefault(order.getId(), 0L)));
     }
 
     // 관리자: 주문 상세
@@ -133,7 +139,7 @@ public class AdminOrderService {
         OrderStatus current = order.getOrderStatus();
         OrderStatus target = request.orderStatus();
         if (current == target) {
-            return AdminOrderSummaryResponse.from(order);
+            return summary(order);
         }
         if (target == null || target != NEXT.get(current)) {
             throw new ApiException(HttpStatus.CONFLICT, "INVALID_STATUS_TRANSITION", "허용되지 않는 주문 또는 배송 상태 변경입니다.");
@@ -150,7 +156,14 @@ public class AdminOrderService {
                         .build()
         );
         order.changeStatus(target);
-        return AdminOrderSummaryResponse.from(order);
+        return summary(order);
+    }
+
+    // 상태 변경 응답에 주문 상품의 총수량 포함
+    private AdminOrderSummaryResponse summary(Order order) {
+        long quantity = items.findQuantitiesByOrderIds(List.of(order.getId())).stream()
+                .mapToLong(OrderQuantityResponse::quantity).sum();
+        return AdminOrderSummaryResponse.from(order, quantity);
     }
 
     // 조회 대상이 없을 때 반환할 오류 생성

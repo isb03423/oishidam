@@ -84,7 +84,6 @@ CREATE TABLE IF NOT EXISTS products (
     category_id BIGINT NOT NULL REFERENCES categories(category_id),
     name VARCHAR(200) NOT NULL,
     description TEXT NOT NULL,
-    brand VARCHAR(100),
     price NUMERIC(14, 0) NOT NULL CHECK (price >= 0),
     sale_status VARCHAR(20) NOT NULL CHECK (sale_status IN ('DRAFT', 'ON_SALE', 'STOPPED')), -- 작성 중·판매 중·판매 중지
     published_at TIMESTAMP WITHOUT TIME ZONE, -- 최초 판매 시작 시각
@@ -271,6 +270,30 @@ CREATE TABLE IF NOT EXISTS reviews (
     CHECK ((answer_content IS NULL AND answered_by IS NULL AND answered_at IS NULL AND answer_updated_at IS NULL)
         OR (answer_content IS NOT NULL AND answered_by IS NOT NULL AND answered_at IS NOT NULL AND answer_updated_at IS NOT NULL))
 );
+-- 리뷰별 AI 감성 분석 결과; 본문 수정 시 기존 결과를 제거하고 재분석한다.
+CREATE TABLE IF NOT EXISTS review_sentiments (
+    review_id BIGINT PRIMARY KEY REFERENCES reviews(review_id) ON DELETE CASCADE,
+    sentiment VARCHAR(20) NOT NULL CHECK (sentiment IN
+        ('VERY_POSITIVE', 'POSITIVE', 'NEUTRAL', 'NEGATIVE', 'VERY_NEGATIVE')), -- 5단계 감성
+    confidence NUMERIC(5, 4) NOT NULL CHECK (confidence BETWEEN 0 AND 1), -- 사전 분석에서는 휴리스틱 값
+    model_name VARCHAR(200) NOT NULL,
+    analyzed_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT LOCALTIMESTAMP
+);
+
+-- API와 직접 SQL 수정 모두에서 오래된 감정 결과를 제거한다.
+CREATE OR REPLACE FUNCTION invalidate_review_sentiment() RETURNS TRIGGER
+LANGUAGE plpgsql AS '
+BEGIN
+    DELETE FROM review_sentiments WHERE review_id = NEW.review_id;
+    RETURN NEW;
+END;
+';
+DROP TRIGGER IF EXISTS review_content_sentiment_changed ON reviews;
+CREATE TRIGGER review_content_sentiment_changed
+    AFTER UPDATE OF content ON reviews
+    FOR EACH ROW WHEN (OLD.content IS DISTINCT FROM NEW.content)
+    EXECUTE FUNCTION invalidate_review_sentiment();
+
 -- 리뷰에 첨부된 이미지 주소와 표시 순서
 CREATE TABLE IF NOT EXISTS review_images (
     review_id BIGINT NOT NULL REFERENCES reviews(review_id),

@@ -7,7 +7,6 @@ public record ProductSummaryResponse(
         Long productId,
         Long categoryId,
         String name,
-        String brand,
         BigDecimal price,
         int stockQuantity,
         ImageResponse primaryImage,

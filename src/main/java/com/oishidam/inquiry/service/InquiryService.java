@@ -20,6 +20,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -53,7 +55,7 @@ public class InquiryService {
 
     // 관리자 문의 검색 및 상태별 조회
     @Transactional(readOnly = true)
-    public Page<InquirySummaryResponse> adminList(String keyword, String status, int page, int size) {
+    public Page<AdminInquirySummaryResponse> adminList(String keyword, String status, int page, int size) {
         if (status != null && !status.isBlank()) {
             validateStatus(status);
         }
@@ -65,7 +67,14 @@ public class InquiryService {
                 ),
                 status == null || status.isBlank() ? cb.conjunction() : cb.equal(root.get("status"), status)
         );
-        return inquiries.findAll(filter, pageable(page, size)).map(this::summary);
+        Page<Inquiry> result = inquiries.findAll(filter, pageable(page, size));
+        // 현재 페이지의 고객 메시지를 함께 조회하고 과거 추가 문의가 있으면 최초 본문을 사용한다.
+        Map<Long, String> contents = result.isEmpty() ? Map.of() : messages.findQuestionsByInquiryIdIn(
+                result.getContent().stream().map(Inquiry::getId).toList()).stream()
+                .collect(Collectors.toMap(message -> message.getInquiry().getId(), InquiryMessage::getContent, (first, next) -> first));
+        return result.map(inquiry -> new AdminInquirySummaryResponse(
+                inquiry.getId(), inquiry.getTitle(), inquiry.getStatus(), inquiry.getMember().getId(),
+                inquiry.getMember().getName(), inquiry.getCreatedAt(), contents.get(inquiry.getId())));
     }
 
     // 본인 주문 확인 후 문의와 첫 메시지를 함께 저장한다.

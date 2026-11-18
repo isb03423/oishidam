@@ -12,7 +12,6 @@ public record AdminProductRequest(
         @NotNull Long categoryId,
         @NotBlank @Size(max = 200) String name,
         @NotBlank String description,
-        @Size(max = 100) String brand,
         @NotNull @DecimalMin("0") @Digits(integer = 14, fraction = 0) BigDecimal price,
         @NotNull @Min(0) Integer stockQuantity,
         @Min(0) Integer expectedStockQuantity

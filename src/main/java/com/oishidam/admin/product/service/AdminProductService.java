@@ -14,11 +14,13 @@ import com.oishidam.product.repository.ProductImageRepository;
 import com.oishidam.product.repository.ProductRepository;
 import com.oishidam.product.repository.StockHistoryRepository;
 import com.oishidam.product.service.StockHistoryService;
+import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +28,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
@@ -50,7 +54,8 @@ public class AdminProductService {
 
     // 관리자: 상품 목록
     @Transactional(readOnly = true)
-    public Page<AdminProductResponse> list(int page, int size, String keyword) {
+    public Page<AdminProductResponse> list(int page, int size, String keyword, SaleStatus saleStatus,
+                                          Long categoryId, String stockComparison, Integer stockQuantity) {
         if (page < 0 || size < 1 || size > 100) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_PAGINATION", "페이지 번호 또는 크기가 올바르지 않습니다.");
         }
@@ -63,7 +68,49 @@ public class AdminProductService {
         }
         String search = keyword == null ? "" : keyword.trim().toLowerCase(java.util.Locale.ROOT)
                 .replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
-        return productRepository.findForAdmin(search, pageable).map(AdminProductResponse::from);
+        if ((stockQuantity == null) != (stockComparison == null)
+                || stockQuantity != null && (stockQuantity < 0 || !List.of("GT", "LT", "EQ").contains(stockComparison))) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_STOCK_FILTER", "재고 수량과 비교 조건을 함께 확인해 주세요.");
+        }
+        var categoryIds = categoryId == null ? null : adminCategoryIds(categoryId);
+        Specification<Product> filter = (root, query, cb) -> {
+            List<Predicate> conditions = new ArrayList<>();
+            conditions.add(cb.isNull(root.get("deletedAt")));
+            if (!search.isEmpty()) {
+                conditions.add(cb.like(cb.lower(root.get("name")), "%" + search + "%", '\\'));
+            }
+            if (saleStatus != null) conditions.add(cb.equal(root.get("saleStatus"), saleStatus));
+            if (categoryIds != null) conditions.add(root.get("category").get("id").in(categoryIds));
+            if (stockQuantity != null) {
+                conditions.add(switch (stockComparison) {
+                    case "GT" -> cb.greaterThan(root.get("stockQuantity"), stockQuantity);
+                    case "LT" -> cb.lessThan(root.get("stockQuantity"), stockQuantity);
+                    default -> cb.equal(root.get("stockQuantity"), stockQuantity);
+                });
+            }
+            return cb.and(conditions.toArray(Predicate[]::new));
+        };
+        return productRepository.findAll(filter, pageable).map(AdminProductResponse::from);
+    }
+
+    // 숨김 카테고리도 포함해 선택한 분류와 하위 분류를 조회한다.
+    private List<Long> adminCategoryIds(Long categoryId) {
+        var categories = categoryRepository.findAll();
+        if (categories.stream().noneMatch(category -> category.getId().equals(categoryId))) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "CATEGORY_NOT_FOUND", "카테고리를 찾을 수 없습니다.");
+        }
+        var ids = new HashSet<Long>();
+        ids.add(categoryId);
+        boolean changed;
+        do {
+            changed = false;
+            for (var category : categories) {
+                if (category.getParent() != null && ids.contains(category.getParent().getId())) {
+                    changed |= ids.add(category.getId());
+                }
+            }
+        } while (changed);
+        return new ArrayList<>(ids);
     }
 
     // 관리자: 상품 상세
@@ -91,7 +138,6 @@ public class AdminProductService {
                         .category(category)
                         .name(info.name().trim())
                         .description(info.description().trim())
-                        .brand(info.brand())
                         .price(info.price())
                         .stockQuantity(info.stockQuantity())
                         .saleStatus(SaleStatus.DRAFT)
@@ -119,7 +165,7 @@ public class AdminProductService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "EXPECTED_STOCK_REQUIRED", "변경 전 재고 수량이 필요합니다.");
         }
         validateStockVersion(previous, request.expectedStockQuantity());
-        product.update(category, request.name().trim(), request.description(), request.brand(), request.price(), request.stockQuantity());
+        product.update(category, request.name().trim(), request.description(), request.price(), request.stockQuantity());
         if (previous != product.getStockQuantity()) {
             stockHistory.record(product, previous, "ADJUSTMENT", null, actorId);
         }
@@ -191,20 +237,13 @@ public class AdminProductService {
     public AdminImageResponse createImage(Long productId, AdminImageRequest request) {
         Product product = lockProduct(productId);
 
-        // 기존 대표 이미지 해제
-        if (request.isPrimary()) {
-            clearPrimary(productId);
-        }
-
-        ProductImage image = imageRepository.save(
-                ProductImage.builder()
-                        .product(product)
-                        .storageKey(request.storageKey().trim())
-                        .altText(request.altText() == null ? null : request.altText().trim())
-                        .sortOrder(request.sortOrder())
-                        .isPrimary(request.isPrimary())
-                        .build()
-        );
+        var existing = imageRepository.findByProductIdInOrderByIsPrimaryDescSortOrderAscIdAsc(List.of(productId));
+        ProductImage image = existing.isEmpty()
+                ? ProductImage.builder().product(product).sortOrder(0).isPrimary(true).build()
+                : existing.getFirst();
+        image.update(request.storageKey().trim(), request.altText() == null ? null : request.altText().trim(), 0, true);
+        imageRepository.save(image);
+        imageRepository.deleteAll(existing.stream().filter(item -> item != image).toList());
 
         return AdminImageResponse.from(image);
     }
@@ -218,10 +257,10 @@ public class AdminProductService {
     ) {
         lockProduct(productId);
         ProductImage image = findImage(productId, imageId);
-        if (request.isPrimary()) {
-            clearPrimary(productId);
-        }
-        image.update(request.storageKey().trim(), request.altText(), request.sortOrder(), request.isPrimary());
+        var existing = imageRepository.findByProductIdInOrderBySortOrderAscIdAsc(List.of(productId));
+        imageRepository.deleteAll(existing.stream().filter(item -> !item.getId().equals(imageId)).toList());
+        imageRepository.flush();
+        image.update(request.storageKey().trim(), request.altText(), 0, true);
         return AdminImageResponse.from(image);
     }
 
@@ -230,14 +269,6 @@ public class AdminProductService {
     public void deleteImage(Long productId, Long imageId) {
         lockProduct(productId);
         imageRepository.delete(findImage(productId, imageId));
-    }
-
-    // 기존 대표 이미지 해제 및 반영
-    private void clearPrimary(Long productId) {
-        imageRepository.findByProductIdAndIsPrimaryTrue(productId).ifPresent(image -> {
-            image.clearPrimary();
-            imageRepository.flush();
-        });
     }
 
     // 상품의 이미지 조회

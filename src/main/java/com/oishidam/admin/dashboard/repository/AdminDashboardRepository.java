@@ -4,6 +4,7 @@ import com.oishidam.admin.dashboard.dto.DashboardAlertResponse;
 import com.oishidam.admin.dashboard.dto.DashboardCustomerResponse;
 import com.oishidam.admin.dashboard.dto.DashboardRecentOrderResponse;
 import com.oishidam.admin.dashboard.dto.DashboardStatusResponse;
+import com.oishidam.admin.dashboard.dto.DashboardStockAlertResponse;
 import com.oishidam.order.entity.Order;
 import com.oishidam.order.enums.OrderStatus;
 import jakarta.persistence.EntityManager;
@@ -71,6 +72,26 @@ public class AdminDashboardRepository {
                 .collect(Collectors.toMap(row -> row.get(0, LocalDate.class), row -> row.get(1, BigDecimal.class)));
     }
 
+    // 오늘 주문을 생성 시각의 시간대별로 집계한다.
+    public Map<Integer, Long> ordersByHour(LocalDateTime from, LocalDateTime until) {
+        return entityManager.createQuery("""
+                SELECT EXTRACT(HOUR FROM o.createdAt), COUNT(o) FROM Order o
+                WHERE o.createdAt >= :from AND o.createdAt < :until GROUP BY EXTRACT(HOUR FROM o.createdAt)
+                """, Tuple.class).setParameter("from", from).setParameter("until", until).getResultList().stream()
+                .collect(Collectors.toMap(row -> ((Number) row.get(0)).intValue(), row -> row.get(1, Long.class)));
+    }
+
+    // 승인된 주문의 매출을 결제 시각의 시간대별로 집계한다.
+    public Map<Integer, BigDecimal> salesByHour(LocalDateTime from, LocalDateTime until) {
+        return entityManager.createQuery("""
+                SELECT EXTRACT(HOUR FROM p.paidAt), SUM(p.order.totalAmount) FROM PaymentConfirmation p
+                WHERE p.paidAt >= :from AND p.paidAt < :until AND p.order.orderStatus IN :approved
+                GROUP BY EXTRACT(HOUR FROM p.paidAt)
+                """, Tuple.class).setParameter("from", from).setParameter("until", until)
+                .setParameter("approved", APPROVED).getResultList().stream()
+                .collect(Collectors.toMap(row -> ((Number) row.get(0)).intValue(), row -> row.get(1, BigDecimal.class)));
+    }
+
     // 기간 내 주문의 상태별 건수를 조회한다.
     public List<DashboardStatusResponse> statuses(LocalDateTime from, LocalDateTime until) {
         return entityManager.createQuery("""
@@ -96,6 +117,24 @@ public class AdminDashboardRepository {
                 SELECT COUNT(p) FROM Product p WHERE p.deletedAt IS NULL
                 AND p.saleStatus = com.oishidam.product.enums.SaleStatus.ON_SALE AND p.stockQuantity <= 5
                 """, Long.class).getSingleResult();
+    }
+
+    // 재고 알림 전체 중 품절 상품 수를 집계한다.
+    public long countSoldOutAlerts() {
+        return entityManager.createQuery("""
+                SELECT COUNT(p) FROM Product p WHERE p.deletedAt IS NULL
+                AND p.saleStatus = com.oishidam.product.enums.SaleStatus.ON_SALE AND p.stockQuantity = 0
+                """, Long.class).getSingleResult();
+    }
+
+    // 재고 알림을 품절 우선으로 정렬하고 요청한 페이지만 반환한다.
+    public List<DashboardStockAlertResponse> stockAlerts(int offset, int size) {
+        return entityManager.createQuery("""
+                SELECT NEW com.oishidam.admin.dashboard.dto.DashboardStockAlertResponse(p.id, p.name, p.stockQuantity)
+                FROM Product p WHERE p.deletedAt IS NULL
+                AND p.saleStatus = com.oishidam.product.enums.SaleStatus.ON_SALE AND p.stockQuantity <= 5
+                ORDER BY p.stockQuantity, p.id DESC
+                """, DashboardStockAlertResponse.class).setFirstResult(offset).setMaxResults(size).getResultList();
     }
 
     // 재고 확인 상품 중 최근 등록된 10건을 조회한다.

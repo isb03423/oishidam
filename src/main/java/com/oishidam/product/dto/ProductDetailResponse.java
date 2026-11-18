@@ -9,7 +9,6 @@ public record ProductDetailResponse(
         Long categoryId,
         String name,
         String description,
-        String brand,
         LocalDateTime publishedAt,
         List<ImageResponse> images,
         BigDecimal price,

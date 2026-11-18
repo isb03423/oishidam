@@ -106,6 +106,7 @@ function paste(event, index) {
   background: #fff;
   color: inherit;
   font: inherit;
+  font-size: var(--font-size-control);
 }
 .phone-input input:focus { outline: 1px solid var(--color-primary); }
 .phone-input input[readonly] { background: #f7f3f4; }

@@ -36,13 +36,13 @@ const route = useRoute()
 .logo { display: inline-block; }
 .logo img { display: block; width: 150px; height: auto; }
 .icon { display: grid; width: 80px; height: 80px; place-items: center; margin: 38px auto 24px; border-radius: 50%; background: var(--color-background); color: var(--color-primary); }
-.not-found-icon { font-size: 24px; font-weight: 800; }
+.not-found-icon { font-size: 1.5rem; font-weight: 800; }
 .icon svg { width: 40px; height: 40px; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.eyebrow { margin: 0 0 10px; color: var(--color-primary); font-size: 11px; font-weight: 700; letter-spacing: .13em; }
-h1 { margin: 0; font-size: 25px; font-weight: 700; }
-.description { margin: 12px 0 30px; color: #766970; font-size: 15px; line-height: 1.6; word-break: keep-all; }
+.eyebrow { margin: 0 0 10px; color: var(--color-primary); font-size: var(--font-size-caption); font-weight: 700; letter-spacing: .13em; }
+h1 { margin: 0; font-size: var(--font-size-title); font-weight: 700; }
+.description { margin: 12px 0 30px; color: #766970; font-size: var(--font-size-body); line-height: 1.6; word-break: keep-all; }
 .actions { display: grid; gap: 10px; }
-.button { display: flex; min-height: 48px; align-items: center; justify-content: center; border: 1px solid var(--color-primary); border-radius: 8px; font-size: 15px; font-weight: 700; }
+.button { display: flex; min-height: 48px; align-items: center; justify-content: center; border: 1px solid var(--color-primary); border-radius: 8px; font-size: var(--font-size-control); font-weight: 700; }
 .primary { background: var(--color-primary); color: white; }
 .secondary { background: white; color: var(--color-primary); }
 .button:hover { opacity: .85; }

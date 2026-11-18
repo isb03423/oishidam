@@ -4,7 +4,7 @@
   border-radius: 12px;
   background: #fff;
   color: var(--color-text);
-  font-size: 14px;
+  font-size: var(--font-size-body);
 }
 
 .profile-card { display: grid; gap: 13px; }
@@ -35,6 +35,7 @@
   border-radius: 7px;
   color: inherit;
   font: inherit;
+  font-size: var(--font-size-control);
 }
 
 .account-card input[readonly],
@@ -48,6 +49,7 @@
   background: #fff;
   color: var(--color-primary);
   font: inherit;
+  font-size: var(--font-size-control);
   cursor: pointer;
 }
 
@@ -76,7 +78,7 @@
 }
 
 .profile-security-form label { text-align: left; }
-.profile-security-form h3 { margin: 0; font-size: 17px; font-weight: 700; }
+.profile-security-form h3 { margin: 0; font-size: var(--font-size-section); font-weight: 700; }
 
 .verify-symbol {
   display: grid;
@@ -98,7 +100,7 @@
 }
 
 .verify-symbol svg { width: 32px; height: 32px; }
-.profile-security-form h2 { margin: 0; font-size: 19px; font-weight: 700; }
+.profile-security-form h2 { margin: 0; font-size: var(--font-size-section); font-weight: 700; }
 .profile-security-form p { margin: 7px 0 16px; color: #71666b; line-height: 1.5; }
 .profile-security-form .account-message { color: var(--color-primary); }
 
@@ -168,7 +170,7 @@
   align-items: center;
   gap: 8px;
   margin: 0;
-  font-size: 17px;
+  font-size: var(--font-size-section);
   font-weight: 700;
 }
 
@@ -187,7 +189,7 @@
   stroke-linejoin: round;
 }
 
-.profile-panel-heading p { margin: 0; color: #71666b; font-size: 12px; }
+.profile-panel-heading p { margin: 0; color: #71666b; font-size: var(--font-size-label); }
 .profile-fields { padding: 16px; }
 .profile-fields .profile-row { grid-template-columns: 100px minmax(0, 1fr); }
 .profile-fields .profile-row > input,
@@ -242,8 +244,8 @@
 .security-shield { fill: #fff; stroke-width: 2.5; }
 .security-rays { stroke: #ed7778; }
 
-.profile-password-copy h3 { margin: 0 0 4px; font-size: 15px; font-weight: 700; }
-.profile-password-copy p { margin: 0; color: #71666b; font-size: 12px; line-height: 1.5; }
+.profile-password-copy h3 { margin: 0 0 4px; font-size: var(--font-size-body); font-weight: 700; }
+.profile-password-copy p { margin: 0; color: #71666b; font-size: var(--font-size-label); line-height: 1.5; }
 
 .profile-security-content .profile-password-button {
   width: 100%;

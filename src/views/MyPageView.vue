@@ -195,7 +195,6 @@ onBeforeUnmount(() => controller?.abort())
 
 <style scoped>
 .mypage-overview {
-  --mypage-title-size-adjustment: 1px;
 }
 
 .member-welcome {
@@ -218,7 +217,7 @@ onBeforeUnmount(() => controller?.abort())
   box-sizing: border-box;
   background: linear-gradient(135deg, #c98d99, #ad6477);
   color: #fff;
-  font-size: 19px;
+  font-size: 1.1875rem;
   font-weight: 500;
   letter-spacing: .04em;
   line-height: 1.35;
@@ -232,13 +231,13 @@ onBeforeUnmount(() => controller?.abort())
 .member-message p {
   margin: 0;
   color: #685f63;
-  font-size: 14px;
+  font-size: var(--font-size-body);
 }
 
 .member-message h2 {
   margin: 8px 0 10px;
   color: #21191c;
-  font-size: 25px;
+  font-size: 1.5625rem;
   line-height: 1.2;
 }
 
@@ -254,7 +253,7 @@ onBeforeUnmount(() => controller?.abort())
   border-radius: 99px;
   background: #ca929c;
   color: #fff;
-  font-size: 12px;
+  font-size: var(--font-size-label);
   font-weight: 600;
 }
 
@@ -295,19 +294,19 @@ onBeforeUnmount(() => controller?.abort())
 .summary-card p {
   margin: 0 0 4px;
   color: #5f5559;
-  font-size: 13px;
+  font-size: var(--font-size-table);
   font-weight: 600;
 }
 
 .summary-card strong {
   color: #21191c;
-  font-size: 24px;
+  font-size: 1.5rem;
   line-height: 1;
 }
 
 .summary-card > span {
   color: var(--color-text);
-  font-size: 29px;
+  font-size: 1.8125rem;
   font-weight: 300;
   line-height: 1;
 }
@@ -352,7 +351,7 @@ onBeforeUnmount(() => controller?.abort())
 .member-message h2 {
   margin: 0 0 10px;
   color: var(--color-primary);
-  font-size: 23px;
+  font-size: 1.4375rem;
 }
 
 .member-message p {
@@ -384,7 +383,7 @@ onBeforeUnmount(() => controller?.abort())
 .dashboard-card h2 {
   margin: 0 0 10px;
   color: var(--color-text);
-  font-size: 16px;
+  font-size: var(--font-size-section);
   font-weight: 500;
   line-height: 1.2;
 }
@@ -416,7 +415,7 @@ onBeforeUnmount(() => controller?.abort())
   align-items: center;
   gap: 4px;
   color: #807579;
-  font-size: 10px;
+  font-size: var(--font-size-caption);
   font-weight: 500;
   white-space: nowrap;
 }
@@ -499,7 +498,7 @@ onBeforeUnmount(() => controller?.abort())
   border-radius: 8px;
   background: #fff;
   color: var(--color-text);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   line-height: 1.5;
   text-align: left;
 }
@@ -557,12 +556,12 @@ onBeforeUnmount(() => controller?.abort())
 
 .recommendation-items :deep(.product-name) {
   margin-bottom: 2px;
-  font-size: 10px;
+  font-size: var(--font-size-caption);
   -webkit-line-clamp: 1;
 }
 
 .recommendation-items :deep(.product-price) {
-  font-size: 11px;
+  font-size: var(--font-size-caption);
 }
 
 .recommendation-item {
@@ -574,7 +573,7 @@ onBeforeUnmount(() => controller?.abort())
   padding: 7px;
   border-radius: 9px;
   color: var(--color-text);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
   line-height: 1.3;
   box-sizing: border-box;
 }
@@ -639,7 +638,7 @@ onBeforeUnmount(() => controller?.abort())
   padding-inline: 4px;
   overflow: hidden;
   color: #71666b;
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -650,7 +649,7 @@ onBeforeUnmount(() => controller?.abort())
   flex: 1;
   place-items: center;
   color: #71666b;
-  font-size: 13px;
+  font-size: var(--font-size-table);
 }
 
 .activity-bar {
@@ -667,7 +666,7 @@ onBeforeUnmount(() => controller?.abort())
 .activity-bar strong {
   margin-right: 0;
   color: var(--color-text);
-  font-size: 16px;
+  font-size: var(--font-size-body);
   font-weight: 500;
 }
 
@@ -680,7 +679,7 @@ onBeforeUnmount(() => controller?.abort())
   background: transparent;
   color: var(--color-text);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--font-size-control);
   cursor: pointer;
 }
 
@@ -746,7 +745,7 @@ onBeforeUnmount(() => controller?.abort())
   }
 
   .member-message h2 {
-    font-size: 21px;
+    font-size: 1.3125rem;
   }
 
   .member-grade {

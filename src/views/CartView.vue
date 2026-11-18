@@ -127,7 +127,7 @@ async function deleteItems(ids) {
   padding: 10px 12px;
   border: 1px solid var(--color-border);
   border-radius: 9px;
-  font-size: 13px;
+  font-size: var(--font-size-table);
 }
 
 .cart-toolbar {
@@ -146,6 +146,7 @@ async function deleteItems(ids) {
   background: #fff;
   color: inherit;
   font: inherit;
+  font-size: var(--font-size-control);
 }
 
 .cart-toolbar button:enabled {
@@ -205,7 +206,7 @@ input[type='checkbox'] {
   border-radius: 9px;
   background: var(--color-background);
   color: #71666b;
-  font-size: 10px;
+  font-size: var(--font-size-caption);
 }
 
 .cart-thumbnail img { width: 100%; height: 68px; object-fit: contain; }
@@ -222,13 +223,13 @@ input[type='checkbox'] {
 
 .cart-quantity span { min-width: 30px; text-align: center; }
 .cart-quantity button, .cart-remove {
-  width: 30px;
-  height: 32px;
+  width: 1.875rem;
+  min-height: 2rem;
   border: 0;
   background: #fff;
   color: var(--color-primary);
   font: inherit;
-  font-size: 18px;
+  font-size: var(--font-size-section);
   cursor: pointer;
 }
 
@@ -262,7 +263,7 @@ input[type='checkbox'] {
 
 .cart-summary {
   margin-top: 16px;
-  font-size: 13px;
+  font-size: var(--font-size-table);
   padding: 14px;
   border: 1px solid var(--color-border);
   border-radius: 12px;
@@ -278,7 +279,7 @@ input[type='checkbox'] {
 .cart-summary h2 {
   margin: 0;
   color: var(--color-primary);
-  font-size: 15px;
+  font-size: var(--font-size-section);
   font-weight: 700;
 }
 
@@ -286,7 +287,7 @@ input[type='checkbox'] {
 .cart-summary dl > div { display: flex; justify-content: space-between; gap: 8px; padding: 4px 0; }
 .cart-summary dd { margin: 0; text-align: right; font-weight: 700; }
 .cart-summary .cart-total { margin-top: 4px; padding-top: 8px; border-top: 1px solid var(--color-border); font-weight: 700; }
-.cart-total dd { font-size: 16px; }
+.cart-total dd { font-size: var(--font-size-body); }
 
 .cart-checkout {
   width: 100%;
@@ -297,6 +298,7 @@ input[type='checkbox'] {
   background: var(--color-primary);
   color: #fff;
   font: inherit;
+  font-size: var(--font-size-control);
   font-weight: 700;
   cursor: pointer;
 }

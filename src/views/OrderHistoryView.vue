@@ -163,7 +163,7 @@ async function repurchase() {
               :aria-label="order.items[0].name + ' 상품 상세보기'"
             >
               <img v-if="order.items[0].imageUrl" :src="order.items[0].imageUrl" alt="" loading="lazy" />
-              <span v-else>{{ order.items[0].brand || '상품' }}</span>
+              <span v-else>상품</span>
             </RouterLink>
             <div>
               <h2>{{ order.items[0]?.name ?? '상품 정보 없음' }}<template v-if="order.items.length > 1"> 외 {{ order.items.length - 1 }}건</template></h2>
@@ -294,7 +294,7 @@ select, input, button {
   background: #fff;
   color: var(--color-text);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--font-size-control);
 }
 
 select, input {
@@ -398,7 +398,7 @@ svg {
   flex-wrap: wrap;
   gap: 4px 18px;
   background: #f8f3f5;
-  font-size: 12px;
+  font-size: var(--font-size-label);
 }
 
 .order-meta strong {
@@ -417,7 +417,7 @@ svg {
 
 .order-product h2 {
   margin: 0 0 4px;
-  font-size: 15px;
+  font-size: var(--font-size-section);
   font-weight: 500;
   overflow-wrap: anywhere;
 }
@@ -425,7 +425,7 @@ svg {
 .order-product p {
   margin: 0;
   color: #71666b;
-  font-size: 13px;
+  font-size: var(--font-size-table);
 }
 
 .order-product p span {
@@ -443,7 +443,7 @@ svg {
   height: 53px;
   border-radius: 4px;
   color: #fff;
-  font-size: 9px;
+  font-size: var(--font-size-caption);
   font-weight: 700;
 }
 
@@ -460,7 +460,7 @@ svg {
   border-radius: 999px;
   background: #f7e7eb;
   color: #794153;
-  font-size: 13px;
+  font-size: var(--font-size-table);
   font-weight: 600;
   white-space: nowrap;
 }
@@ -505,7 +505,7 @@ svg {
 
 .repurchase-header h2 {
   margin: 0;
-  font-size: clamp(20px, 5vw, 24px);
+  font-size: var(--font-size-section);
   font-weight: 700;
   line-height: 1.5;
 }
@@ -748,7 +748,7 @@ svg {
   }
 
   .order-actions button, .order-status {
-    font-size: 12px;
+    font-size: var(--font-size-control);
   }
 }
 </style>

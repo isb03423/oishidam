@@ -53,7 +53,7 @@ defineProps({
   background: #fff;
   color: var(--color-primary);
   font: inherit;
-  font-size: 16px;
+  font-size: var(--font-size-control);
   line-height: 1.5;
   text-align: center;
   text-decoration: none;

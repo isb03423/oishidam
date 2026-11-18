@@ -188,7 +188,7 @@ async function addSelectionToCart() {
   padding: 10px 12px;
   border: 1px solid var(--color-border);
   border-radius: 9px;
-  font-size: 13px;
+  font-size: var(--font-size-table);
 }
 
 .wishlist-select-all {
@@ -206,6 +206,7 @@ async function addSelectionToCart() {
   background: #fff;
   color: inherit;
   font: inherit;
+  font-size: var(--font-size-control);
 }
 
 .wishlist-selection button:enabled {
@@ -260,7 +261,7 @@ async function addSelectionToCart() {
   background: #fff;
   color: var(--color-text);
   box-shadow: 0 8px 24px rgb(57 44 50 / 15%);
-  font-size: 13px;
+  font-size: var(--font-size-table);
 }
 
 .wishlist-toast-row {
@@ -339,7 +340,7 @@ async function addSelectionToCart() {
   background: transparent;
   color: var(--color-primary);
   font: inherit;
-  font-size: 18px;
+  font-size: var(--font-size-section);
   line-height: 1;
   cursor: pointer;
 }
@@ -381,7 +382,7 @@ input[type='checkbox'] {
   padding: 40px 12px;
   border: 1px solid var(--color-border);
   border-radius: 9px;
-  font-size: 14px;
+  font-size: var(--font-size-body);
 }
 
 .wishlist-empty p {

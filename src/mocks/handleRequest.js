@@ -39,7 +39,7 @@ export function handleMockRequest({ method = 'GET', path, params = {}, data, sce
       .map((category) => category.category_id)]
     let items = products.filter((product) => !product.deleted_at && product.sale_status === 'ON_SALE')
       .filter((product) => !categoryId || categoryIds.includes(product.category_id))
-      .filter((product) => `${product.name} ${product.brand} ${product.description}`.toLocaleLowerCase('ko-KR').includes(keyword))
+      .filter((product) => `${product.name} ${product.description}`.toLocaleLowerCase('ko-KR').includes(keyword))
       .map(summarize)
     if (scenario === 'empty') items = []
     const sort = params.sort ?? 'new'

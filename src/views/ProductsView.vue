@@ -185,7 +185,7 @@ watch(
 
 #products-title {
   margin: 0 0 12px;
-  font-size: clamp(19px, 2.2vw, 22px);
+  font-size: clamp(1.5rem, 3vw, 1.75rem);
   font-weight: 700;
   line-height: 1.3;
 }
@@ -194,7 +194,7 @@ watch(
 .catalog-note {
   margin: -4px 0 14px;
   color: var(--color-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-label);
 }
 
 .catalog-note {
@@ -211,7 +211,7 @@ watch(
 
 .catalog-count {
   color: var(--color-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-label);
 }
 
 .catalog-toolbar select {
@@ -221,7 +221,7 @@ watch(
   border-radius: 6px;
   background: var(--color-white);
   color: var(--color-text);
-  font-size: 13px;
+  font-size: var(--font-size-control);
 }
 
 .catalog-toolbar select:disabled {
@@ -244,7 +244,7 @@ watch(
   border: 1px solid var(--color-border);
   border-radius: 999px;
   color: var(--color-text);
-  font-size: 13px;
+  font-size: var(--font-size-table);
 }
 
 .category-filters a:hover,

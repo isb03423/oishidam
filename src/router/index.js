@@ -41,7 +41,7 @@ const routes = [
     redirect: (to) => ({ name: 'AdminDashboard', params: { section: 'products' }, query: to.query, hash: to.hash }),
   },
   {
-    path: '/admin/:section(products|categories|orders|members|inquiries|reviews|analytics)?',
+    path: '/admin/:section(products|categories|orders|members|inquiries|reviews|analytics|sentiments)?',
     name: 'AdminDashboard',
     meta: { hideLayout: true },
     component: () => import('../views/AdminDashboardView.vue'),

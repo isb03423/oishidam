@@ -297,13 +297,13 @@ async function removeInquiry() {
   border-radius: 12px;
   background: var(--color-white);
   color: var(--color-text);
-  font-size: 14px;
+  font-size: var(--font-size-body);
 }
 
 .inquiry-dialog::backdrop { background: rgb(57 44 50 / 50%); }
 .inquiry-dialog-heading { display: flex; align-items: center; justify-content: space-between; }
-.inquiry-dialog-heading h2 { font-size: 17px; font-weight: 700; }
-.inquiry-close { border: 0; background: transparent; color: var(--color-primary); font-size: 24px; line-height: 1; cursor: pointer; }
+.inquiry-dialog-heading h2 { font-size: var(--font-size-section); font-weight: 700; }
+.inquiry-close { border: 0; background: transparent; color: var(--color-primary); font-size: 1.5rem; line-height: 1; cursor: pointer; }
 .inquiry-dialog textarea { resize: none; }
 .inquiry-items {
   border: 1px solid var(--color-border);
@@ -332,7 +332,7 @@ async function removeInquiry() {
 .inquiry-row:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
 .inquiry-title { overflow-wrap: anywhere; }
 .inquiry-date { white-space: nowrap; }
-.inquiry-chevron { color: var(--color-primary); font-size: 20px; line-height: 1; }
+.inquiry-chevron { color: var(--color-primary); font-size: 1.25rem; line-height: 1; }
 .inquiry-row[aria-expanded="true"] .inquiry-chevron { transform: rotate(90deg); }
 .inquiry-expanded { display: grid; gap: 10px; padding: 0 16px 16px; }
 .activity-badge {
@@ -341,7 +341,7 @@ async function removeInquiry() {
   border-radius: 999px;
   background: var(--color-accent);
   color: var(--color-text);
-  font-size: 12px;
+  font-size: var(--font-size-label);
   font-weight: 650;
   white-space: nowrap;
 }

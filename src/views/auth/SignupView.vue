@@ -297,7 +297,7 @@ onBeforeUnmount(() => {
 
 .signup-title {
   margin: 0;
-  font-size: 28px;
+  font-size: 1.75rem;
   font-weight: 700;
   line-height: 1.4;
 }
@@ -305,7 +305,7 @@ onBeforeUnmount(() => {
 .signup-welcome {
   margin: 10px 0 24px;
   color: #8d7e85;
-  font-size: 13px;
+  font-size: var(--font-size-table);
 }
 
 /* 필수 입력 필드 */
@@ -346,7 +346,7 @@ onBeforeUnmount(() => {
   background: transparent;
   color: var(--color-text);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--font-size-control);
 }
 
 .signup-field input::placeholder {
@@ -379,7 +379,7 @@ onBeforeUnmount(() => {
 .field-error {
   margin: -2px 2px 2px;
   color: #b53951;
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   line-height: 1.4;
 }
 
@@ -404,12 +404,12 @@ onBeforeUnmount(() => {
   padding: 0;
   border: 0;
   color: var(--color-text);
-  font-size: 13px;
+  font-size: var(--font-size-table);
 }
 
 .optional-profile-heading span {
   color: #8d7e85;
-  font-size: 12px;
+  font-size: var(--font-size-label);
   font-weight: 400;
 }
 
@@ -421,7 +421,7 @@ onBeforeUnmount(() => {
 
 .birth-selects select {
   width: 100%;
-  height: 36px;
+  min-height: 2.25rem;
   padding: 0 8px;
   border: 1px solid var(--color-border);
   border-radius: 7px;
@@ -429,7 +429,7 @@ onBeforeUnmount(() => {
   background: #fff;
   color: var(--color-text);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--font-size-control);
 }
 
 .birth-selects select:focus {
@@ -440,7 +440,7 @@ onBeforeUnmount(() => {
 .optional-profile-hint {
   margin: 8px 0 0;
   color: #82767c;
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   line-height: 1.4;
 }
 
@@ -457,7 +457,7 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 24px;
   color: #62555b;
-  font-size: 13px;
+  font-size: var(--font-size-table);
 }
 
 .gender-options label {
@@ -487,7 +487,7 @@ onBeforeUnmount(() => {
   padding: 10px 0 13px;
   border-bottom: 1px solid var(--color-border);
   color: var(--color-text);
-  font-size: 13px;
+  font-size: var(--font-size-table);
   font-weight: 600;
   cursor: pointer;
 }
@@ -506,7 +506,7 @@ onBeforeUnmount(() => {
   align-items: center;
   padding: 15px 0 2px;
   color: #685960;
-  font-size: 12px;
+  font-size: var(--font-size-label);
 }
 
 .agreement-list label {
@@ -522,6 +522,7 @@ onBeforeUnmount(() => {
   background: transparent;
   color: var(--color-secondary);
   font: inherit;
+  font-size: var(--font-size-control);
   cursor: pointer;
 }
 
@@ -533,7 +534,7 @@ onBeforeUnmount(() => {
 .signup-request-error {
   margin: 4px 0 0;
   color: #b53951;
-  font-size: 12px;
+  font-size: var(--font-size-label);
   line-height: 1.5;
 }
 
@@ -547,7 +548,7 @@ onBeforeUnmount(() => {
   background: var(--color-primary);
   color: #fff;
   font: inherit;
-  font-size: 14px;
+  font-size: var(--font-size-control);
   font-weight: 600;
   cursor: pointer;
 }
@@ -564,7 +565,7 @@ onBeforeUnmount(() => {
 .signup-login {
   margin: 28px 0 0;
   color: #8d7e85;
-  font-size: 12px;
+  font-size: var(--font-size-label);
 }
 
 .signup-login a {

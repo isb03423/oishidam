@@ -126,7 +126,7 @@ const titleIcons = {
   gap: 8px;
   margin: 0;
   color: var(--color-text);
-  font-size: calc(20px + var(--mypage-title-size-adjustment, 0px));
+  font-size: 1.5rem;
   font-weight: 500;
   line-height: 1.2;
   transform: translateX(3px);
@@ -148,7 +148,7 @@ const titleIcons = {
 .mypage-heading p {
   margin: 0;
   color: #71666b;
-  font-size: 15px;
+  font-size: var(--font-size-body);
 }
 
 @media (max-width: 860px) {
@@ -168,7 +168,7 @@ const titleIcons = {
   }
 
   .mypage-heading h1 {
-    font-size: calc(26px + var(--mypage-title-size-adjustment, 0px));
+    font-size: var(--font-size-title);
   }
 }
 </style>

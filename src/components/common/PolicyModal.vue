@@ -84,7 +84,7 @@ watch(() => props.open, async (isOpen) => {
 
 .policy-modal-header h2 {
   margin: 0;
-  font-size: 15px;
+  font-size: var(--font-size-section);
   font-weight: 700;
 }
 
@@ -96,7 +96,7 @@ watch(() => props.open, async (isOpen) => {
   border-radius: 6px;
   background: transparent;
   color: #62555b;
-  font-size: 24px;
+  font-size: 1.5rem;
   line-height: 1;
   cursor: pointer;
 }
@@ -112,7 +112,7 @@ watch(() => props.open, async (isOpen) => {
   border-radius: 7px;
   background: #fff;
   color: #51444a;
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   line-height: 1.62;
   white-space: pre-line;
 }
@@ -126,7 +126,7 @@ watch(() => props.open, async (isOpen) => {
   border-radius: 8px;
   background: var(--color-background);
   color: #62555b;
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   line-height: 1.55;
 }
 
@@ -136,13 +136,13 @@ watch(() => props.open, async (isOpen) => {
 
 .policy-modal-footer button {
   width: 100%;
-  height: 34px;
+  min-height: 2.125rem;
   border: 0;
   border-radius: 8px;
   background: var(--color-primary);
   color: #fff;
   font: inherit;
-  font-size: 12px;
+  font-size: var(--font-size-control);
   font-weight: 600;
   cursor: pointer;
 }

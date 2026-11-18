@@ -68,7 +68,7 @@ defineExpose({ open })
   border: 0;
   background: transparent;
   color: var(--color-primary);
-  font-size: 24px;
+  font-size: 1.5rem;
   cursor: pointer;
 }
 
@@ -94,13 +94,13 @@ defineExpose({ open })
 
 .delete-dialog h2 {
   margin: 0;
-  font-size: 20px;
+  font-size: var(--font-size-section);
   font-weight: 700;
 }
 
 .delete-dialog p {
   margin: 8px 0 20px;
-  font-size: 14px;
+  font-size: var(--font-size-body);
 }
 
 .delete-actions {
@@ -114,6 +114,7 @@ defineExpose({ open })
   border: 1px solid var(--color-primary);
   border-radius: 8px;
   font: inherit;
+  font-size: var(--font-size-control);
   cursor: pointer;
 }
 

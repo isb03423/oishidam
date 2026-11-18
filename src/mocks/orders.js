@@ -1,16 +1,16 @@
 const exampleProducts = {
-  pocky: { name: '포키 딸기맛', brand: 'Pocky', tone: 'berry', category_id: '80', price: 6400 },
-  kitkat: { name: '킷캣 말차맛', brand: 'KitKat', tone: 'matcha', category_id: '89', price: 7100 },
-  meiji: { name: '메이지 초콜릿', brand: 'meiji', tone: 'cocoa', category_id: '89', price: 9500 },
-  'calbee-chips': { name: '칼비 감자칩', brand: 'Calbee', tone: 'potato', category_id: '79', price: 4500 },
-  bourbon: { name: '부르봉 쿠키', brand: 'Bourbon', tone: 'cocoa', category_id: '80', price: 6500 },
-  jagarico: { name: '가루비 자가리코', brand: 'Calbee', tone: 'matcha', category_id: '79', price: 5200 },
-  'calbee-usushio': { name: '칼비 포테토칩 우스시오맛', brand: 'Calbee', tone: 'potato', category_id: '79', price: 4500 },
+  pocky: { name: '포키 딸기맛', tone: 'berry', category_id: '80', price: 6400 },
+  kitkat: { name: '킷캣 말차맛', tone: 'matcha', category_id: '89', price: 7100 },
+  meiji: { name: '메이지 초콜릿', tone: 'cocoa', category_id: '89', price: 9500 },
+  'calbee-chips': { name: '칼비 감자칩', tone: 'potato', category_id: '79', price: 4500 },
+  bourbon: { name: '부르봉 쿠키', tone: 'cocoa', category_id: '80', price: 6500 },
+  jagarico: { name: '가루비 자가리코', tone: 'matcha', category_id: '79', price: 5200 },
+  'calbee-usushio': { name: '칼비 포테토칩 우스시오맛', tone: 'potato', category_id: '79', price: 4500 },
 }
 
 export function exampleOrderProduct(key) {
-  const { name, brand, tone } = exampleProducts[key]
-  return { product_id: 'example-order-' + key, name, brand, tone }
+  const { name, tone } = exampleProducts[key]
+  return { product_id: 'example-order-' + key, name, tone }
 }
 
 export function getExampleOrderProduct(productId) {

@@ -1,0 +1,118 @@
+.admin-shell {
+  --admin-list-primary-weight: 500;
+  --admin-page-block: 28px;
+  --admin-page-inline: 32px;
+  --admin-page-gap: 24px;
+  --admin-panel-inline: 24px;
+  --admin-toolbar-block: 20px;
+  --admin-list-heading-block: 18px;
+}
+
+.admin-page {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: var(--admin-page-gap);
+  inline-size: 100%;
+  max-inline-size: 1680px;
+  min-inline-size: 0;
+  min-block-size: 0;
+  margin-inline: auto;
+  padding: var(--admin-page-block) var(--admin-page-inline);
+}
+.admin-page > .admin-page-heading { flex: none; }
+.admin-dashboard-page {
+  gap: 0;
+  min-block-size: calc(100dvh - var(--admin-header-height));
+  background: var(--admin-surface);
+}
+.admin-page > .admin-page-heading-sticky {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 20;
+  margin: -16px calc(-1 * var(--admin-page-inline)) 0;
+  padding: 16px var(--admin-page-inline);
+  border-block-end: 1px solid var(--admin-line);
+  background: var(--admin-surface);
+}
+
+.admin-list-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-inline-size: 0;
+  min-block-size: 0;
+  border: 1px solid var(--admin-line);
+  border-radius: 8px;
+  background: var(--admin-surface);
+  overflow: hidden;
+}
+.admin-list-panel > :not(.admin-list-scroll, .category-groups) { flex-shrink: 0; }
+.admin-list-toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  padding: var(--admin-toolbar-block) var(--admin-panel-inline);
+  border-block-end: 1px solid var(--admin-line);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+.admin-list-toolbar > form {
+  display: flex;
+  align-items: flex-end;
+  flex: 1;
+  gap: 12px;
+  min-inline-size: max-content;
+}
+.admin-list-toolbar :is(input, select, button) { min-block-size: 40px; }
+.admin-list-toolbar :is(input, select, textarea) { font-weight: 400; }
+.admin-list-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: var(--admin-list-heading-block) var(--admin-panel-inline);
+}
+.admin-list-heading-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.admin-list-heading-actions :is(p, span) { color: var(--admin-muted); font-size: var(--font-size-label); }
+.admin-list-heading-actions select { min-block-size: 32px; padding-block: 3px; font-size: var(--font-size-control); }
+.admin-list-scroll {
+  flex: 1;
+  min-inline-size: 0;
+  min-block-size: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--admin-strong-line) var(--admin-subtle);
+  scroll-padding-block-start: 48px;
+}
+.admin-shell .admin-list-table :where(thead th) { padding: 12px 16px; background: var(--admin-subtle); font-size: var(--font-size-label); }
+.admin-shell .admin-list-table :where(tbody th, tbody td) { block-size: 54px; padding: 10px 16px; vertical-align: middle; }
+.admin-list-preview { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--admin-ink); font-size: var(--font-size-table); line-height: 1.7; }
+.admin-list-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  min-block-size: 64px;
+  padding: 12px var(--admin-panel-inline);
+  border-block-start: 1px solid var(--admin-line);
+}
+.admin-list-footer > span { margin-inline-end: auto; color: var(--admin-muted); font-size: var(--font-size-caption); font-variant-numeric: tabular-nums; }
+.admin-shell .admin-list-footer .list-pagination { border: 0; margin: 0; padding: 0; }
+.admin-list-feedback { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 16px var(--admin-panel-inline); color: var(--admin-muted); font-size: var(--font-size-table); }
+.admin-list-feedback[role='alert'] { color: var(--admin-danger); background: var(--admin-danger-soft); }
+
+@media (max-width: 1100px) {
+  .admin-shell { --admin-page-block: 24px; --admin-page-inline: 24px; }
+}
+@media (min-width: 761px) and (max-height: 760px) {
+  .admin-shell { --admin-page-block: 18px; --admin-page-inline: 24px; --admin-page-gap: 16px; --admin-panel-inline: 16px; --admin-toolbar-block: 12px; --admin-list-heading-block: 10px; }
+}
+@media (max-width: 760px) {
+  .admin-shell { --admin-header-height: 58px; --admin-page-block: 20px; --admin-page-inline: 16px; --admin-page-gap: 20px; --admin-panel-inline: 16px; --admin-toolbar-block: 16px; --admin-list-heading-block: 16px; }
+  .admin-list-footer > span { inline-size: 100%; text-align: center; margin: 0; }
+}

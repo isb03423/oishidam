@@ -141,7 +141,7 @@ function toggleProductWish() {
   align-items: center;
   gap: 8px;
   color: #9b9297;
-  font-size: 11px;
+  font-size: var(--font-size-caption);
 }
 
 .product-image-placeholder svg {
@@ -204,7 +204,7 @@ function toggleProductWish() {
   border-radius: 4px;
   background: var(--color-primary);
   color: var(--color-white);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   font-weight: 700;
   pointer-events: none;
 }
@@ -217,7 +217,7 @@ function toggleProductWish() {
   border-radius: 4px;
   background: rgb(57 44 50 / 80%);
   color: #fff;
-  font-size: 11px;
+  font-size: var(--font-size-caption);
 }
 
 .product-stock-label.is-low-stock {
@@ -236,7 +236,7 @@ function toggleProductWish() {
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-  font-size: 12px;
+  font-size: var(--font-size-label);
   font-weight: 500;
   line-height: 1.4;
   word-break: keep-all;
@@ -252,7 +252,7 @@ function toggleProductWish() {
 }
 
 .product-price {
-  font-size: 14px;
+  font-size: var(--font-size-body);
   font-weight: 700;
   white-space: nowrap;
 }

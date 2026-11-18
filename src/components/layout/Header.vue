@@ -356,7 +356,7 @@ function requireLogin(memberRoute) {
   outline: none;
   background: transparent;
   color: var(--color-text, #392C32);
-  font-size: 15px;
+  font-size: var(--font-size-control);
 }
 
 .header-search input::placeholder {
@@ -395,7 +395,7 @@ function requireLogin(memberRoute) {
 }
 
 .text-link {
-  font-size: 14px;
+  font-size: var(--font-size-control);
   font-weight: 500;
   color: var(--color-text, #392C32);
 }
@@ -418,7 +418,7 @@ function requireLogin(memberRoute) {
 }
 
 .member-name {
-  font-size: 13px;
+  font-size: var(--font-size-table);
   font-weight: 400;
 }
 
@@ -437,7 +437,7 @@ function requireLogin(memberRoute) {
 
 .member-actions .text-link,
 .guest-actions .text-link {
-  font-size: 13px;
+  font-size: var(--font-size-control);
   font-weight: 400;
 }
 
@@ -462,7 +462,7 @@ function requireLogin(memberRoute) {
 .logout-error {
   padding-bottom: 12px;
   color: #b53951;
-  font-size: 12px;
+  font-size: var(--font-size-label);
 }
 
 .action-divider {
@@ -514,7 +514,7 @@ function requireLogin(memberRoute) {
   border-radius: 50%;
   background: var(--color-secondary, #76617E);
   color: #fff;
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   font-weight: 700;
 }
 
@@ -551,14 +551,14 @@ function requireLogin(memberRoute) {
   display: inline-flex;
   align-items: center;
   color: var(--color-text, #392C32);
-  font-size: 15px;
+  font-size: var(--font-size-control);
   font-weight: 600;
   white-space: nowrap;
 }
 
 /* 신상품 · 베스트 · 문의 메뉴의 글자 크기와 굵기 */
 .nav-link {
-  font-size: 15px;
+  font-size: var(--font-size-control);
   font-weight: 500;
 }
 
@@ -664,7 +664,7 @@ function requireLogin(memberRoute) {
 
   .nav-category,
   .nav-link {
-    font-size: 13px;
+    font-size: var(--font-size-control);
   }
 }
 </style>

@@ -342,14 +342,14 @@ async function deleteReview(ids) {
 <style scoped>
 .review-list { display: grid; gap: 8px; }
 .review-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 12px 14px; }
-.review-card .activity-button { min-height: 28px; border-radius: 999px; font-size: 12px; }
+.review-card .activity-button { min-height: 28px; border-radius: 999px; font-size: var(--font-size-control); }
 .review-card .review-secondary-button {
   border-color: var(--color-secondary);
   background: var(--color-secondary);
   color: var(--color-white);
 }
 
-.review-copy { font-size: 13px; }
+.review-copy { font-size: var(--font-size-table); }
 .review-actions { display: grid; justify-items: end; gap: 5px; }
 .review-actions--management { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .review-dialog {
@@ -363,13 +363,13 @@ async function deleteReview(ids) {
   border-radius: 12px;
   background: var(--color-white);
   color: var(--color-text);
-  font-size: 14px;
+  font-size: var(--font-size-body);
 }
 
 .review-dialog::backdrop { background: rgb(57 44 50 / 50%); }
 .review-dialog-heading { display: flex; align-items: center; justify-content: space-between; }
-.review-dialog-heading h2 { font-size: 17px; font-weight: 700; }
-.review-close { border: 0; background: transparent; color: var(--color-primary); font-size: 24px; line-height: 1; cursor: pointer; }
+.review-dialog-heading h2 { font-size: var(--font-size-section); font-weight: 700; }
+.review-close { border: 0; background: transparent; color: var(--color-primary); font-size: 1.5rem; line-height: 1; cursor: pointer; }
 .review-dialog textarea { resize: none; }
 .review-dialog-product { padding: 10px; background: var(--color-background); }
 
@@ -431,7 +431,7 @@ async function deleteReview(ids) {
   text-align: center;
 }
 .review-drop-zone.is-dragging { border-color: var(--color-primary); background: var(--color-accent); }
-.review-image-help, .review-image-error { margin-top: 6px; font-size: 12px; }
+.review-image-help, .review-image-error { margin-top: 6px; font-size: var(--font-size-label); }
 .review-image-help { color: var(--color-secondary); }
 .review-image-error { color: var(--color-primary); }
 .review-images { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 0; padding: 0; list-style: none; }
@@ -447,7 +447,7 @@ async function deleteReview(ids) {
   border-radius: 50%;
   background: var(--color-white);
   color: var(--color-text);
-  font-size: 18px;
+  font-size: var(--font-size-section);
   line-height: 1;
   cursor: pointer;
 }

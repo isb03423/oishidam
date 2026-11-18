@@ -72,7 +72,7 @@ defineEmits(['retry'])
 .product-section-title {
   margin: 0;
   color: var(--color-text);
-  font-size: clamp(19px, 1.65vw, 25px);
+  font-size: clamp(1.1875rem, 1.65vw, 1.5625rem);
   font-weight: 750;
   line-height: 1.3;
   letter-spacing: -.025em;
@@ -81,7 +81,7 @@ defineEmits(['retry'])
 .product-section-subtitle {
   margin: 0;
   color: #82767c;
-  font-size: 12px;
+  font-size: var(--font-size-label);
 }
 
 /* 제목도 더보기와 같은 화면으로 이동 */
@@ -104,13 +104,13 @@ defineEmits(['retry'])
   gap: 4px;
   min-height: 32px;
   color: var(--color-text);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   font-weight: 500;
   white-space: nowrap;
 }
 
 .product-section-more span {
-  font-size: 17px;
+  font-size: var(--font-size-section);
   line-height: 1;
 }
 
@@ -150,7 +150,7 @@ defineEmits(['retry'])
   border-radius: 9px;
   color: #82767c;
   text-align: center;
-  font-size: 13px;
+  font-size: var(--font-size-table);
 }
 
 .product-state p {
@@ -160,7 +160,7 @@ defineEmits(['retry'])
 .product-error-detail {
   max-width: 100%;
   overflow-wrap: anywhere;
-  font-size: 11px;
+  font-size: var(--font-size-caption);
 }
 
 .product-retry {

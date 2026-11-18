@@ -227,13 +227,13 @@ async function removeAddress(address) {
 
 .address-card-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .address-card-title { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
-.address-card-title h2 { margin: 0; font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
+.address-card-title h2 { margin: 0; font-size: var(--font-size-section); font-weight: 600; overflow-wrap: anywhere; }
 .address-default {
   padding: 2px 8px;
   border-radius: 999px;
   background: var(--color-accent);
   color: var(--color-primary);
-  font-size: 12px;
+  font-size: var(--font-size-label);
   font-weight: 600;
 }
 
@@ -249,10 +249,10 @@ async function removeAddress(address) {
   grid-template-columns: 76px minmax(0, 1fr);
   gap: 8px;
 }
-.address-details dt { color: #71666b; font-size: 14px; font-weight: 600; }
+.address-details dt { color: #71666b; font-size: var(--font-size-body); font-weight: 600; }
 .address-details dd { margin: 0; overflow-wrap: anywhere; }
 .address-main { display: block; font-weight: 600; }
-.address-detail { display: block; margin-top: 2px; font-size: 14px; }
+.address-detail { display: block; margin-top: 2px; font-size: var(--font-size-body); }
 .address-panel > p { margin: 0; }
 .address-detail,
 .address-empty { color: #71666b; }

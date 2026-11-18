@@ -92,7 +92,7 @@ const won = (price) => `${currency.format(price)}원`
               :aria-label="item.name + ' 상품 상세보기'"
             >
               <img v-if="item.imageUrl" :src="item.imageUrl" alt="" loading="lazy" />
-              <span v-else>{{ item.brand || '상품' }}</span>
+              <span v-else>상품</span>
             </RouterLink>
             <div>
               <strong>{{ item.name }}</strong>
@@ -183,7 +183,7 @@ const won = (price) => `${currency.format(price)}원`
 <style scoped>
 .order-cancel-button {
   flex-shrink: 0;
-  height: 24px;
+  min-height: 1.5rem;
   margin-left: auto;
   padding: 0 10px;
   border: 1px solid var(--color-primary);
@@ -191,7 +191,7 @@ const won = (price) => `${currency.format(price)}원`
   background: #fff;
   color: var(--color-primary);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--font-size-control);
   font-weight: 500;
   line-height: 22px;
   cursor: pointer;
@@ -216,12 +216,12 @@ const won = (price) => `${currency.format(price)}원`
 }
 
 .order-cancel-dialog h2 {
-  font-size: 18px;
+  font-size: var(--font-size-section);
 }
 
 .order-cancel-dialog p {
   margin: 12px 0;
-  font-size: 14px;
+  font-size: var(--font-size-body);
 }
 
 .order-cancel-dialog form {
@@ -233,11 +233,11 @@ const won = (price) => `${currency.format(price)}원`
   align-items: center;
   gap: 4px;
   color: #71666b;
-  font-size: 15px;
+  font-size: var(--font-size-body);
 }
 
 .back-to-orders span {
-  font-size: 19px;
+  font-size: 1.1875rem;
   line-height: 1;
 }
 
@@ -283,14 +283,14 @@ const won = (price) => `${currency.format(price)}원`
   margin: 0 0 4px;
   color: var(--color-text);
   font-family: Georgia, serif;
-  font-size: 25px;
+  font-size: 1.5625rem;
   letter-spacing: .05em;
 }
 
 .receipt-heading span {
   color: var(--color-secondary);
   font-family: Georgia, serif;
-  font-size: 10px;
+  font-size: var(--font-size-caption);
   letter-spacing: .19em;
 }
 
@@ -310,14 +310,14 @@ const won = (price) => `${currency.format(price)}원`
 .receipt-section-heading h2 {
   margin: 0;
   color: var(--color-text);
-  font-size: 15px;
+  font-size: var(--font-size-section);
   font-weight: 600;
 }
 
 .receipt-section-heading h2 span,
 .receipt-section-heading > span {
   color: #71666b;
-  font-size: 12px;
+  font-size: var(--font-size-section);
   font-weight: 400;
 }
 
@@ -347,7 +347,7 @@ const won = (price) => `${currency.format(price)}원`
   height: 40px;
   border-radius: 5px;
   color: #fff;
-  font-size: 8px;
+  font-size: var(--font-size-caption);
   font-weight: 700;
 }
 
@@ -360,7 +360,7 @@ const won = (price) => `${currency.format(price)}원`
 .receipt-product-list strong {
   overflow: hidden;
   color: var(--color-text);
-  font-size: 13px;
+  font-size: var(--font-size-table);
   font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -368,12 +368,12 @@ const won = (price) => `${currency.format(price)}원`
 
 .receipt-product-list li > div span {
   color: #71666b;
-  font-size: 11px;
+  font-size: var(--font-size-caption);
 }
 
 .receipt-product-list b {
   color: var(--color-text);
-  font-size: 13px;
+  font-size: var(--font-size-table);
   font-weight: 700;
   white-space: nowrap;
 }
@@ -390,7 +390,7 @@ const won = (price) => `${currency.format(price)}원`
   background: #fff;
   color: var(--color-primary);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--font-size-control);
   font-weight: 500;
   cursor: pointer;
 }
@@ -425,7 +425,7 @@ const won = (price) => `${currency.format(price)}원`
   justify-content: space-between;
   margin-bottom: 9px;
   color: #53464c;
-  font-size: 13px;
+  font-size: var(--font-size-table);
 }
 
 .receipt-total strong {
@@ -438,13 +438,13 @@ const won = (price) => `${currency.format(price)}원`
   border-radius: 7px;
   background: var(--color-accent);
   color: var(--color-text);
-  font-size: 16px;
+  font-size: var(--font-size-body);
   font-weight: 600;
 }
 
 .receipt-final-total strong {
   color: var(--color-primary);
-  font-size: 19px;
+  font-size: 1.1875rem;
   font-weight: 700;
 }
 
@@ -491,7 +491,7 @@ const won = (price) => `${currency.format(price)}원`
   margin: 0;
   padding: 12px 14px 4px;
   color: var(--color-text);
-  font-size: 16px;
+  font-size: var(--font-size-section);
   font-weight: 600;
 }
 
@@ -524,7 +524,7 @@ const won = (price) => `${currency.format(price)}원`
 .order-info-card dd {
   margin: 0;
   color: var(--color-text);
-  font-size: 12px;
+  font-size: var(--font-size-label);
   line-height: 1.45;
 }
 
@@ -545,7 +545,7 @@ const won = (price) => `${currency.format(price)}원`
   border-radius: 999px;
   background: #f6e8df;
   color: #80503c;
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   font-weight: 600;
 }
 

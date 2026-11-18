@@ -40,13 +40,26 @@ test('관리자 목록·상세·대시보드를 인증과 서버 검색 조건�
   assert.equal(requests.filter((item) => item.url.includes('page=1&size=20&keyword=')).length, 5)
   await api.getAdminList('orders', { orderStatus: 'PAID', from: '2026-11-01', to: '2026-11-16' })
   assert.equal(requests.at(-1).url, '/api/admin/orders?orderStatus=PAID&from=2026-11-01&to=2026-11-16')
+  await api.getAdminList('reviews', { productName: '곤약젤리', answered: false })
+  const reviewUrl = new URL(requests.at(-1).url, 'http://localhost')
+  assert.equal(reviewUrl.searchParams.get('productName'), '곤약젤리')
+  assert.equal(reviewUrl.searchParams.get('answered'), 'false')
+  assert.equal(reviewUrl.searchParams.has('productId'), false)
+  await api.getAdminList('reviews', { productId: 1345 })
+  assert.equal(requests.at(-1).url, '/api/admin/reviews?productId=1345')
   await api.getAdminList('members', { isActive: false })
   assert.equal(requests.at(-1).url, '/api/admin/members?isActive=false')
+  await api.getAdminOperations({ from: '2026-11-01', to: '2026-11-17' })
+  assert.equal(requests.at(-1).url, '/api/admin/dashboard/operations?from=2026-11-01&to=2026-11-17')
+  await api.getAdminOperations({ days: 1 })
+  assert.equal(requests.at(-1).url, '/api/admin/dashboard/operations?days=1')
+  await api.getAdminStockAlerts({ page: 2, size: 5 })
+  assert.equal(requests.at(-1).url, '/api/admin/dashboard/stock-alerts?page=2&size=5')
 })
 
 test('상품·카테고리 저장·삭제 및 상태·답변 변경을 서버 메서드와 필드에 맞춘다', async () => {
   requests.length = 0
-  const product = { categoryId: 2, name: '상품', description: '설명', brand: null, price: 5000, stockQuantity: 3, expectedStockQuantity: 5 }
+  const product = { categoryId: 2, name: '상품', description: '설명', price: 5000, stockQuantity: 3, expectedStockQuantity: 5 }
   const category = { parentId: null, name: '분류', sortOrder: 0, isActive: false }
   await api.createAdminProduct(product)
   await api.updateAdminProduct(7, product)
@@ -70,6 +83,8 @@ test('상품·카테고리 저장·삭제 및 상태·답변 변경을 서버 �
   assert.deepEqual(requests[8].data, { isActive: false })
   assert.deepEqual(requests[9].data, { content: '답변' })
   assert.deepEqual(requests[10].data, { content: '리뷰 답변' })
+  await api.setAdminMemberStatus(9, true)
+  assert.deepEqual(requests.at(-1).data, { isActive: true })
   await assert.rejects(api.deleteAdminCategory(999), (error) => error.code === 'CATEGORY_IN_USE')
 })
 
@@ -91,4 +106,31 @@ test('주문 상태는 서버의 배송 순서를 지키고 결제·취소 상�
     assert.equal(statuses.nextOrderStatus(current), expected)
   }
   for (const status of ['PAYMENT_PENDING', 'PAYMENT_FAILED', 'CANCELLED', 'DELIVERED']) assert.equal(statuses.nextOrderStatus(status), undefined)
+})
+
+test('상품 복합 검색과 재고 전용 변경 요청은 수량 0도 유지한다', async () => {
+  await api.getAdminList('products', { page: 0, size: 10, saleStatus: 'ON_SALE', categoryId: 2, stockComparison: 'EQ', stockQuantity: 0 })
+  assert.equal(requests.at(-1).url, '/api/admin/products?page=0&size=10&saleStatus=ON_SALE&categoryId=2&stockComparison=EQ&stockQuantity=0')
+  await api.setAdminProductStock(7, 0, 5)
+  assert.equal(requests.at(-1).method, 'PATCH')
+  assert.equal(requests.at(-1).url, '/api/admin/products/7/stock')
+  assert.deepEqual(requests.at(-1).data, { stockQuantity: 0, expectedStockQuantity: 5 })
+})
+
+
+test('AI 고객 분석은 관리자 인증과 차트 옵션으로 조회하고 후기 감정분석 다음에 둔다', async () => {
+  session.setSession({ member_id: 1, name: '관리자', role: 'ADMIN' }, { tokens: { accessToken: 'ai-admin-token' } })
+  await api.getAdminCustomerAnalytics()
+  assert.equal(requests.at(-1).url, '/api/admin/analytics/customers?charts=true')
+  assert.equal(requests.at(-1).token, 'Bearer ai-admin-token')
+  const { adminNavigation } = await import('../src/utils/adminNavigation.js')
+  assert.deepEqual(adminNavigation[1], ['sentiments', '후기 감정분석', '운영 현황'])
+  assert.deepEqual(adminNavigation[2], ['analytics', 'AI 고객 분석', '운영 현황'])
+  assert.equal(adminNavigation.filter(([key]) => key === 'analytics').length, 1)
+})
+
+test('후기 감정분석은 관리자 인증을 사용해 저장된 결과를 조회한다', async () => {
+  await api.getAdminReviewAnalytics()
+  assert.equal(requests.at(-1).url, '/api/admin/reviews/analytics')
+  assert.equal(requests.at(-1).token, 'Bearer ai-admin-token')
 })

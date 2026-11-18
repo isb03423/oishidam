@@ -109,7 +109,7 @@ function previewCategory(event, group) {
   min-height: 40px;
   padding: 8px 12px;
   color: var(--color-text);
-  font-size: 14px;
+  font-size: var(--font-size-body);
   line-height: 1.4;
   overflow-wrap: anywhere;
   word-break: keep-all;
@@ -140,7 +140,7 @@ function previewCategory(event, group) {
   border: 0;
   background: transparent;
   color: var(--color-text);
-  font-size: 17px;
+  font-size: var(--font-size-section);
   cursor: pointer;
 }
 

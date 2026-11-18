@@ -1,6 +1,10 @@
 <script setup>
-import { computed, ref, shallowRef, watch } from 'vue'
+import { activateAdminRow, activateAdminRowKey } from '../utils/adminRow.js'
+import { computed, nextTick, ref, shallowRef, watch } from 'vue'
 import { session } from '../stores/session.js'
+import AdminPageHeading from '../components/admin/AdminPageHeading.vue'
+import AdminListPanel from '../components/admin/AdminListPanel.vue'
+import { adminStatusTone } from '../utils/adminPresentation.js'
 
 const props = defineProps({ section: String, title: String })
 const demo = computed(() => session.source === 'mock')
@@ -8,6 +12,8 @@ const source = shallowRef(null)
 const error = ref('')
 const query = ref('')
 const editing = ref(null)
+const demoDialog = ref(null)
+watch(editing, async value => { if (value) { await nextTick(); if (!demoDialog.value?.open) demoDialog.value?.showModal() } })
 const entries = ref({})
 const notice = ref('')
 const storageKey = 'oishidam:admin-demo:v1'
@@ -33,9 +39,9 @@ const pages = {
   orders: { columns: ['주문번호', '주문일', '주문자', '금액', '상태'], fields: [
     { key: 'status', label: '주문 상태', options: (row) => statuses.slice(statuses.indexOf(row.status), statuses.indexOf(row.status) + 2).map((status) => [status, status]) },
   ], cells: (row) => [row.id, date.format(row.date), row.customer, money.format(row.total) + '원', row.status] },
-  members: { columns: ['이름', '이메일', '가입일', '상태'], fields: [
+  members: { columns: ['이름', '이메일', '상태', '가입일'], fields: [
     { key: 'note', label: '관리 메모', type: 'textarea', optional: true },
-  ], cells: (row) => [row.name, row.email, row.joined_at, row.status === 'ACTIVE' ? '활성' : '탈퇴'] },
+  ], cells: (row) => [row.name, row.email, row.status === 'ACTIVE' ? '활성' : '탈퇴', row.joined_at] },
   inquiries: { columns: ['제목', '문의 내용', '답변'], fields: [{ key: 'answer', label: '답변', type: 'textarea' }],
     cells: (row) => [row.title, row.content, row.answer || '답변 대기'] },
   reviews: { columns: ['상품', '별점', '후기', '관리자 답변'], fields: [{ key: 'reply', label: '관리자 답변', type: 'textarea' }],
@@ -77,19 +83,18 @@ function save() {
 </script>
 
 <template>
-  <main class="management">
-    <header class="management-heading"><h1>{{ title }}</h1><p>{{ section === 'analytics' ? '고객의 쇼핑 활동과 관심을 살펴보세요.' : '오이시담 운영 정보를 관리하세요.' }}</p></header>
-    <section v-if="!demo" class="card feature-empty"><span class="feature-tag">준비 중</span><h2>고객 분석을 준비하고 있어요.</h2><p>분석 기능이 연결되면 이곳에서 고객별 쇼핑 경향을 확인할 수 있어요.</p></section>
-    <p v-else-if="error" class="card" role="alert">{{ error }}</p>
+  <main class="admin-page management">
+    <AdminPageHeading :title="title" :description="section === 'analytics' ? '고객의 쇼핑 활동과 관심을 살펴보세요.' : '스토어 운영 정보를 조회하고 관리하세요.'" />
+    <p v-if="error" class="card" role="alert">{{ error }}</p>
     <p v-else-if="!source" class="card" role="status">데이터를 불러오는 중이에요.</p>
-    <section v-else class="card">
-      <div class="toolbar">
-        <p>{{ section === 'analytics' ? '고객 세그먼트 데이터 집계' : '모의 운영 데이터' }} · {{ rows.length }}건</p>
-        <input v-model="query" type="search" aria-label="목록 검색" placeholder="목록 검색" />
-      </div>
+    <AdminListPanel v-else :total="rows.length" :title="section === 'categories' ? '카테고리 구조' : '전체'" :unit="section === 'categories' ? '개' : '건'" class="demo-list-card" :aria-label="title + ' 목록'">
+      <template #filters>
+        <p>{{ section === 'analytics' ? '고객 세그먼트 데이터 집계' : '모의 운영 데이터' }}</p>
+        <label class="search-field" for="admin-demo-search"><span>목록 검색</span><input id="admin-demo-search" v-model="query" type="search" placeholder="검색어를 입력하세요" /></label>
+      </template>
       <p v-if="notice" role="status">{{ notice }}</p>
-      <form v-if="editing" class="editor" @submit.prevent="save">
-        <h2>{{ editing.name || editing.title || editing.id }} 편집</h2>
+      <dialog v-if="editing" ref="demoDialog" class="admin-detail-dialog" aria-labelledby="admin-demo-editor-title" @cancel.prevent="editing = null"><form class="editor demo-editor" @submit.prevent="save">
+        <h2 id="admin-demo-editor-title">{{ editing.name || editing.title || editing.id }} 편집</h2>
         <label v-for="field in page.fields" :key="field.key">
           {{ field.label }}
           <select v-if="field.options" v-model="editing[field.key]" required>
@@ -100,18 +105,18 @@ function save() {
           <input v-else v-model.trim="editing[field.key]" required maxlength="100" />
         </label>
         <div class="actions"><button type="submit">저장</button><button type="button" @click="editing = null">취소</button></div>
-      </form>
-      <div v-if="rows.length" class="scroll" tabindex="0" role="region" :aria-label="title + ' 목록'">
-        <table class="data-table">
-          <thead><tr><th v-for="column in page.columns" :key="column" scope="col">{{ column }}</th><th v-if="page.fields.length" scope="col">관리</th></tr></thead>
-          <tbody><tr v-for="{ row, cells } in rows" :key="row.id">
-            <td v-for="(cell, index) in cells" :key="index" :data-label="page.columns[index]">{{ cell }}</td>
-            <td v-if="page.fields.length" data-label="관리"><button type="button" @click="editing = { ...row }; notice = ''">편집</button></td>
+      </form></dialog>
+      <div v-if="rows.length" class="admin-list-scroll" tabindex="-1" role="region" :aria-label="title + ' 목록'">
+        <table class="admin-list-table data-table">
+          <thead><tr><th v-for="column in page.columns" :key="column" scope="col">{{ column }}</th></tr></thead>
+          <tbody><tr v-for="{ row, cells } in rows" :key="row.id" :tabindex="page.fields.length ? 0 : undefined" @keydown="page.fields.length && activateAdminRowKey($event, () => { editing = { ...row }; notice = '' })" :class="{ 'admin-clickable-row': page.fields.length }" @click="page.fields.length && activateAdminRow($event, () => { editing = { ...row }; notice = '' })">
+            <td v-for="(cell, index) in cells" :key="index" :data-label="page.columns[index]"><span :class="{ 'status-pill': page.columns[index].includes('상태') }" :data-tone="adminStatusTone(cell)">{{ cell }}</span></td>
+
           </tr></tbody>
         </table>
       </div>
       <p v-else class="empty">검색 결과가 없어요.</p>
-    </section>
+    </AdminListPanel>
   </main>
 </template>
 

@@ -1,4 +1,13 @@
 :root {
+  /* 브라우저 기본 글자 크기에 따라 함께 조절되는 공통 크기 */
+  --font-size-caption: .75rem;
+  --font-size-label: .8125rem;
+  --font-size-table: .875rem;
+  --font-size-control: .9375rem;
+  --font-size-body: 1rem;
+  --font-size-section: 1.125rem;
+  --font-size-title: 1.75rem;
+
   /* 오이시담 브랜드 색상 */
   --color-primary: #9C4F63;
   --color-secondary: #76617E;
@@ -13,4 +22,8 @@
 
   /* 레이아웃 */
   --content-width: 1020px;
+}
+
+@media (max-width: 760px) {
+  :root { --font-size-control: 1rem; }
 }

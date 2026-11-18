@@ -38,16 +38,18 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
     Page<Review> findPublicByProductId(@Param("productId") Long productId, Pageable pageable);
 
     @EntityGraph(attributePaths = {"orderItem", "member", "answeredBy"})
-    @Query("SELECT r FROM Review r WHERE r.deletedAt IS NULL " +
+    @Query("SELECT r FROM Review r LEFT JOIN ReviewSentiment s ON s.reviewId = r.id WHERE r.deletedAt IS NULL " +
             "AND (:productId IS NULL OR r.orderItem.productId = :productId) " +
             "AND LOWER(r.orderItem.productName) LIKE LOWER(CONCAT('%', :productName, '%')) ESCAPE '\\' " +
             "AND (:answered IS NULL OR (:answered = TRUE AND r.answerContent IS NOT NULL) OR (:answered = FALSE AND r.answerContent IS NULL)) " +
+            "AND (:sentiment IS NULL OR (:sentiment = 'UNANALYZED' AND s.reviewId IS NULL) OR s.sentiment = :sentiment) " +
             "AND LOWER(r.content) LIKE LOWER(CONCAT('%', :keyword, '%')) ESCAPE '\\'")
     Page<Review> findForAdmin(
             @Param("productId") Long productId,
             @Param("productName") String productName,
             @Param("keyword") String keyword,
             @Param("answered") Boolean answered,
+            @Param("sentiment") String sentiment,
             Pageable pageable
     );
 }

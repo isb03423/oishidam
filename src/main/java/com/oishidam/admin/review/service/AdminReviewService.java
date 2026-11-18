@@ -1,6 +1,7 @@
 package com.oishidam.admin.review.service;
 
 import com.oishidam.admin.review.dto.AdminReviewResponse;
+import com.oishidam.admin.review.enums.ReviewSentimentFilter;
 import com.oishidam.common.exception.ApiException;
 import com.oishidam.member.entity.Member;
 import com.oishidam.member.enums.MemberRole;
@@ -41,6 +42,7 @@ public class AdminReviewService {
             String productName,
             String keyword,
             Boolean answered,
+            ReviewSentimentFilter sentiment,
             int page,
             int size
     ) {
@@ -53,7 +55,8 @@ public class AdminReviewService {
                 .replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
 
         // 조건에 맞는 리뷰와 상품 정보 조회
-        Page<Review> result = reviews.findForAdmin(productId, name, search, answered, pageable(page, size));
+        Page<Review> result = reviews.findForAdmin(productId, name, search, answered,
+                sentiment == null ? null : sentiment.name(), pageable(page, size));
         Map<Long, String> results = result.isEmpty() ? Map.of() : sentiments.findCurrentByReviewIdIn(
                 result.getContent().stream().map(Review::getId).toList()).stream()
                 .collect(Collectors.toMap(ReviewSentiment::getReviewId, ReviewSentiment::getSentiment));

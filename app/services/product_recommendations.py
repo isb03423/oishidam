@@ -17,7 +17,7 @@ WITH RECURSIVE visible_categories AS (
     FROM categories child JOIN visible_categories parent ON child.parent_id = parent.category_id
     WHERE child.is_active
 )
-SELECT p.product_id, p.category_id, p.name, COALESCE(p.brand, '') AS brand,
+SELECT p.product_id, p.category_id, p.name,
        p.price, p.published_at, s.stock_quantity,
        LEFT(p.description, 1000) AS description, c.name AS category,
        (p.sale_status = 'ON_SALE' AND s.stock_quantity > 0
@@ -29,7 +29,7 @@ WHERE p.deleted_at IS NULL
 """
 
 PRODUCT_SUMMARIES = f"""
-SELECT p.product_id, p.category_id, p.name, p.brand, p.price, p.published_at,
+SELECT p.product_id, p.category_id, p.name, p.price, p.published_at,
        p.stock_quantity, image.storage_key, image.alt_text
 FROM ({CATALOG}) p
 LEFT JOIN product_images image ON image.product_id = p.product_id AND image.is_primary
@@ -142,7 +142,6 @@ def product_summaries(product_ids: list[int]) -> list[dict]:
             "productId": row.product_id,
             "categoryId": row.category_id,
             "name": row.name,
-            "brand": row.brand,
             "price": int(row.price),
             "publishedAt": row.published_at.isoformat(),
             "stockQuantity": int(row.stock_quantity),
@@ -161,7 +160,7 @@ def content_scores(catalog: pd.DataFrame, weights: dict[int, float]) -> dict[int
 
     # 한국어와 일본어 상품명을 형태소 분석 없이 비교하도록 문자 단위로 벡터화
     description = catalog["description"].str.replace(r"<[^>]+>", " ", regex=True)
-    documents = catalog["name"] + " " + catalog["brand"] + " " + catalog["category"] + " " + description
+    documents = catalog["name"] + " " + catalog["category"] + " " + description
     vectors = TfidfVectorizer(analyzer="char", ngram_range=(2, 3), max_features=50_000).fit_transform(documents)
     seed_weights = np.array([weights[ids[index]] for index in seeds])
     profile = vectors[seeds].T @ (seed_weights / seed_weights.sum())

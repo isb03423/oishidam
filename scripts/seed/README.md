@@ -71,12 +71,7 @@ DB 이름이 `oishidam` 또는 검증용 `oishidam_seed_verify`이고, 해당 �
 
 Docker 최초 초기화 시 후기 2,520건 전체에 별점이 저장된다. 1·2·3·4점은 각각 450건, 5점은 720건이며, 생성 후 별점 누락 또는 범위 오류가 있으면 전체 삽입을 롤백한다. 기존 DB에 이 SQL을 다시 실행해도 이미 입력한 별점은 변경하지 않는다.
 
-기존 개발 DB는 먼저 [별점 컬럼 마이그레이션](../../backend/src/main/resources/sql/migrations/20261119_add_review_rating.sql)을 적용한다. 기존 후기 본문에 맞춰 빈 별점만 채우려면 다음을 실행한다. 기존 점수와 후기 본문은 덮어쓰지 않으며, 판단할 수 없는 문구는 미평가로 남긴다. 실제 고객 별점을 추정하는 운영용 스크립트는 아니다.
-
-```powershell
-docker compose cp backend/src/main/resources/sql/seeds/20261119_backfill_review_ratings.sql db:/tmp/backfill-review-ratings.sql
-docker compose exec -T db psql -U oishidam -d oishidam -X -v ON_ERROR_STOP=1 -f /tmp/backfill-review-ratings.sql
-```
+기존 개발 DB는 먼저 별점 컬럼과 제약을 별도로 반영해야 한다. 이미 저장된 후기의 별점은 자동으로 변경하지 않는다.
 
 ## 개발용 로그인 계정
 

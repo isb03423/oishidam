@@ -83,7 +83,7 @@ psql -h localhost -U postgres -c "CREATE DATABASE oishidam;"
 1. [20261118_add_review_sentiments.sql](src/main/resources/sql/migrations/20261118_add_review_sentiments.sql)
 2. [20261118_remove_sentiment_review_content.sql](src/main/resources/sql/migrations/20261118_remove_sentiment_review_content.sql)
 
-후기 별점은 [20261119_add_review_rating.sql](src/main/resources/sql/migrations/20261119_add_review_rating.sql)을 기존 DB에 적용한 뒤 백엔드를 재시작합니다. 기존 후기의 별점은 NULL(미평가)로 유지되며, 새 후기는 1~5점 정수 별점이 필수입니다. 수정 요청에서 별점을 생략하면 기존 값을 유지합니다. 관리자 답변에는 별점 입력이 필요하지 않습니다.
+후기 별점을 사용하려면 기존 DB에 `schema.sql`의 `reviews.rating` 컬럼과 제약을 별도로 반영한 뒤 백엔드를 재시작합니다. 기존 후기의 별점은 NULL(미평가)로 유지되며, 새 후기는 1~5점 정수 별점이 필수입니다. 수정 요청에서 별점을 생략하면 기존 값을 유지합니다. 관리자 답변에는 별점 입력이 필요하지 않습니다.
 
 공개 `GET /api/products/{productId}/reviews/summary`는 삭제되지 않은 해당 상품의 전체 후기 수 `reviewCount`, 별점 평가 수 `ratingCount`, 평균 별점 `averageRating`을 반환합니다. 평균에는 별점이 있는 후기만 포함하며, 평가가 없으면 NULL입니다. 미평가 후기를 0점으로 계산하지 않습니다.
 

@@ -194,12 +194,7 @@ WHERE email = 'admin@example.com';
 
 콘솔 종료는 `\q`입니다. 기존 데이터가 있는 DB의 스키마 변경은 별도 마이그레이션을 검토해야 하며, `schema.sql`의 `CREATE TABLE IF NOT EXISTS`가 기존 테이블의 컬럼을 자동 갱신해 주지는 않습니다.
 
-후기 별점 기능을 기존 DB에 반영할 때는 백엔드 재시작 전에 다음을 실행합니다. 기존 후기와 본문은 보존되며 별점은 미평가(NULL)로 추가됩니다. 개발용 후기의 빈 점수를 내용에 맞춰 채우는 방법은 [시드 안내](scripts/seed/README.md#후기-별점)를 참고합니다.
-
-```powershell
-docker compose cp backend/src/main/resources/sql/migrations/20261119_add_review_rating.sql db:/tmp/add-review-rating.sql
-docker compose exec -T db psql -U oishidam -d oishidam -X -v ON_ERROR_STOP=1 -f /tmp/add-review-rating.sql
-```
+후기 별점 기능을 기존 DB에 반영할 때는 백엔드 재시작 전에 별점 컬럼과 제약을 별도로 반영해야 합니다. 기존 후기와 본문은 보존하고 별점은 미평가(NULL)로 유지합니다. 신규 개발 DB의 후기 별점은 [시드 안내](scripts/seed/README.md#후기-별점)를 참고합니다.
 
 ## 실행 후 자주 쓰는 명령
 

@@ -2,3 +2,5 @@
 .env.*
 !.env.example
 *.dump
+/backend/src/main/resources/sql/migrations/20261119_add_review_rating.sql
+/backend/src/main/resources/sql/seeds/20261119_backfill_review_ratings.sql

@@ -256,21 +256,35 @@ async function deleteReview(ids) {
       </div>
 
       <section v-else ref="writtenHeading" class="review-list" aria-label="작성한 후기" tabindex="-1">
-        <article v-for="item in written" :key="item.id" class="activity-panel review-card">
-          <ReviewProduct :item="item">
-            <ReviewRating :rating="item.rating" />
-            <p class="activity-copy review-copy">{{ item.content }}</p>
-            <ul v-if="item.images?.length" class="review-images" aria-label="후기 첨부 이미지">
+        <article v-for="item in written" :key="item.id" class="activity-panel written-review-card">
+          <div class="written-review-product">
+            <RouterLink :to="{ name: 'ProductDetail', params: { productId: item.product_id } }" class="written-product-photo" :aria-label="item.name + ' 상품 보기'">
+              <img v-if="item.imageUrl" :src="item.imageUrl" :alt="item.name" loading="lazy" />
+              <span v-else>이미지 없음</span>
+            </RouterLink>
+            <div class="written-product-info">
+              <h2>{{ item.name }}</h2>
+              <p class="written-order-dates"><span>주문일 {{ item.ordered || '—' }}</span><span>배송 완료 {{ item.delivered || '—' }}</span></p>
+              <div class="written-review-rating"><ReviewRating :rating="item.rating" /><strong v-if="item.rating != null" aria-hidden="true">{{ Number(item.rating).toFixed(1) }}</strong></div>
+            </div>
+          </div>
+          <p class="written-review-copy">{{ item.content }}</p>
+            <ul v-if="item.images?.length" class="review-images written-review-images" aria-label="후기 첨부 이미지">
               <li v-for="image in item.images" :key="image.url">
                 <img :src="image.url" :alt="image.file?.name || '후기 첨부 이미지'" loading="lazy" />
               </li>
             </ul>
-            <p v-if="item.reply" class="activity-copy">관리자 답변: {{ item.reply }}</p>
-          </ReviewProduct>
-          <div class="review-actions review-actions--management">
+          <div v-if="item.reply" class="written-review-reply">
+            <div class="written-reply-heading">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M7 18 3 21v-6a8 8 0 1 1 4 3Z" /><path d="M7 10h2m2 0h2m2 0h2" /></svg>
+              <strong>관리자 답변</strong><time v-if="item.replyDate">{{ item.replyDate }}</time>
+            </div>
+            <p>{{ item.reply }}</p>
+          </div>
+          <div class="review-actions review-actions--management written-review-footer">
             <small v-if="!isMock" class="activity-meta">{{ item.editable ? `수정·삭제 기한 ${item.editableUntil?.replace('T', ' ').slice(0, 16)}` : '수정·삭제 기한이 지났습니다.' }}</small>
-            <button type="button" class="activity-button review-secondary-button" :disabled="busy || (!isMock && !item.editable)" @click="startReview(item, true)">수정하기</button>
-            <button type="button" class="activity-button" :disabled="busy || (!isMock && !item.editable)" @click="deleteDialog.open([item.id])">삭제</button>
+            <button type="button" class="activity-button written-edit-button" :disabled="busy || (!isMock && !item.editable)" @click="startReview(item, true)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="m16 3 5 5-12 12-6 1 1-6Z M13 6l5 5" /></svg>수정</button>
+            <button type="button" class="activity-button written-delete-button" :disabled="busy || (!isMock && !item.editable)" @click="deleteDialog.open([item.id])"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M3 6h18 M9 6V3h6v3 M6 6l1 15h10l1-15 M10 10v7 M14 10v7" /></svg>삭제</button>
           </div>
         </article>
         <p v-if="!loading && !loadError && !written.length" class="activity-empty" role="status">작성한 후기가 없습니다.</p>
@@ -353,6 +367,45 @@ async function deleteReview(ids) {
 .review-copy { font-size: var(--font-size-table); }
 .review-actions { display: grid; justify-items: end; gap: 5px; }
 .review-actions--management { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.written-review-card { display: grid; gap: 16px; padding: 22px 24px; border: 1px solid #eadde5; border-radius: 18px; background: #fff; }
+.written-review-product { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 22px; align-items: start; }
+.written-product-photo { display: grid; place-items: center; width: 112px; aspect-ratio: 1; overflow: hidden; border-radius: 10px; background: #fcf4f8; color: var(--color-secondary); font-size: 12px; }
+.written-product-photo img { width: 100%; height: 100%; object-fit: cover; }
+.written-product-info { min-width: 0; }
+.written-product-info h2 { margin: 0 0 10px; font-size: 19px; font-weight: 750; line-height: 1.45; overflow-wrap: anywhere; }
+.written-order-dates { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 0 0 12px; color: var(--color-secondary); font-size: 14px; }
+.written-order-dates span + span { padding-left: 14px; border-left: 1px solid #deced7; }
+.written-review-rating { display: flex; align-items: center; gap: 12px; color: #b43e63; }
+.written-review-rating :deep(.review-rating-stars svg) { width: 23px; height: 23px; }
+.written-review-rating :deep(.review-rating-display) { color: #b43e63; }
+.written-review-rating :deep(.review-rating-display > span:last-child) { display: none; }
+.written-review-rating > strong { font-size: 21px; font-weight: 700; }
+.written-review-copy { margin: 0; font-size: 16px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+.written-review-images { gap: 12px; margin: 0; }
+.written-review-images img { width: 88px; height: 88px; border-radius: 10px; }
+.written-review-reply { padding: 14px 18px; border-radius: 12px; background: #f7f2f5; }
+.written-reply-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 15px; }
+.written-reply-heading svg { width: 20px; height: 20px; color: #b43e63; }
+.written-reply-heading strong { font-weight: 700; }
+.written-reply-heading time { border-left: 1px solid #d9c8d2; padding-left: 12px; color: var(--color-secondary); font-size: 13px; }
+.written-review-reply p { margin: 7px 0 0 32px; font-size: 15px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+.written-review-footer { align-items: center; gap: 10px; margin-top: 2px; padding-top: 16px; border-top: 1px solid #eee4eb; }
+.written-review-footer .activity-meta { flex: 1 1 240px; font-size: 13px; color: var(--color-secondary); }
+.written-review-footer .activity-button { gap: 7px; min-height: 38px; min-width: 88px; padding: 7px 16px; border-radius: 10px; font-size: 15px; font-weight: 650; }
+.written-review-footer svg { width: 19px; height: 19px; }
+.written-review-footer .written-edit-button { border-color: #af4665; background: #af4665; color: white; }
+.written-review-footer .written-delete-button { border-color: #ba617d; color: #af4665; background: white; }
+@media (max-width: 600px) {
+  .written-review-card { padding: 16px; gap: 14px; }
+  .written-review-product { grid-template-columns: 80px minmax(0, 1fr); gap: 14px; }
+  .written-product-photo { width: 80px; }
+  .written-product-info h2 { font-size: 16px; margin-bottom: 6px; }
+  .written-order-dates { font-size: 12px; gap: 4px; margin-bottom: 6px; }
+  .written-order-dates span + span { border: 0; padding: 0; }
+  .written-review-rating :deep(.review-rating-stars svg) { width: 18px; height: 18px; }
+  .written-review-rating > strong { font-size: 18px; }
+  .written-review-footer .activity-meta { flex-basis: 100%; }
+}
 .review-dialog {
   position: fixed;
   inset: 0;

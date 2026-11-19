@@ -7,6 +7,8 @@ export async function getProductReviews(productId, page = 0, { size = 10, signal
     content: result.content.map((review) => ({
       id: String(review.reviewId), content: review.content, ...(review.rating != null ? { rating: review.rating } : {}), date: review.createdAt?.slice(0, 10),
       images: (review.imageUrls ?? []).map((url) => ({ url })), reply: review.answerContent,
+      ...(review.authorName ? { authorName: review.authorName } : {}),
+      ...(review.answeredAt ? { replyDate: review.answeredAt.slice(0, 10) } : {}),
     })),
   }
 }
@@ -24,6 +26,7 @@ export async function getMyReviews(type, page = 0, { size = 10, signal } = {}) {
     deadline: item.writeDeadline?.replace('T', ' ').slice(0, 16), editable: item.editable,
     editableUntil: item.review?.editableUntil, content: item.review?.content ?? '', rating: item.review?.rating,
     images: (item.review?.imageUrls ?? []).map((url) => ({ url })), reply: item.review?.answerContent,
+    ...(item.review?.answeredAt ? { replyDate: item.review.answeredAt.slice(0, 10).replaceAll('-', '.') } : {}),
   })) }
 }
 

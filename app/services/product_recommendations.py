@@ -36,6 +36,26 @@ LEFT JOIN product_images image ON image.product_id = p.product_id AND image.is_p
 WHERE p.available AND p.product_id = ANY(:product_ids)
 """
 
+# PostgreSQL의 활동 시각은 한국 시간 기준 timestamp without time zone이다.
+INTERESTS = """
+SELECT product_id, 1.0 AS base_weight,
+       EXTRACT(EPOCH FROM ((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul') - created_at)) / 86400.0 AS age_days
+FROM wish_items WHERE member_id = :member_id
+UNION ALL
+SELECT product_id, 2.0 AS base_weight,
+       EXTRACT(EPOCH FROM ((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')
+           - COALESCE(updated_at, created_at))) / 86400.0 AS age_days
+FROM cart_items WHERE member_id = :member_id
+"""
+
+RECENCY_HALF_LIFE_DAYS = 30.0
+
+
+def recency_weight(age_days: float) -> float:
+    """최근 활동의 영향력을 높이고, 30일마다 절반으로 감쇠한다."""
+    return 2.0 ** (-max(float(age_days), 0.0) / RECENCY_HALF_LIFE_DAYS)
+
+
 PURCHASES = """
 WITH target AS (
     SELECT birth_year, gender,
@@ -43,6 +63,8 @@ WITH target AS (
     FROM members WHERE member_id = :member_id
 )
 SELECT o.member_id, i.product_id, SUM(i.quantity) AS quantity,
+       EXTRACT(EPOCH FROM ((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')
+           - MAX(o.created_at))) / 86400.0 AS age_days,
        (o.member_id <> :member_id AND m.gender = target.gender
         AND m.birth_year BETWEEN 1900 AND target.current_year
         AND target.birth_year BETWEEN 1900 AND target.current_year
@@ -60,32 +82,35 @@ GROUP BY o.member_id, i.product_id, same_group
 
 
 def recommend_products(member_id: int, limit: int) -> dict:
-    """찜과 구매 이력을 바탕으로 추천 상품 순위 계산"""
+    """찜·장바구니·구매 이력과 활동 시점을 바탕으로 추천 순위 계산"""
     # 1. 노출 가능한 카테고리의 상품 조회
     catalog = query_df(CATALOG)
     if not catalog["available"].any():
         return {"recommendationType": "DEFAULT", "productIds": []}
 
-    # 2. 찜과 최근 180일 구매 내역 수집
+    # 2. 현재 찜·장바구니와 최근 180일 구매 내역 수집
     params = {"member_id": member_id}
-    wish_df = query_df(
-        "SELECT product_id FROM wish_items WHERE member_id = :member_id",
-        params,
-    )
+    interest_df = query_df(INTERESTS, params)
     purchase_df = query_df(PURCHASES, params)
 
     purchases = defaultdict(dict)
-    group_sales = defaultdict(int)
+    group_sales = defaultdict(float)
+    overall_sales = defaultdict(float)
     for row in purchase_df.itertuples(index=False):
-        purchases[row.member_id][row.product_id] = row.quantity
+        freshness = recency_weight(row.age_days)
+        purchases[row.member_id][row.product_id] = freshness
+        overall_sales[row.product_id] += row.quantity * freshness
         if row.same_group:
-            group_sales[row.product_id] += row.quantity
+            group_sales[row.product_id] += row.quantity * freshness
 
-    # 3. 찜보다 구매 이력에 높은 가중치 부여
+    # 3. 찜 1, 장바구니 2, 구매 3에 최근 활동 가중치를 곱해 합산
+    # 수량은 개인 취향에 반영하지 않아 대량 구매/장바구니 담기의 영향을 제한한다.
     own_purchases = purchases.get(member_id, {})
-    weights = dict.fromkeys(wish_df["product_id"], 1.0)
-    for product_id in own_purchases:
-        weights[product_id] = weights.get(product_id, 0) + 2.0
+    weights = defaultdict(float)
+    for row in interest_df.itertuples(index=False):
+        weights[row.product_id] += float(row.base_weight) * recency_weight(row.age_days)
+    for product_id, freshness in own_purchases.items():
+        weights[product_id] += 3.0 * freshness
 
     # 4. 콘텐츠 유사도와 구매 패턴 점수를 합산해 개인화 순위 계산
     content = content_scores(catalog, weights)
@@ -104,21 +129,41 @@ def recommend_products(member_id: int, limit: int) -> dict:
         key=lambda product: (-scores[product], product),
     )[:limit]
 
-    # 5. 남은 자리는 같은 연령대·성별 고객의 판매 수량 순으로 채움
+    # 5. 남은 자리는 같은 연령대·성별 고객의 최근 가중 판매 수량 순으로 채움
     selected = set(personalized)
     demographic = sorted(
         (product for product in available if product in group_sales and product not in selected),
         key=lambda product: (-group_sales[product], product),
     )[: limit - len(personalized)]
 
+    # 6. 연령·성별과 무관하게 전체 고객의 최근 가중 판매 수량으로 보충
+    selected.update(demographic)
+    popular = sorted(
+        (product for product in available if product in overall_sales and product not in selected),
+        key=lambda product: (-overall_sales[product], product),
+    )[: limit - len(selected)]
+
+    # 7. 구매 데이터도 부족하면 공개된 최신 상품부터 보충한다.
+    selected.update(popular)
+    newest = [
+        int(product)
+        for product in catalog.sort_values(
+            ["published_at", "product_id"], ascending=[False, False], na_position="last",
+        )["product_id"]
+        if product in available and product not in selected
+    ][: limit - len(selected)]
+
     recommendation_type = "DEFAULT"
     if demographic:
         recommendation_type = "PERSONALIZED_WITH_DEMOGRAPHIC" if personalized else "DEMOGRAPHIC"
     elif personalized:
         recommendation_type = "PERSONALIZED"
+    if popular or newest:
+        stages = sum(bool(items) for items in (personalized, demographic, popular, newest))
+        recommendation_type = "MIXED" if stages > 1 else ("POPULAR" if popular else "NEW")
     return {
         "recommendationType": recommendation_type,
-        "productIds": personalized + demographic,
+        "productIds": personalized + demographic + popular + newest,
     }
 
 
@@ -175,14 +220,15 @@ def collaborative_scores(purchases: dict, member_id: int) -> dict[int, float]:
     if not own:
         return {}
 
-    # 대량 구매가 유사도를 좌우하지 않도록 상품별 구매 여부만 사용
+    # 구매 수량 대신 활동 시점 가중치로 코사인 유사도를 계산한다.
+    own_norm = sqrt(sum(weight ** 2 for weight in own.values()))
     neighbors = []
     for user, history in purchases.items():
         if user == member_id:
             continue
-        common = len(own.keys() & history.keys())
+        common = sum(own[product] * history[product] for product in own.keys() & history.keys())
         if common:
-            similarity = common / sqrt(len(own) * len(history))
+            similarity = common / (own_norm * sqrt(sum(weight ** 2 for weight in history.values())))
             neighbors.append((similarity, user))
 
     scores = defaultdict(float)
@@ -191,5 +237,5 @@ def collaborative_scores(purchases: dict, member_id: int) -> dict[int, float]:
     total = sum(similarity for similarity, _ in nearest)
     for similarity, user in nearest:
         for product in purchases[user].keys() - own.keys():
-            scores[product] += similarity / total
+            scores[product] += similarity * purchases[user][product] / total
     return scores

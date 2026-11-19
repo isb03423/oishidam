@@ -33,7 +33,7 @@
 
 ```text
 oishidam/
-├─ compose.yaml                   # 기본 실행: Caddy 80·443만 공개
+├─ compose.yaml                   # 외부: Caddy 80·443, 로컬: AI 8000
 ├─ caddy/Caddyfile                # APP_URL에 따른 HTTP/HTTPS·인증서 자동 관리
 ├─ compose.db-access.yaml         # 선택: 로컬 DB 관리용 127.0.0.1:5433
 ├─ .env.example                   # Compose 환경변수 예시
@@ -68,13 +68,13 @@ ai-service ──→ backend:8080/api   # 전달받은 JWT·현재 회원 권한
 backend / ai-service ──→ db:5432 # 같은 PostgreSQL 사용
 ```
 
-- 기본 호스트 공개 포트는 Caddy의 **80·443**입니다. 프론트·백엔드·AI·DB에는 `ports`를 지정하지 않습니다.
+- 외부 공개 포트는 Caddy의 **80·443**입니다. AI는 배포 PC에서 상태·문서를 확인할 수 있도록 **127.0.0.1:8000**에만 연결합니다. 프론트·백엔드·DB에는 `ports`를 지정하지 않습니다.
 - `APP_URL=http://localhost`는 기존처럼 HTTP로 실행합니다. 공개 도메인의 `https://` 주소를 설정하면 Caddy가 인증서를 자동 발급·갱신하고 HTTP를 HTTPS로 이동시킵니다. [Caddy 자동 HTTPS 문서](https://caddyserver.com/docs/automatic-https)
 - Nginx는 내부 Caddy가 전달한 HTTPS·클라이언트 IP 정보를 사용합니다. Nginx의 8080 포트를 별도로 공개하지 않습니다.
-- 백엔드와 AI의 API는 프론트 주소 아래에서 접근하며 기존 JWT·역할 검증을 그대로 적용합니다. 포트 비공개가 API 인증을 대신하지는 않습니다.
+- 백엔드와 AI의 업무 API는 프론트 주소 아래에서 접근하며 JWT·역할 검증을 적용합니다. AI 서비스의 상태 확인·API 문서는 인증 없이 공개합니다. 포트 비공개가 업무 API 인증을 대신하지는 않습니다.
 - 컨테이너끼리는 `localhost`가 아닌 `backend`, `ai-service`, `db` 서비스 이름으로 통신합니다.
 - DB 준비 → 백엔드 준비·스키마 초기화 → AI 준비 → 프론트 준비 → Caddy 순서로 시작합니다. 단순 실행 여부뿐 아니라 healthcheck 결과를 기다립니다. [Docker 실행 순서 문서](https://docs.docker.com/compose/how-tos/startup-order/)
-- 백엔드 healthcheck는 공개 카테고리 API로 DB 연결까지 확인합니다. AI는 기존 `/health`에도 인증이 필요하므로 비로그인 요청에 대한 **401 응답**을 준비 상태로 사용합니다. 모델 추론 성공까지 확인하는 검사는 아닙니다.
+- 백엔드 healthcheck는 공개 카테고리 API로 DB 연결까지 확인합니다. AI는 공개 `/health`의 **200 응답**을 준비 상태로 사용합니다. DB 연결이나 모델 추론 성공까지 확인하는 검사는 아닙니다.
 - `restart: unless-stopped`로 비정상 종료 시 재시작합니다. healthcheck 실패 자체가 자동 재시작을 일으키지는 않습니다.
 
 ## Docker로 처음 실행하기
@@ -193,6 +193,13 @@ WHERE email = 'admin@example.com';
 ```
 
 콘솔 종료는 `\q`입니다. 기존 데이터가 있는 DB의 스키마 변경은 별도 마이그레이션을 검토해야 하며, `schema.sql`의 `CREATE TABLE IF NOT EXISTS`가 기존 테이블의 컬럼을 자동 갱신해 주지는 않습니다.
+
+후기 별점 기능을 기존 DB에 반영할 때는 백엔드 재시작 전에 다음을 실행합니다. 기존 후기와 본문은 보존되며 별점은 미평가(NULL)로 추가됩니다. 개발용 후기의 빈 점수를 내용에 맞춰 채우는 방법은 [시드 안내](scripts/seed/README.md#후기-별점)를 참고합니다.
+
+```powershell
+docker compose cp backend/src/main/resources/sql/migrations/20261119_add_review_rating.sql db:/tmp/add-review-rating.sql
+docker compose exec -T db psql -U oishidam -d oishidam -X -v ON_ERROR_STOP=1 -f /tmp/add-review-rating.sql
+```
 
 ## 실행 후 자주 쓰는 명령
 
@@ -373,7 +380,7 @@ Spring API의 요청·응답 명세는 [Swagger UI](http://localhost/swagger-ui/
 | AI 감정분석 | `/api/ai/sentiment/*` |
 | AI 고객 분석 | `/api/ai/analytics/customers` |
 
-인증이 필요한 API에는 `Authorization: Bearer <accessToken>`을 전달합니다. AI도 백엔드의 현재 회원 조회로 JWT와 권한을 확인합니다. 개인화 추천과 본인 후기 단건 분석 외의 AI API는 관리자 권한이 필요합니다.
+인증이 필요한 API에는 `Authorization: Bearer <accessToken>`을 전달합니다. AI도 백엔드의 현재 회원 조회로 JWT와 권한을 확인합니다. 개인화 추천과 본인 후기 단건 분석 외의 AI 업무 API는 관리자 권한이 필요합니다. AI 서비스의 `/health`, `/docs`, `/docs/oauth2-redirect`, `/redoc`, `/openapi.json`은 로그인 없이 접근할 수 있습니다. Docker 배포 PC에서는 [AI 상태 확인](http://localhost:8000/health), [Swagger UI](http://localhost:8000/docs), [ReDoc](http://localhost:8000/redoc), [OpenAPI](http://localhost:8000/openapi.json)을 사용할 수 있습니다. 8000 포트는 로컬 전용이므로 다른 PC에서는 직접 접근할 수 없습니다.
 
 ## Docker 없이 개발하기
 
@@ -433,7 +440,7 @@ docker compose up -d --wait --wait-timeout 300
 | HTTPS 인증서 발급 실패 | `docker compose logs --tail=100 caddy`, DNS A/AAAA·공인 IP·TCP 80/443 포워딩·Windows 방화벽 확인 |
 | `unhealthy`, 준비 시간 초과 | `docker compose logs --tail=100 db backend ai-service frontend`로 원인 확인 |
 | Nginx 502 | backend·ai-service의 실행·healthcheck 확인. 해당 컨테이너만 재생성한 뒤에는 `docker compose restart frontend`로 프록시 연결도 갱신 |
-| API 인증 오류 | 로그인·토큰 만료·현재 회원 상태·권한 확인. AI `/health`의 비로그인 401은 현재 정상 동작 |
+| API 인증 오류 | 업무 API는 로그인·토큰 만료·현재 회원 상태·권한 확인. AI `/health`·문서 조회는 로그인 없이 200 응답이어야 함 |
 | 다른 PC에서 AI 요청이 localhost로 감 | 루트 `.env`의 `APP_URL`을 실제 접속 출처로 바꾸고 frontend 재빌드 |
 | 카카오 콜백 실패 | 공개 주소의 Redirect URI 등록, `APP_URL`과 실제 브라우저 출처 일치 여부 |
 | 이미지 업로드·결제 실패 | 외부 연동 키·서비스 네트워크 접근·요청 크기 확인 |

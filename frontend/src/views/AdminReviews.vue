@@ -1,5 +1,6 @@
 <script setup>
 import AdminSentimentBadge from '../components/admin/AdminSentimentBadge.vue'
+import ReviewRating from '../components/common/ReviewRating.vue'
 import { activateAdminRow, activateAdminRowKey } from '../utils/adminRow.js'
 import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
@@ -94,11 +95,12 @@ watch(() => route.query.id, (id) => { if (typeof id === 'string' && /^\d+$/.test
       <p v-if="error" class="admin-list-feedback" role="alert">{{ error }} <button type="button" @click="retry++">다시 시도</button></p>
       <div class="admin-list-scroll inquiry-table-wrap" tabindex="-1" role="region" aria-label="고객 후기 표" :aria-busy="loading">
         <table v-if="items.length" class="admin-list-table inquiry-table">
-          <caption class="sr-only">상품명, 후기 내용과 답변 상태</caption><colgroup><col class="product-col" /><col class="subject-col" /><col class="sentiment-col" /><col class="status-col" /><col class="author-col" /><col class="date-col" /></colgroup>
-          <thead><tr><th scope="col">상품명</th><th scope="col">후기 내용</th><th scope="col" class="status-cell">감정</th><th scope="col" class="status-cell">답변 상태</th><th scope="col">작성자</th><th scope="col">작성일</th></tr></thead>
+          <caption class="sr-only">상품명, 후기 내용, 별점, 감정과 답변 상태</caption><colgroup><col class="product-col" /><col class="subject-col" /><col class="rating-col" /><col class="sentiment-col" /><col class="status-col" /><col class="author-col" /><col class="date-col" /></colgroup>
+          <thead><tr><th scope="col">상품명</th><th scope="col">후기 내용</th><th scope="col" class="status-cell">별점</th><th scope="col" class="status-cell">감정</th><th scope="col" class="status-cell">답변 상태</th><th scope="col">작성자</th><th scope="col">작성일</th></tr></thead>
           <tbody><tr v-for="item in items" :key="item.reviewId" class="admin-clickable-row" tabindex="0" aria-haspopup="dialog" @keydown="activateAdminRowKey($event, () => open(item.reviewId))" @click="activateAdminRow($event, () => open(item.reviewId))">
             <td><strong class="review-product-name" :title="item.productName">{{ item.productName || '—' }}</strong></td>
             <td class="inquiry-subject"><span class="admin-list-preview" :title="item.content">{{ item.content }}</span><small v-if="item.imageUrls?.length" class="review-photo-count">사진 {{ item.imageUrls.length }}</small></td>
+            <td class="status-cell"><ReviewRating :rating="item.rating" /></td>
             <td class="status-cell"><AdminSentimentBadge :sentiment="item.sentiment" /></td>
             <td class="status-cell"><span class="inquiry-status" :class="item.answerContent ? 'is-answered' : 'is-pending'">{{ item.answerContent ? '답변 완료' : '답변 대기' }}</span></td>
             <td class="inquiry-author">{{ item.memberName || '이름 확인 중' }}</td><td class="inquiry-date"><time :datetime="item.createdAt">{{ stamp(item.createdAt) }}</time></td>
@@ -121,4 +123,6 @@ watch(() => route.query.id, (id) => { if (typeof id === 'string' && /^\d+$/.test
 .review-product-name { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--admin-ink); font-size: var(--font-size-table); font-weight: var(--admin-list-primary-weight); line-height: 1.7; }
 .review-photo-count { display: inline-block; margin-top: 6px; color: var(--admin-info); font-size: var(--font-size-label); }
 .sentiment-col { width: 118px; }
+.rating-col { width: 126px; }
+.reviews-page .inquiry-table { min-width: 1120px; }
 </style>

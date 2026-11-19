@@ -1,18 +1,18 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { categoryGroups } from '../../data/categories.js'
+import { categoryGroups, categoryLoading, categoryError, loadCategories } from '../../stores/categories.js'
 
 defineEmits(['select'])
 
 const route = useRoute()
 const selectedId = ref()
-const selectedGroup = computed(() => categoryGroups.find((group) =>
+const selectedGroup = computed(() => categoryGroups.value.find((group) =>
   group.category_id === selectedId.value,
-) ?? categoryGroups.find((group) =>
+) ?? categoryGroups.value.find((group) =>
   group.category_id === route.query.categoryId ||
   group.children.some((child) => child.category_id === route.query.categoryId),
-) ?? categoryGroups[0])
+) ?? categoryGroups.value[0])
 
 const productsIn = (category) => ({
   name: 'Products',
@@ -24,7 +24,12 @@ function previewCategory(event, group) {
 </script>
 
 <template>
-  <section id="site-category-menu" class="category-menu" :class="{ 'has-children': selectedGroup.children.length }" aria-label="전체 카테고리">
+  <section id="site-category-menu" class="category-menu" :class="{ 'has-children': selectedGroup?.children.length }" aria-label="전체 카테고리">
+    <p v-if="categoryLoading" role="status">카테고리를 불러오는 중이에요.</p>
+    <div v-else-if="categoryError" role="status">
+      <p>{{ categoryError }}</p>
+      <button type="button" @click="loadCategories">다시 시도</button>
+    </div>
     <div class="category-columns">
       <ul class="category-groups" aria-label="대분류">
         <li
@@ -57,7 +62,7 @@ function previewCategory(event, group) {
       </ul>
 
       <ul
-        v-if="selectedGroup.children.length"
+        v-if="selectedGroup?.children.length"
         id="category-subcategories"
         class="category-children"
         :aria-label="selectedGroup.name + ' 카테고리'"

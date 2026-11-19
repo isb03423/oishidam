@@ -1,12 +1,14 @@
 package com.oishidam.review.dto;
 
 import com.oishidam.review.entity.Review;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
 public record PublicReviewResponse(
         Long reviewId,
         String content,
+        Integer rating,
         List<String> imageUrls,
         LocalDateTime createdAt,
         String answerContent,
@@ -17,6 +19,7 @@ public record PublicReviewResponse(
         return new PublicReviewResponse(
                 review.getId(),
                 review.getContent(),
+                review.getRating(),
                 List.copyOf(review.getImageUrls()),
                 review.getCreatedAt(),
                 review.getAnswerContent(),

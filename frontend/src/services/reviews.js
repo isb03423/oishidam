@@ -5,10 +5,14 @@ export async function getProductReviews(productId, page = 0, { size = 10, signal
   return {
     ...result,
     content: result.content.map((review) => ({
-      id: String(review.reviewId), content: review.content, rating: review.rating, date: review.createdAt?.slice(0, 10),
+      id: String(review.reviewId), content: review.content, ...(review.rating != null ? { rating: review.rating } : {}), date: review.createdAt?.slice(0, 10),
       images: (review.imageUrls ?? []).map((url) => ({ url })), reply: review.answerContent,
     })),
   }
+}
+
+export function getProductReviewSummary(productId, { signal } = {}) {
+  return apiRequest({ path: `/products/${encodeURIComponent(productId)}/reviews/summary`, signal, mock: false })
 }
 
 export async function getMyReviews(type, page = 0, { size = 10, signal } = {}) {

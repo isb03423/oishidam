@@ -62,6 +62,13 @@ public class ReviewService {
         return reviews.findPublicByProductId(productId, pageable).map(PublicReviewResponse::from);
     }
 
+    // 상품 전체 후기의 평균 별점과 평가 수 조회
+    @Transactional(readOnly = true)
+    public ReviewRatingSummaryResponse ratingSummary(Long productId) {
+        products.detail(productId);
+        return reviews.ratingSummary(productId);
+    }
+
     // 리뷰 작성 가능 여부
     @Transactional(readOnly = true)
     public ReviewEligibilityResponse eligibility(Long memberId, Long itemId) {
@@ -86,14 +93,14 @@ public class ReviewService {
     public ReviewResponse create(
             Long memberId,
             Long itemId,
-            ReviewContentRequest request
+            ReviewCreateRequest request
     ) {
         return create(memberId, itemId, request, List.of());
     }
 
     // 첨부 이미지를 업로드하고 리뷰와 함께 저장
     @Transactional
-    public ReviewResponse create(Long memberId, Long itemId, ReviewContentRequest request, List<MultipartFile> files) {
+    public ReviewResponse create(Long memberId, Long itemId, ReviewCreateRequest request, List<MultipartFile> files) {
         Member member = lockMember(memberId);
         OrderItem item = item(itemId, memberId);
         LocalDateTime deadline = writeDeadline(item);
@@ -111,6 +118,7 @@ public class ReviewService {
                         .orderItem(item)
                         .member(member)
                         .content(request.content().trim())
+                        .rating(request.rating())
                         .imageUrls(new ArrayList<>(urls))
                         .build()
         );
@@ -123,12 +131,13 @@ public class ReviewService {
     public ReviewResponse update(
             Long memberId,
             Long reviewId,
-            ReviewContentRequest request
+            ReviewUpdateRequest request
     ) {
         lockMember(memberId);
         Review review = ownReview(reviewId, memberId);
         validateEditable(review);
         review.updateContent(request.content().trim());
+        review.updateRating(request.rating());
         reviews.flush();
         sentiments.analyzeAfterCommit(review.getId());
         return ReviewResponse.from(review);
@@ -178,6 +187,7 @@ public class ReviewService {
         List<String> urls = new ArrayList<>(retained);
         urls.addAll(uploadImages(files, retained.size()));
         review.updateContent(request.content().trim());
+        review.updateRating(request.rating());
         review.updateImages(urls);
         reviews.flush();
         sentiments.analyzeAfterCommit(review.getId());

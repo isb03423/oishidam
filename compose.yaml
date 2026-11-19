@@ -52,6 +52,8 @@ services:
   ai-service:
     build: ./ai-service
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
     environment:
       DB_HOST: db
       DB_PORT: "5432"
@@ -71,8 +73,7 @@ services:
       backend:
         condition: service_healthy
     healthcheck:
-      # /health에도 기존 JWT 인증이 적용되므로 비로그인 요청의 401로 응답 여부를 확인한다.
-      test: ["CMD", "python", "-c", "import http.client; c = http.client.HTTPConnection('localhost', 8000, timeout=3); c.request('GET', '/health'); assert c.getresponse().status == 401"]
+      test: ["CMD", "python", "-c", "import http.client; c = http.client.HTTPConnection('localhost', 8000, timeout=3); c.request('GET', '/health'); assert c.getresponse().status == 200"]
       interval: 10s
       timeout: 5s
       start_period: 30s

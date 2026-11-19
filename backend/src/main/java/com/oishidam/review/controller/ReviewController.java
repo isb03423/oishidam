@@ -1,12 +1,7 @@
 package com.oishidam.review.controller;
 
 import com.oishidam.common.dto.ApiResponse;
-import com.oishidam.review.dto.PublicReviewResponse;
-import com.oishidam.review.dto.ReviewContentRequest;
-import com.oishidam.review.dto.ReviewEligibilityResponse;
-import com.oishidam.review.dto.ReviewResponse;
-import com.oishidam.review.dto.MyReviewItemResponse;
-import com.oishidam.review.dto.ReviewUpdateRequest;
+import com.oishidam.review.dto.*;
 import com.oishidam.review.service.MyReviewService;
 import com.oishidam.review.service.ReviewService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -61,6 +56,12 @@ public class ReviewController {
         return ApiResponse.ok(service.publicList(productId, page, size));
     }
 
+    @Operation(summary = "상품 별점 집계", description = "삭제되지 않은 전체 후기 중 별점이 있는 후기의 평균과 평가 수를 조회합니다.")
+    @GetMapping("/api/products/{productId}/reviews/summary")
+    public ApiResponse<ReviewRatingSummaryResponse> ratingSummary(@PathVariable Long productId) {
+        return ApiResponse.ok(service.ratingSummary(productId));
+    }
+
     @Operation(summary = "리뷰 작성 가능 여부 조회")
     @GetMapping("/api/orders/items/{itemId}/review")
     public ApiResponse<ReviewEligibilityResponse> eligibility(
@@ -76,7 +77,7 @@ public class ReviewController {
     public ApiResponse<ReviewResponse> create(
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable Long itemId,
-            @Valid @RequestBody ReviewContentRequest request
+            @Valid @RequestBody ReviewCreateRequest request
     ) {
         return ApiResponse.ok(service.create(Long.valueOf(jwt.getSubject()), itemId, request));
     }
@@ -87,7 +88,7 @@ public class ReviewController {
     public ApiResponse<ReviewResponse> createWithImages(
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable Long itemId,
-            @Valid @ModelAttribute ReviewContentRequest request,
+            @Valid @ModelAttribute ReviewCreateRequest request,
             @RequestPart(value = "files", required = false) List<MultipartFile> files
     ) {
         return ApiResponse.ok(service.create(Long.valueOf(jwt.getSubject()), itemId, request, files));
@@ -98,7 +99,7 @@ public class ReviewController {
     public ApiResponse<ReviewResponse> update(
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable Long reviewId,
-            @Valid @RequestBody ReviewContentRequest request
+            @Valid @RequestBody ReviewUpdateRequest request
     ) {
         return ApiResponse.ok(service.update(Long.valueOf(jwt.getSubject()), reviewId, request));
     }

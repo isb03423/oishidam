@@ -1,7 +1,6 @@
 import logging
 
 from fastapi import Depends, FastAPI
-from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -15,10 +14,6 @@ app = FastAPI(
     title="오이시담(Oishidam) AI Service",
     description="오이시담(Oishidam) 쇼핑몰 프로젝트의 추천 · 감정분석 · 데이터분석",
     version="1.0",
-    dependencies=[Depends(authorize_request)],
-    docs_url=None,
-    redoc_url=None,
-    openapi_url=None,
 )
 
 app.add_middleware(
@@ -29,24 +24,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(recommend.router)
-app.include_router(sentiment.router)
-app.include_router(customers.router)
-
-
-@app.get("/openapi.json", include_in_schema=False)
-def openapi():
-    return app.openapi()
-
-
-@app.get("/docs", include_in_schema=False)
-def docs():
-    return get_swagger_ui_html(openapi_url="/openapi.json", title=app.title)
-
-
-@app.get("/redoc", include_in_schema=False)
-def redoc():
-    return get_redoc_html(openapi_url="/openapi.json", title=app.title)
+app.include_router(recommend.router, dependencies=[Depends(authorize_request)])
+app.include_router(sentiment.router, dependencies=[Depends(authorize_request)])
+app.include_router(customers.router, dependencies=[Depends(authorize_request)])
 
 
 @app.get("/health")

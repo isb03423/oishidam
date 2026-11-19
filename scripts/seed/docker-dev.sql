@@ -107,6 +107,8 @@ DECLARE
       '출고 전 주문은 주문 내역에서 취소할 수 있습니다. 이미 배송이 시작된 경우에는 접수 후 처리 방법을 안내해 드리겠습니다.',
       '요청하신 포장 내용을 확인했습니다. 상품에 맞는 완충재를 사용해 안전하게 포장하겠습니다.',
       '현재 입고 일정을 확인하고 있습니다. 일정이 확정되면 상품 페이지의 판매 상태를 통해 안내하겠습니다.'];
+    -- 후기 문구 순서에 맞춘 별점: 재구매·강한 만족 5점, 만족 4점, 보통 3점, 불만 2점, 심한 불만 1점.
+    review_ratings integer[] := ARRAY[5,4,5,4,5,4,4,5,3,3,3,4,2,3,2,3,2,1,2,2,5,5,5,5,1,1,1,1];
     review_texts text[] := ARRAY['기대 이상으로 맛있네요. 가족들도 잘 먹어서 다음에는 넉넉하게 주문하려고요.',
       '포장이 꼼꼼해서 부서진 곳 없이 잘 받았습니다. 맛도 만족해요!',
       '일본 여행 때 먹었던 맛이 생각나서 샀는데 역시 맛있어요. 또 구매할게요.',
@@ -136,6 +138,10 @@ DECLARE
       '아무리 생각해도 별 하나도 아깝습니다. 냄새도 이상하고 도저히 먹을 수 없는 맛이었어요. 끔찍한 경험이었습니다. 절대 추천하지 않습니다.',
       '맛없고 불쾌하고 실망스럽습니다. 정말 형편없고 끔찍해요. 최악입니다. 다시는 사지 않겠습니다.'];
 BEGIN
+    IF cardinality(review_ratings) <> cardinality(review_texts)
+        OR EXISTS (SELECT 1 FROM unnest(review_ratings) AS score WHERE score NOT BETWEEN 1 AND 5) THEN
+        RAISE EXCEPTION '후기 문구와 별점 구성을 확인하세요.';
+    END IF;
     IF EXISTS (SELECT 1 FROM members WHERE email = 'admin@example.com') THEN
         RAISE NOTICE '이미 생성된 시드입니다. 기존 데이터와 계정은 변경하지 않습니다.';
         RETURN;
@@ -272,8 +278,8 @@ BEGIN
                 review_seq := review_seq+1; n := 1+(review_seq-1)%cardinality(review_texts);
                 SELECT CASE WHEN review_seq%3=0 THEN '이번에 '||name||' 주문했어요. ' ELSE '' END||review_texts[n] INTO review_content
                 FROM products WHERE product_id=product_key;
-                INSERT INTO reviews(order_item_id,member_id,content,answer_content,answered_by,answered_at,answer_updated_at,created_at)
-                VALUES (item_key,member_key,review_content,
+                INSERT INTO reviews(order_item_id,member_id,content,rating,answer_content,answered_by,answered_at,answer_updated_at,created_at)
+                VALUES (item_key,member_key,review_content,review_ratings[n],
                     CASE WHEN review_seq%2=0 THEN '소중한 후기 감사합니다. 더 좋은 상품과 서비스로 보답하겠습니다.' END,
                     CASE WHEN review_seq%2=0 THEN admin_id END,CASE WHEN review_seq%2=0 THEN created+interval '10 hours' END,
                     CASE WHEN review_seq%2=0 THEN created+interval '10 hours' END,created+interval '8 hours')
@@ -383,6 +389,9 @@ BEGIN
         END IF;
     END LOOP;
     IF (SELECT before_count FROM _seed_counts WHERE table_name='members')>0 THEN RETURN; END IF;
+    IF EXISTS (SELECT 1 FROM _seed_reviews WHERE rating IS NULL OR rating NOT BETWEEN 1 AND 5) THEN
+        RAISE EXCEPTION '모든 생성 후기에는 1~5점 별점이 있어야 합니다.';
+    END IF;
     IF (SELECT count(*) FROM _seed_products WHERE sale_status='ON_SALE'
         AND created_at BETWEEN localtimestamp-interval '30 days' AND localtimestamp)<>24 THEN
         RAISE EXCEPTION '신상품은 24개여야 합니다.';

@@ -79,7 +79,7 @@ if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 | `DB_USER` | `postgres` | DB 사용자 |
 | `DB_PASSWORD` | 없음 | DB 비밀번호, 실제 접속 정보로 설정 |
 | `FRONTEND_ORIGINS` | 아래 설명 참고 | CORS 허용 출처, 쉼표로 구분 |
-| `SPRING_API_URL` | `http://127.0.0.1:8080/api` | 모든 FastAPI 요청의 JWT·현재 권한 확인 주소 |
+| `SPRING_API_URL` | `http://127.0.0.1:8080/api` | 업무 API의 JWT·현재 권한 확인 주소 |
 | `CHART_DIR` | `./charts` | 차트 저장 경로, 실행 디렉터리 기준 |
 
 `FRONTEND_ORIGINS` 기본값은 `http://localhost:5173,http://127.0.0.1:5173,http://localhost:1573`입니다. 선택 설정은 필요할 때 `.env`에 추가합니다.
@@ -113,26 +113,27 @@ AI 서비스 루트에서 실행합니다.
 
 | 주소 | 설명 |
 | --- | --- |
-| [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health) | ADMIN, 프로세스 응답 확인 |
-| [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) | ADMIN, Swagger UI |
-| [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc) | ADMIN, ReDoc API 문서 |
+| [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health) | 공개, 프로세스 응답 확인 |
+| [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) | 공개, Swagger UI |
+| [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc) | 공개, ReDoc API 문서 |
+| [http://127.0.0.1:8000/openapi.json](http://127.0.0.1:8000/openapi.json) | 공개, OpenAPI 스키마 |
 
 `/health`는 `{"status":"Running"}`을 반환하며, DB 연결이나 감정분석 모델 준비 여부까지 검사하지 않습니다. `--reload`는 개발용 옵션입니다.
 
-Spring Boot에서 AI 서비스를 호출하는 주소는 백엔드 환경변수 `AI_SERVICE_URL`로 설정하며 기본값은 `http://localhost:8000`입니다. 반대로 모든 FastAPI 요청에서 로그인 회원을 확인하려면 `SPRING_API_URL`에 지정한 Spring Boot 서버가 실행 중이어야 합니다.
+Spring Boot에서 AI 서비스를 호출하는 주소는 백엔드 환경변수 `AI_SERVICE_URL`로 설정하며 기본값은 `http://localhost:8000`입니다. 인증이 필요한 업무 API에서 로그인 회원을 확인하려면 `SPRING_API_URL`에 지정한 Spring Boot 서버가 실행 중이어야 합니다. 공개 상태 확인과 문서 조회는 Spring Boot를 호출하지 않습니다.
 
-인증·권한은 아래 공통 정책으로 검사합니다. CORS 허용 출처에서도 JWT가 필요합니다.
+업무 API의 인증·권한은 아래 공통 정책으로 검사합니다. CORS 허용 출처에서도 업무 API에는 JWT가 필요합니다.
 
 ## 공통 JWT 검증과 권한
 
 1. 클라이언트 또는 Spring Boot가 FastAPI에 `Authorization: Bearer <JWT>`를 전달합니다.
 2. `app/auth.py`가 같은 JWT로 Spring Boot의 `GET /api/members/me`를 호출합니다. 요청 간 인증 결과를 캐시하지 않으며 같은 요청 안에서는 검증을 공유합니다.
 3. Spring Security가 서명·만료·issuer·audience·회원 활성 상태·토큰 버전·로그아웃 폐기 여부를 검증합니다. FastAPI는 응답의 현재 회원 ID와 DB 기준 권한을 사용합니다.
-4. 추천과 본인 후기 단건 분석 외에는 ADMIN만 허용합니다. 새 API도 별도 예외를 추가하지 않으면 ADMIN 전용입니다.
+4. 업무 API 라우터에는 공통 인증을 적용하며, 추천과 본인 후기 단건 분석 외에는 ADMIN만 허용합니다. 해당 라우터에 추가한 API도 별도 예외가 없으면 ADMIN 전용입니다.
 
 JWT 누락·만료·폐기는 401, 권한 부족은 403입니다. 인증 확인 서버의 장애·시간 초과·잘못된 응답은 503으로 거부하며 인증을 생략하지 않습니다. JWT 서명 비밀키는 Python 서비스와 공유하지 않습니다.
 
-`/health`, `/docs`, `/redoc`, `/openapi.json`도 ADMIN 인증 대상입니다. 브라우저 주소창만으로 접근하면 인증 헤더가 없어 401이 발생합니다. API 클라이언트에서 관리자 Bearer 헤더를 설정해 접근해야 하며 문서 페이지의 스키마 요청에도 같은 헤더가 필요합니다. CORS 사전 요청인 OPTIONS에는 업무 API를 실행하지 않고 CORS 응답만 제공합니다.
+`/health`, `/docs`, `/docs/oauth2-redirect`, `/redoc`, `/openapi.json`은 로그인 없이 공개합니다. 문서 조회와 업무 API 실행 권한은 별개이며, Swagger UI에서 보호된 API를 실행하려면 Authorize에 액세스 토큰을 입력해야 합니다. CORS 사전 요청인 OPTIONS에는 업무 API를 실행하지 않고 CORS 응답만 제공합니다.
 
 ## API
 
@@ -140,7 +141,7 @@ JWT 누락·만료·폐기는 401, 권한 부족은 403입니다. 인증 확인 
 
 | 메서드 | 경로 | 파라미터·본문 | 인증·동작 |
 | --- | --- | --- | --- |
-| GET | `/health` | 없음 | ADMIN, 프로세스 상태 조회 |
+| GET | `/health` | 없음 | 공개, 프로세스 상태 조회 |
 | GET | `/api/ai/recommend/products` | `limit`: 기본 3, 1~100 | 로그인한 USER·ADMIN, 본인의 추천 상품 요약 |
 | POST | `/api/ai/recommend/products` | `limit`: 기본 3, 1~100 / JSON `{"member_id":1}` | 로그인한 USER·ADMIN, 본인 회원 ID만 허용 |
 | POST | `/api/ai/sentiment/reviews/{review_id}/analyze` | `review_id`: 1 이상, 본문 없음 | 로그인 회원 본인의 저장된 후기 한 건 분석·DB 저장 |
@@ -148,7 +149,7 @@ JWT 누락·만료·폐기는 401, 권한 부족은 403입니다. 인증 확인 
 | GET | `/api/ai/sentiment/summary` | `product_id`: 선택, 1 이상 | ADMIN, 전체 또는 특정 상품의 감정 집계 |
 | GET | `/api/ai/analytics/customers` | `charts`: 기본 `true` | ADMIN, `false`이면 차트 생성 생략 |
 
-모든 API는 `Authorization: Bearer <액세스 토큰>` 헤더를 사용합니다. 추천의 “모든 유저”는 로그인한 USER·ADMIN을 의미하며 비로그인 요청은 허용하지 않습니다. 관리자도 단건 후기 분석 경로에서는 본인 후기만 분석할 수 있고, 전체 처리에는 관리자 일괄 API를 사용합니다.
+업무 API는 `Authorization: Bearer <액세스 토큰>` 헤더를 사용합니다. 추천의 “모든 유저”는 로그인한 USER·ADMIN을 의미하며 비로그인 요청은 허용하지 않습니다. 관리자도 단건 후기 분석 경로에서는 본인 후기만 분석할 수 있고, 전체 처리에는 관리자 일괄 API를 사용합니다.
 
 ### 관리자 화면에서 다시 분석하기
 
@@ -162,7 +163,7 @@ JWT 누락·만료·폐기는 401, 권한 부족은 403입니다. 인증 확인 
 
 ```powershell
 $adminHeaders = @{ Authorization = 'Bearer <관리자 액세스 토큰>' }
-Invoke-RestMethod -Method Get -Headers $adminHeaders -Uri 'http://127.0.0.1:8000/health'
+Invoke-RestMethod -Method Get -Uri 'http://127.0.0.1:8000/health'
 Invoke-RestMethod -Method Get -Headers $adminHeaders -Uri 'http://127.0.0.1:8000/api/ai/analytics/customers?charts=false'
 Invoke-RestMethod -Method Get -Headers $adminHeaders -Uri 'http://127.0.0.1:8000/api/ai/sentiment/summary?product_id=1'
 ```

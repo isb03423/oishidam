@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import CategorySidebar from '../components/product/CategorySidebar.vue'
 import ProductCard from '../components/product/ProductCard.vue'
 import { development } from '../config/development.js'
-import { categories, categoryGroups } from '../data/categories.js'
+import { categories, categoryGroups } from '../stores/categories.js'
 import { getProducts, getRecommendations } from '../services/catalog.js'
 import Pagination from '../components/common/Pagination.vue'
 import { shoppingOwner } from '../stores/session.js'
@@ -20,8 +20,8 @@ const recommendationSource = ref('')
 const retry = ref(0)
 const pageSize = 20
 const categoryId = computed(() => typeof route.query.categoryId === 'string' ? route.query.categoryId : undefined)
-const category = computed(() => categories.find((item) => item.category_id === categoryId.value))
-const activeGroup = computed(() => categoryGroups.find((group) =>
+const category = computed(() => categories.value.find((item) => item.category_id === categoryId.value))
+const activeGroup = computed(() => categoryGroups.value.find((group) =>
   group.category_id === (category.value?.parent_id ?? category.value?.category_id),
 ))
 const aiRecommended = computed(() => route.query.recommend === 'ai')

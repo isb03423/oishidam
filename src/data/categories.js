@@ -1,4 +1,4 @@
-// 활성 카테고리 스냅샷 · oishidam-full-20261113-184521.sql
+// 모의 API 전용 카테고리 · 실제 화면에서는 카테고리 API를 사용한다.
 export const categories = [
   { category_id: '64', parent_id: null, name: '편의점', sort_order: 1, is_active: true },
   { category_id: '65', parent_id: '64', name: '로손', sort_order: 1, is_active: true },

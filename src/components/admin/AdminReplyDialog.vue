@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, ref, useId, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import AdminIcon from './AdminIcon.vue'
 import AdminSentimentBadge from './AdminSentimentBadge.vue'
+import ReviewRating from '../common/ReviewRating.vue'
 import InquiryConversation from '../common/InquiryConversation.vue'
 import { getAdminDetail, replyAdminInquiry, replyAdminReview } from '../../services/admin.js'
 import { getSessionRevision, session, shoppingOwner } from '../../stores/session.js'
@@ -134,7 +135,7 @@ defineExpose({ open })
       <div ref="body" class="reply-body">
         <p v-if="loading" class="reply-loading" role="status">{{ isInquiry ? '문의' : '후기' }} 내용을 불러오는 중입니다.</p>
         <template v-if="detail">
-          <div class="reply-context"><div><span class="reply-customer">{{ detail.memberName || '이름 확인 중' }}</span><div class="reply-badges"><AdminSentimentBadge v-if="!isInquiry" :sentiment="detail.sentiment" /><span class="inquiry-status" :class="(isInquiry ? inquiryAnswered : detail.answerContent) ? 'is-answered' : 'is-pending'">{{ (isInquiry ? inquiryAnswered : detail.answerContent) ? '답변 완료' : '답변 대기' }}</span></div></div><h3>{{ isInquiry ? detail.title : detail.productName || '상품 후기' }}</h3></div>
+          <div class="reply-context"><div><span class="reply-customer">{{ detail.memberName || '이름 확인 중' }}</span><div class="reply-badges"><ReviewRating v-if="!isInquiry" :rating="detail.rating" /><AdminSentimentBadge v-if="!isInquiry" :sentiment="detail.sentiment" /><span class="inquiry-status" :class="(isInquiry ? inquiryAnswered : detail.answerContent) ? 'is-answered' : 'is-pending'">{{ (isInquiry ? inquiryAnswered : detail.answerContent) ? '답변 완료' : '답변 대기' }}</span></div></div><h3>{{ isInquiry ? detail.title : detail.productName || '상품 후기' }}</h3></div>
           <InquiryConversation v-if="isInquiry" :messages="detail.messages || []" :owner-id="detail.memberId" :owner-name="detail.memberName" />
           <article v-else class="review-original"><p>{{ detail.content }}</p><section v-if="detail.imageUrls?.length" class="review-photo-section" :aria-labelledby="id + '-photos'"><h4 :id="id + '-photos'">첨부 사진 <span>{{ detail.imageUrls.length }}장</span></h4><ul class="review-attachments"><li v-for="(url, index) in detail.imageUrls" :key="index"><button type="button" :aria-label="'첨부 사진 ' + (index + 1) + ' 크게 보기'" aria-haspopup="dialog" @click="openPhoto(index)"><span v-if="failedPhotos.has(url)" class="review-photo-failed">사진을 불러오지 못했습니다</span><img v-else :src="url" :alt="'후기 첨부 사진 ' + (index + 1)" loading="lazy" @error="failedPhotos.add(url)" /></button></li></ul></section></article>
         </template>

@@ -32,7 +32,14 @@ function mockProductForView(product) {
 export async function getCategories(options = {}) {
   const mock = import.meta.env.DEV && development.mockEnabled
   const data = await apiRequest({ ...options, path: '/categories', mock })
-  return mock ? data : { items: Array.isArray(data) ? data : data.categories }
+  return mock ? data : {
+    items: (Array.isArray(data) ? data : data.categories).map((category) => ({
+      category_id: String(category.categoryId),
+      parent_id: category.parentId == null ? null : String(category.parentId),
+      name: category.name,
+      sort_order: category.sortOrder,
+    })),
+  }
 }
 
 export async function getRecommendations({ signal, limit, type } = {}) {

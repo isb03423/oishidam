@@ -1,5 +1,5 @@
 <script setup>
-import { categoryGroups } from '../../data/categories.js'
+import { categoryGroups, categoryLoading, categoryError, loadCategories } from '../../stores/categories.js'
 
 defineProps({
   activeGroupId: { type: String, default: '' },
@@ -9,6 +9,11 @@ defineProps({
 <template>
   <aside class="mypage-sidebar category-sidebar" aria-labelledby="catalog-sidebar-title">
     <h2 id="catalog-sidebar-title" class="sidebar-title">카테고리</h2>
+    <p v-if="categoryLoading" role="status">카테고리를 불러오는 중이에요.</p>
+    <div v-else-if="categoryError" role="status">
+      <p>{{ categoryError }}</p>
+      <button type="button" @click="loadCategories">다시 시도</button>
+    </div>
     <nav aria-labelledby="catalog-sidebar-title">
       <ul class="sidebar-menu-list">
         <li v-for="group in categoryGroups" :key="group.category_id">

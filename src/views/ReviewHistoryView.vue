@@ -1,5 +1,6 @@
 
 <script setup>
+import ReviewRating from '../components/common/ReviewRating.vue'
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import ActivityFilters from '../components/ActivityFilters.vue'
 import DeleteConfirmationDialog from '../components/DeleteConfirmationDialog.vue'
@@ -257,9 +258,7 @@ async function deleteReview(ids) {
       <section v-else ref="writtenHeading" class="review-list" aria-label="작성한 후기" tabindex="-1">
         <article v-for="item in written" :key="item.id" class="activity-panel review-card">
           <ReviewProduct :item="item">
-            <p v-if="item.rating != null" class="review-rating-display" :aria-label="'5점 만점에 ' + item.rating + '점'">
-              <span aria-hidden="true">{{ '★'.repeat(item.rating) }}{{ '☆'.repeat(5 - item.rating) }}</span>
-            </p>
+            <ReviewRating :rating="item.rating" />
             <p class="activity-copy review-copy">{{ item.content }}</p>
             <ul v-if="item.images?.length" class="review-images" aria-label="후기 첨부 이미지">
               <li v-for="image in item.images" :key="image.url">
@@ -287,20 +286,22 @@ async function deleteReview(ids) {
         <button type="button" class="review-close" aria-label="닫기" :disabled="busy" @click="closeEditor">×</button>
       </header>
       <div v-if="editing" class="activity-panel review-dialog-product"><ReviewProduct :item="editing" /></div>
-      <fieldset class="review-rating" aria-labelledby="review-rating-label" :disabled="busy">
-        <p id="review-rating-label" class="review-rating-label">상품은 만족스러우셨나요?</p>
-        <div class="review-rating-options">
-          <label v-for="score in 5" :key="score" class="review-rating-option" :class="{ 'is-selected': score <= rating }">
-            <input v-model="rating" type="radio" name="review-rating" :value="score" :aria-label="score + '점'" :required="!updating" />
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="m12 2.5 2.9 5.9 6.5.9-4.7 4.6 1.1 6.5-5.8-3-5.8 3 1.1-6.5-4.7-4.6 6.5-.9Z" />
-            </svg>
-          </label>
-        </div>
-        <p class="review-rating-value" aria-hidden="true">
-          {{ rating ? rating + ' / 5' : '별을 눌러 평가해 주세요' }}
-        </p>
-      </fieldset>
+      <div class="review-rating-panel">
+        <fieldset class="review-rating" :disabled="busy">
+          <legend class="review-rating-label">상품은 만족스러우셨나요?</legend>
+          <div class="review-rating-options">
+            <label v-for="score in 5" :key="score" :for="'review-rating-' + score" class="review-rating-option" :class="{ 'is-selected': score <= rating }">
+              <input :id="'review-rating-' + score" v-model="rating" type="radio" name="review-rating" :value="score" :aria-label="score + '점'" :required="!updating" />
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="m12 2.5 2.9 5.9 6.5.9-4.7 4.6 1.1 6.5-5.8-3-5.8 3 1.1-6.5-4.7-4.6 6.5-.9Z" />
+              </svg>
+            </label>
+          </div>
+          <p class="review-rating-value" aria-hidden="true">
+            {{ rating ? rating + ' / 5' : '별을 눌러 평가해 주세요' }}
+          </p>
+        </fieldset>
+      </div>
       <label class="activity-field">
         후기 내용
         <textarea v-model="content" maxlength="5000" required :disabled="busy" placeholder="상품 후기를 입력해 주세요."></textarea>
@@ -329,7 +330,7 @@ async function deleteReview(ids) {
       </fieldset>
       <div class="activity-actions">
         <button type="button" class="activity-button" :disabled="busy" @click="closeEditor">취소</button>
-        <button type="submit" class="activity-button is-primary" :disabled="busy || !content.trim() || (!updating && rating == null)">{{ busy ? '저장 중…' : updating ? '저장하기' : '등록하기' }}</button>
+        <button type="submit" class="activity-button is-primary" :disabled="busy">{{ busy ? '저장 중…' : updating ? '저장하기' : '등록하기' }}</button>
       </div>
     </form>
   </dialog>
@@ -373,16 +374,19 @@ async function deleteReview(ids) {
 .review-dialog textarea { resize: none; }
 .review-dialog-product { padding: 10px; background: var(--color-background); }
 
-.review-rating {
-  min-width: 0;
-  margin: 0;
+.review-rating-panel {
   padding: 12px 8px;
-  border: 0;
   border-radius: 12px;
   background: #fdf5f6;
   text-align: center;
 }
-.review-rating-label { margin: 0; color: #795e68; font-size: 14px; }
+.review-rating {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.review-rating-label { width: 100%; margin: 0; padding: 0; color: #795e68; font-size: 14px; }
 .review-rating-options { display: flex; justify-content: center; align-items: center; }
 .review-rating-option {
   position: relative;
@@ -417,7 +421,6 @@ async function deleteReview(ids) {
 .review-rating-option:focus-within { outline: 2px solid var(--color-primary); }
 .review-rating:disabled .review-rating-option { cursor: default; opacity: .6; }
 .review-rating-value { margin: 0; color: var(--color-primary); font-size: 14px; }
-.review-rating-display { margin: 0; color: var(--color-primary); letter-spacing: 2px; }
 
 .review-attachments { min-width: 0; }
 .review-attachments legend { margin-bottom: 6px; font-weight: 700; }

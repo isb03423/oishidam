@@ -4,13 +4,14 @@ import { createServer as createHttpServer } from 'node:http'
 import { createServer } from 'vite'
 
 const requests = []
+let reviewRating
 const backend = createHttpServer(async (req, res) => {
   const chunks = []
   for await (const chunk of req) chunks.push(chunk)
   requests.push({ method: req.method, url: req.url, token: req.headers.authorization, body: chunks.length ? JSON.parse(Buffer.concat(chunks)) : null })
   res.writeHead(req.url === '/api/inquiries/99' ? 404 : 200, { 'Content-Type': 'application/json' })
-  const data = req.url.includes('/reviews?')
-    ? { content: [{ reviewId: 4, content: '구매 후기', imageUrls: ['https://example.com/review.jpg'], createdAt: '2026-11-16T12:00:00', answerContent: '감사합니다.' }], totalElements: 21, totalPages: 3 }
+  const data = req.url.endsWith('/reviews/summary') ? { reviewCount: 21, ratingCount: 12, averageRating: 4.25 } : req.url.includes('/reviews?')
+    ? { content: [{ reviewId: 4, content: '구매 후기', rating: reviewRating, imageUrls: ['https://example.com/review.jpg'], createdAt: '2026-11-16T12:00:00', answerContent: '감사합니다.' }], totalElements: 21, totalPages: 3 }
     : req.url.includes('/mine?') ? { content: [{ inquiryId: 7, status: 'OPEN' }], totalElements: 11, totalPages: 2 }
       : { inquiryId: 7, messages: [{ messageId: 1, senderMemberId: 1, content: '문의 내용' }] }
   res.end(JSON.stringify(req.url === '/api/inquiries/99' ? { code: 'INQUIRY_NOT_FOUND', message: '문의를 찾을 수 없습니다.' } : { data }))
@@ -53,4 +54,15 @@ test('상품 리뷰는 비로그인 상태에서도 페이지·사진·관리자
   assert.equal(Object.hasOwn(result.content[0], 'rating'), false)
   assert.equal(requests.at(-1).url, '/api/products/42/reviews?page=1&size=10')
   assert.equal(requests.at(-1).token, undefined)
+})
+
+test('상품 별점과 전체 평균·평가 수를 공개 API에서 받아 미평가와 구분한다', async () => {
+  reviewRating = 3
+  assert.equal((await reviews.getProductReviews(42)).content[0].rating, 3)
+  const summary = await reviews.getProductReviewSummary(42)
+  assert.deepEqual(summary, { reviewCount: 21, ratingCount: 12, averageRating: 4.25 })
+  assert.equal(requests.at(-1).url, '/api/products/42/reviews/summary')
+  assert.equal(requests.at(-1).token, undefined)
+  reviewRating = null
+  assert.equal(Object.hasOwn((await reviews.getProductReviews(42)).content[0], 'rating'), false)
 })

@@ -3,9 +3,10 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import placeholder from '../assets/images/favicon-mark.png'
 import { development } from '../config/development.js'
-import { categories } from '../data/categories.js'
+import { categories } from '../stores/categories.js'
 import { getProduct } from '../services/catalog.js'
-import { getProductReviews } from '../services/reviews.js'
+import { getProductReviews, getProductReviewSummary } from '../services/reviews.js'
+import ReviewRating from '../components/common/ReviewRating.vue'
 import AlertDialog from '../components/common/AlertDialog.vue'
 import Pagination from '../components/common/Pagination.vue'
 import { addProductToCart, cartLine, cartBusy, cartLoading } from '../stores/cart.js'
@@ -15,7 +16,7 @@ import { toggleWish, wishedIds, wishBusy, wishLoading } from '../stores/wishlist
 
 const tabs = [
   { id: 'details', label: '상품 상세정보' },
-  { id: 'reviews', label: '상품 리뷰' },
+  { id: 'reviews', label: '상품 후기' },
   { id: 'customs', label: '통관 안내' },
 ]
 const route = useRoute()
@@ -32,6 +33,7 @@ const cartDialog = ref(null)
 const reviewDialog = ref(null)
 const activeReview = ref(null)
 const serverReviews = ref([])
+const serverReviewSummary = ref(null)
 const reviewPage = ref(1)
 const reviewTotal = ref(null)
 const reviewPages = ref(0)
@@ -42,13 +44,14 @@ const reviewRetry = ref(0)
 const formatter = new Intl.NumberFormat('ko-KR')
 const won = (price) => Number.isFinite(price) ? `${formatter.format(price)}원` : '가격 확인 필요'
 
-const category = computed(() => categories.find((item) => item.category_id === String(product.value?.category_id)))
+const category = computed(() => categories.value.find((item) => item.category_id === String(product.value?.category_id)))
 const images = computed(() => (product.value?.images ?? []).filter((image) => image.url && !failedImages.value.has(image.url)))
 const primaryImage = computed(() => images.value.find((image) => image.is_primary) ?? images.value[0])
 const currentImage = computed(() => images.value.find((image) => image.url === selectedImage.value) ?? primaryImage.value)
 const reviews = computed(() => development.mockEnabled ? product.value?.reviews ?? [] : serverReviews.value)
 const reviewCount = computed(() => development.mockEnabled ? reviews.value.length : reviewTotal.value)
 const averageRating = computed(() => {
+  if (!development.mockEnabled) return serverReviewSummary.value?.averageRating?.toFixed(1) ?? null
   const ratedReviews = reviews.value.filter((review) => Number.isInteger(review.rating))
   return ratedReviews.length
     ? (ratedReviews.reduce((sum, review) => sum + review.rating, 0) / ratedReviews.length).toFixed(1)
@@ -78,9 +81,15 @@ watch(
     quantity.value = 1
     clearNotice()
     try {
-      const detail = await getProduct(id, { signal: controller.signal })
+      const [detail, summary] = await Promise.all([
+        getProduct(id, { signal: controller.signal }),
+        // 후기 집계 실패가 상품 정보 조회를 막지 않도록 한다.
+        development.mockEnabled ? null : getProductReviewSummary(id, { signal: controller.signal }).catch(() => null),
+      ])
       if (controller.signal.aborted) return
       product.value = detail
+      serverReviewSummary.value = summary
+      reviewTotal.value = summary?.reviewCount ?? null
       status.value = detail ? 'ready' : 'missing'
     } catch (error) {
       if (!controller.signal.aborted) {
@@ -96,15 +105,20 @@ watch([() => product.value?.product_id, tab, reviewPage, reviewRetry, () => deve
   onCleanup(() => controller.abort())
   reviewLoading.value = false
   reviewError.value = ''
-  if (!id) { serverReviews.value = []; reviewTotal.value = null; reviewPages.value = 0; return }
+  if (!id) { serverReviews.value = []; serverReviewSummary.value = null; reviewTotal.value = null; reviewPages.value = 0; return }
   if (development.mockEnabled || tab.value !== 'reviews') return
   reviewLoading.value = true
   serverReviews.value = []
+  serverReviewSummary.value = null
   try {
-    const result = await getProductReviews(id, reviewPage.value - 1, { signal: controller.signal })
+    const [result, summary] = await Promise.all([
+      getProductReviews(id, reviewPage.value - 1, { signal: controller.signal }),
+      getProductReviewSummary(id, { signal: controller.signal }),
+    ])
     if (controller.signal.aborted) return
     if (reviewPage.value > 1 && reviewPage.value > result.totalPages) { reviewPage.value = Math.max(1, result.totalPages); return }
     serverReviews.value = result.content
+    serverReviewSummary.value = summary
     reviewTotal.value = result.totalElements
     reviewPages.value = result.totalPages
   } catch (failure) {
@@ -284,17 +298,17 @@ async function order(buyNow) {
         </dl>
       </section>
       <section v-show="tab === 'reviews'" id="panel-reviews" class="detail-panel" role="tabpanel" aria-labelledby="tab-reviews" tabindex="0">
-        <h2>상품 리뷰</h2>
+        <h2>상품 후기</h2>
           <div class="review-summary">
-            <div v-if="development.mockEnabled">
+            <div>
               <span>평균 별점</span>
-              <strong><span aria-hidden="true">★</span> {{ averageRating ?? '—' }}</strong>
+              <strong>{{ averageRating ?? '—' }}</strong>
               <span v-if="averageRating">/ 5</span>
             </div>
-            <span v-if="reviewCount != null">전체 리뷰 {{ reviewCount }}건</span>
+            <span v-if="reviewCount != null">전체 후기 {{ reviewCount }}건</span>
           </div>
 
-          <p v-if="reviewLoading" class="activity-empty" role="status">리뷰를 불러오고 있어요.</p>
+          <p v-if="reviewLoading" class="activity-empty" role="status">후기를 불러오고 있어요.</p>
           <p v-if="reviewError" class="activity-empty">{{ reviewError }} <button type="button" class="action outline" @click="reviewRetry++">다시 시도</button></p>
           <div v-if="reviews.length" class="review-list">
             <article v-for="review in reviews" :key="review.id" class="activity-panel review-entry">
@@ -302,9 +316,7 @@ async function order(buyNow) {
                 <span class="review-main">
                   <strong class="review-product-name">{{ product.name }}</strong>
                   <span class="review-meta">
-                    <span v-if="review.rating != null" class="review-stars" :aria-label="`5점 만점에 ${review.rating}점`">
-                      <span aria-hidden="true">{{ '★'.repeat(review.rating) }}{{ '☆'.repeat(5 - review.rating) }}</span>
-                    </span>
+                    <ReviewRating :rating="review.rating" />
                     <time :datetime="review.date">{{ review.date }}</time>
                   </span>
                   <span class="review-copy">{{ review.content }}</span>
@@ -320,11 +332,11 @@ async function order(buyNow) {
               </button>
             </article>
           </div>
-          <p v-else-if="!reviewLoading && !reviewError" class="activity-empty">아직 등록된 리뷰가 없어요.</p>
-          <Pagination v-if="!development.mockEnabled" v-model="reviewPage" :page-count="reviewPages" :disabled="reviewLoading" label="상품 리뷰 페이지" />
+          <p v-else-if="!reviewLoading && !reviewError" class="activity-empty">아직 등록된 후기가 없어요.</p>
+          <Pagination v-if="!development.mockEnabled" v-model="reviewPage" :page-count="reviewPages" :disabled="reviewLoading" label="상품 후기 페이지" />
           <dialog ref="reviewDialog" class="review-dialog" aria-labelledby="review-dialog-title">
             <header class="review-dialog-header">
-              <h2 id="review-dialog-title">상품 리뷰 상세</h2>
+              <h2 id="review-dialog-title">상품 후기 상세</h2>
               <form method="dialog">
                 <button type="submit" class="action outline" autofocus>닫기</button>
               </form>
@@ -332,9 +344,7 @@ async function order(buyNow) {
             <div v-if="activeReview" class="review-main">
               <strong class="review-product-name">{{ product.name }}</strong>
               <p class="review-meta">
-                <span v-if="activeReview.rating != null" class="review-stars" :aria-label="`5점 만점에 ${activeReview.rating}점`">
-                  <span aria-hidden="true">{{ '★'.repeat(activeReview.rating) }}{{ '☆'.repeat(5 - activeReview.rating) }}</span>
-                </span>
+                <ReviewRating :rating="activeReview.rating" />
                 <time :datetime="activeReview.date">{{ activeReview.date }}</time>
               </p>
               <p class="review-copy">{{ activeReview.content }}</p>

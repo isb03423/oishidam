@@ -1,6 +1,7 @@
 package com.oishidam.admin.review.dto;
 
 import com.oishidam.review.entity.Review;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -12,6 +13,7 @@ public record AdminReviewResponse(
         Long memberId,
         String memberName,
         String content,
+        Integer rating,
         List<String> imageUrls,
         LocalDateTime createdAt,
         LocalDateTime updatedAt,
@@ -30,6 +32,7 @@ public record AdminReviewResponse(
                 review.getMember().getId(),
                 review.getMember().getName(),
                 review.getContent(),
+                review.getRating(),
                 List.copyOf(review.getImageUrls()),
                 review.getCreatedAt(),
                 review.getUpdatedAt(),

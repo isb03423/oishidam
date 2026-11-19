@@ -9,6 +9,7 @@ import lombok.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 @Entity
 @Table(name = "reviews")
@@ -33,6 +34,8 @@ public class Review extends BaseEntity {
     @Column(nullable = false, columnDefinition = "text")
     private String content;
 
+    private Integer rating;
+
     @ElementCollection
     @CollectionTable(name = "review_images", joinColumns = @JoinColumn(name = "review_id"))
     @OrderColumn(name = "sort_order")
@@ -53,8 +56,19 @@ public class Review extends BaseEntity {
 
     private LocalDateTime answerUpdatedAt;
 
+    public List<String> getImageUrls() {
+        // 직접 입력한 사진 순서에 빈 자리가 있어도 조회 응답을 생성할 수 있게 한다.
+        return imageUrls.stream().filter(Objects::nonNull).toList();
+    }
+
     public void updateContent(String content) {
         this.content = content;
+    }
+
+    public void updateRating(Integer rating) {
+        if (rating != null) {
+            this.rating = rating;
+        }
     }
 
     public void updateImages(List<String> imageUrls) {

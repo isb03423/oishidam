@@ -1,5 +1,6 @@
 package com.oishidam.config;
 
+import jakarta.servlet.DispatcherType;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -77,6 +78,8 @@ public class SecurityConfig {
                 .logout(AbstractHttpConfigurer::disable)
 
                 .authorizeHttpRequests(auth -> auth
+                        // 내부 오류 응답을 인증 오류로 덮어쓰지 않는다.
+                        .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         // API 문서
                         .requestMatchers(
                                 HttpMethod.GET,

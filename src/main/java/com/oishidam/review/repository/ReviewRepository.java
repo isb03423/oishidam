@@ -1,5 +1,6 @@
 package com.oishidam.review.repository;
 
+import com.oishidam.review.dto.ReviewRatingSummaryResponse;
 import com.oishidam.review.entity.Review;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
@@ -15,6 +16,12 @@ import java.util.List;
 import java.util.Optional;
 
 public interface ReviewRepository extends JpaRepository<Review, Long> {
+    @Query("""
+            SELECT new com.oishidam.review.dto.ReviewRatingSummaryResponse(COUNT(r), COUNT(r.rating), AVG(r.rating))
+            FROM Review r WHERE r.deletedAt IS NULL AND r.orderItem.productId = :productId
+            """)
+    ReviewRatingSummaryResponse ratingSummary(@Param("productId") Long productId);
+
     @EntityGraph(attributePaths = {"orderItem", "orderItem.order"})
     @Query("""
             SELECT r FROM Review r WHERE r.member.id = :memberId AND r.orderItem.order.member.id = :memberId

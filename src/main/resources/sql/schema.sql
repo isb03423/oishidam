@@ -259,6 +259,7 @@ CREATE TABLE IF NOT EXISTS reviews (
     order_item_id BIGINT NOT NULL UNIQUE REFERENCES order_items(order_item_id),
     member_id BIGINT NOT NULL REFERENCES members(member_id),
     content TEXT NOT NULL,
+    rating SMALLINT CONSTRAINT ck_reviews_rating CHECK (rating BETWEEN 1 AND 5), -- 구매자 별점; 기존 미평가 후기는 NULL
     deleted_at TIMESTAMP WITHOUT TIME ZONE, -- 삭제 시각; NULL이면 삭제되지 않음
     answer_content TEXT,
     answered_by BIGINT REFERENCES members(member_id),

@@ -13,7 +13,8 @@ public record PublicReviewResponse(
         LocalDateTime createdAt,
         String answerContent,
         LocalDateTime answeredAt,
-        LocalDateTime answerUpdatedAt
+        LocalDateTime answerUpdatedAt,
+        String authorName
 ) {
     public static PublicReviewResponse from(Review review) {
         return new PublicReviewResponse(
@@ -24,7 +25,17 @@ public record PublicReviewResponse(
                 review.getCreatedAt(),
                 review.getAnswerContent(),
                 review.getAnsweredAt(),
-                review.getAnswerUpdatedAt()
+                review.getAnswerUpdatedAt(),
+                maskName(review.getMember().getName())
         );
+    }
+
+    private static String maskName(String name) {
+        if (name == null || name.isBlank()) return "구매 회원";
+        int[] letters = name.strip().codePoints().toArray();
+        if (letters.length == 1) return "*";
+        String first = new String(letters, 0, 1);
+        if (letters.length == 2) return first + "*";
+        return first + "*".repeat(letters.length - 2) + new String(letters, letters.length - 1, 1);
     }
 }

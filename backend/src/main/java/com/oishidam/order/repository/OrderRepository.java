@@ -11,9 +11,20 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecificationExecutor<Order> {
+    interface SearchFields {
+        Long getId();
+        String getOrderNumber();
+        String getRecipientName();
+    }
+
+    @EntityGraph(attributePaths = "member")
+    List<Order> findByIdIn(Collection<Long> orderIds);
+
     @Override
     @EntityGraph(attributePaths = "member")
     Page<Order> findAll(Specification<Order> spec, Pageable pageable);

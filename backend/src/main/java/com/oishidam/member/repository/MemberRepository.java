@@ -13,13 +13,27 @@ import java.util.Optional;
 
 @Repository
 public interface MemberRepository extends JpaRepository<Member, Long>, JpaSpecificationExecutor<Member> {
+    interface SearchFields {
+        Long getId();
+        String getName();
+        String getEmail();
+    }
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT m FROM Member m WHERE m.email = :email")
+    @Query("SELECT m FROM Member m WHERE m.emailLookup = :email")
     Optional<Member> findByEmailForUpdate(@Param("email") String email);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT m FROM Member m WHERE m.id = :id")
     Optional<Member> findByIdForUpdate(@Param("id") Long id);
 
-    boolean existsByEmail(String email);
+    @Query("""
+            SELECT m.tokenVersion FROM Member m
+            WHERE m.emailLookup = :email AND m.isActive = true
+              AND m.emailVerifiedAt IS NOT NULL AND m.password IS NOT NULL
+            """)
+    Optional<Long> findPasswordResetVersion(@Param("email") String email);
+
+    @Query("SELECT (COUNT(m) > 0) FROM Member m WHERE m.emailLookup = :email")
+    boolean existsByEmail(@Param("email") String email);
 }

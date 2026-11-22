@@ -2,8 +2,11 @@ package com.oishidam.auth.service;
 
 import com.oishidam.auth.dto.LoginRequest;
 import com.oishidam.auth.dto.LoginResponse;
+import com.oishidam.auth.dto.PasswordResetRequest;
 import com.oishidam.auth.dto.SignupRequest;
 import com.oishidam.auth.dto.SignupResponse;
+import com.oishidam.auth.enums.EmailVerificationPurpose;
+import com.oishidam.auth.repository.AuthRefreshTokenRepository;
 import com.oishidam.auth.validation.PasswordPolicy;
 import com.oishidam.common.exception.ApiException;
 import com.oishidam.member.entity.Member;
@@ -15,6 +18,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.LocalDateTime;
 import java.util.Locale;
 
 @Service
@@ -27,6 +32,12 @@ public class AuthService {
     private final JwtTokenService jwtTokenService;
 
     private final RefreshTokenService refreshTokenService;
+
+    private final EmailVerificationService emailVerificationService;
+
+    private final AuthRefreshTokenRepository refreshTokenRepository;
+
+    private final Clock clock;
 
     // 회원 가입
     @Transactional
@@ -45,9 +56,12 @@ public class AuthService {
             throw new ApiException(HttpStatus.CONFLICT, "EMAIL_ALREADY_EXISTS", "이미 사용 중인 이메일입니다.");
         }
 
+        emailVerificationService.consume(email, EmailVerificationPurpose.SIGNUP, request.verificationToken(), null);
+
         // 3. 회원 생성 및 저장
         Member member = Member.builder()
                 .email(email)
+                .emailVerifiedAt(LocalDateTime.now(clock))
                 .password(passwordEncoder.encode(request.password()))
                 .name(request.name())
                 .phone(request.phone())
@@ -62,6 +76,25 @@ public class AuthService {
         }
 
         return new SignupResponse(member.getId(), member.getEmail(), member.getName(), member.getRole());
+    }
+
+    // 확인된 이메일로 비밀번호를 재설정하고 기존 로그인 토큰을 무효화
+    @Transactional
+    public void resetPassword(PasswordResetRequest request) {
+        if (!request.newPassword().equals(request.passwordConfirm())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "PASSWORD_MISMATCH", "비밀번호가 일치하지 않습니다.");
+        }
+        PasswordPolicy.validate(request.newPassword());
+
+        String email = request.email().trim().toLowerCase(Locale.ROOT);
+        Member member = memberRepository.findByEmailForUpdate(email)
+                .filter(found -> found.isActive() && found.getEmailVerifiedAt() != null && found.getPassword() != null)
+                .orElseThrow(emailVerificationService::invalidVerification);
+        emailVerificationService.consume(
+                email, EmailVerificationPurpose.PASSWORD_RESET, request.verificationToken(), member.getTokenVersion());
+
+        member.changePassword(passwordEncoder.encode(request.newPassword()));
+        refreshTokenRepository.revokeAllForMember(member.getId(), LocalDateTime.now(clock));
     }
 
     // 로그인

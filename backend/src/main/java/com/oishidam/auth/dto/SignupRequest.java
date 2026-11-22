@@ -3,6 +3,7 @@ package com.oishidam.auth.dto;
 import com.oishidam.member.enums.MemberGender;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 public record SignupRequest(
@@ -12,6 +13,7 @@ public record SignupRequest(
         @NotBlank @Size(max = 100) String name,
         @Size(max = 30) String phone,
         Integer birthYear,
-        MemberGender gender
+        MemberGender gender,
+        @NotBlank @Pattern(regexp = "[A-Za-z0-9_-]{43}") String verificationToken
 ) {
 }

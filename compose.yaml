@@ -28,6 +28,14 @@ services:
       SPRING_DATASOURCE_USERNAME: oishidam
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      PII_KEYS: ${PII_KEYS:?Set PII_KEYS in .env}
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-${SMTP_USERNAME:-}}
+      SMTP_AUTH: ${SMTP_AUTH:-true}
+      SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
       FRONTEND_URL: ${APP_URL:-http://localhost}
       SUCCESS_REDIRECT: ${APP_URL:-http://localhost}/oauth/callback
       SERVER_FORWARD_HEADERS_STRATEGY: framework

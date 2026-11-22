@@ -50,8 +50,7 @@ oishidam-backend/
 ├─ src/main/resources/
 │  ├─ application.yaml         # 애플리케이션 설정
 │  └─ sql/
-│     ├─ schema.sql            # 신규 DB 테이블·인덱스·트리거 구성
-│     └─ migrations/           # 기존 DB 변경 SQL
+│     └─ schema.sql            # 신규 DB 테이블·인덱스·트리거 구성
 ├─ gradle/wrapper/
 ├─ .env.example                # 로컬 설정 예시
 ├─ build.gradle
@@ -76,18 +75,9 @@ psql -h localhost -U postgres -c "CREATE DATABASE oishidam;"
 
 애플리케이션 시작 시 [schema.sql](src/main/resources/sql/schema.sql)이 실행됩니다(`spring.sql.init.mode=always`). 테이블 구성은 SQL로 관리하며 Hibernate의 자동 스키마 변경은 사용하지 않습니다(`ddl-auto=none`). 초기 상품·회원 데이터는 별도로 준비해야 합니다.
 
-기존 DB는 `CREATE TABLE IF NOT EXISTS`만으로 컬럼 변경이 모두 반영되지 않습니다. 백업 후 현재 스키마에 필요한 [마이그레이션 SQL](src/main/resources/sql/migrations)을 검토해 수동 적용합니다. 이 프로젝트에는 Flyway·Liquibase에 의한 자동 마이그레이션이 설정되어 있지 않습니다.
-
-후기 감정분석의 기존 DB 변경은 다음 순서입니다.
-
-1. [20261118_add_review_sentiments.sql](src/main/resources/sql/migrations/20261118_add_review_sentiments.sql)
-2. [20261118_remove_sentiment_review_content.sql](src/main/resources/sql/migrations/20261118_remove_sentiment_review_content.sql)
-
 후기 별점을 사용하려면 기존 DB에 `schema.sql`의 `reviews.rating` 컬럼과 제약을 별도로 반영한 뒤 백엔드를 재시작합니다. 기존 후기의 별점은 NULL(미평가)로 유지되며, 새 후기는 1~5점 정수 별점이 필수입니다. 수정 요청에서 별점을 생략하면 기존 값을 유지합니다. 관리자 답변에는 별점 입력이 필요하지 않습니다.
 
 공개 `GET /api/products/{productId}/reviews/summary`는 삭제되지 않은 해당 상품의 전체 후기 수 `reviewCount`, 별점 평가 수 `ratingCount`, 평균 별점 `averageRating`을 반환합니다. 평균에는 별점이 있는 후기만 포함하며, 평가가 없으면 NULL입니다. 미평가 후기를 0점으로 계산하지 않습니다.
-
-[브랜드 컬럼 제거 SQL](src/main/resources/sql/migrations/20261117_drop_product_brand.sql)은 기존 `products.brand` 데이터를 삭제하므로 해당 컬럼을 제거해야 하는 DB에만 적용합니다.
 
 ### 2. 로컬 설정
 
@@ -118,6 +108,8 @@ $jwtRng.Dispose()
 | 설정 | 용도·설정값 |
 | --- | --- |
 | `JWT_SECRET` | 필수. 위에서 생성한 JWT 서명키 |
+| `PII_KEYS` | 필수. 64바이트 개인정보 키의 Base64 값 |
+| `SMTP_USERNAME`, `SMTP_PASSWORD` | 이메일 인증 발송용 Gmail 주소와 Google 앱 비밀번호 |
 | `FRONTEND_URL` | CORS 허용 출처 하나. 기본 `http://localhost:5173` |
 | `AI_SERVICE_URL` | FastAPI 주소. 기본 `http://localhost:8000` |
 | `KAKAO_LOGIN_ENABLED` | 카카오 로그인 활성화 여부. 기본 `false` |
@@ -129,6 +121,27 @@ $jwtRng.Dispose()
 | `SUCCESS_REDIRECT` | 예제 설정에 포함되어 있으나 현재 카카오 로그인 성공 처리는 팝업의 `postMessage`를 사용 |
 
 외부 연동을 사용하지 않는 로컬 실행에서는 예제의 해당 키를 빈 값으로 둘 수 있습니다. 이미지 업로드와 결제는 유효한 키를 설정해야 사용할 수 있습니다. `.env`와 실제 비밀번호·비밀키는 Git에 올리지 않습니다.
+
+### 개인정보 암호화 키 설정
+
+개인정보 암호화는 `.env`의 `PII_KEYS`에서 Base64로 인코딩한 64바이트 키를 읽습니다. 앞 32바이트는 개인정보 암호화에, 뒤 32바이트는 이메일 조회에 사용합니다. 이 프로젝트의 로컬 백엔드와 Docker Compose는 같은 값을 사용합니다.
+
+키를 처음 설정할 때 PowerShell로 값을 생성해 Git에서 제외한 `.env`에 추가합니다. 파일로 이미 키를 설정했다면 그 파일의 기존 Base64 값을 `PII_KEYS`에 넣습니다.
+
+```powershell
+$piiKeyBytes = [byte[]]::new(64)
+$piiRng = [Security.Cryptography.RandomNumberGenerator]::Create()
+try {
+    $piiRng.GetBytes($piiKeyBytes)
+    'PII_KEYS=' + [Convert]::ToBase64String($piiKeyBytes)
+} finally {
+    $piiRng.Dispose()
+}
+```
+
+기존 DB를 재시작하거나 백업에서 복원할 때는 그 DB에 사용한 `PII_KEYS` 값을 유지합니다.
+
+기존 DB에 처음 적용할 때는 DB를 백업하고 이전 백엔드를 모두 종료한 뒤 새 백엔드를 시작합니다. 시작 시 회원·배송지·주문과 이메일 인증 조회값을 한 트랜잭션으로 이관합니다. 평문이 포함된 이전 백업은 접근을 제한하고 별도로 관리합니다. 암호화 후에는 관리자 회원·주문 부분 검색을 백엔드에서 수행하므로 데이터가 늘어나면 조회 비용도 커집니다.
 
 ### 3. 서버 실행
 
@@ -153,6 +166,8 @@ JAR 실행 시에도 프로젝트 루트에서 실행해야 위에서 만든 `.e
 ```
 
 테스트 파일은 프로젝트 정책에 따라 로컬 검증에 사용하며 Git에 추가·스테이징·커밋하지 않습니다. 테스트 추적을 위해 `.gitignore`를 변경하거나 강제 추가하지 않습니다.
+
+관리자 주문 목록에는 결제 대기 주문이 표시되지 않습니다. 결제 요청이 없는 주문은 생성 후 15분이 지나면 삭제합니다. 결제 요청이 있는 주문은 마지막 요청 후 45분이 지나면 결제 실패로 바꾸고 `결제 시간 만료` 사유를 기록합니다. 백엔드는 만료 대상을 1분마다 확인하며 결제 승인 중이거나 승인 기록이 있는 주문은 보존합니다.
 
 ## API 사용
 

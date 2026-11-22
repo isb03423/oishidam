@@ -104,12 +104,16 @@ if (-not (Test-Path .env)) {
     $composeRng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
     $composeDbBytes = New-Object byte[] 24
     $composeJwtBytes = New-Object byte[] 32
+    $composePiiBytes = New-Object byte[] 64
     $composeRng.GetBytes($composeDbBytes)
     $composeRng.GetBytes($composeJwtBytes)
+    $composeRng.GetBytes($composePiiBytes)
     $composeRng.Dispose()
     $composeDbPassword = [BitConverter]::ToString($composeDbBytes).Replace('-', '').ToLowerInvariant()
     $composeJwtSecret = [Convert]::ToBase64String($composeJwtBytes)
+    $composePiiKeys = [Convert]::ToBase64String($composePiiBytes)
     $composeEnv = (Get-Content .env.example -Raw).Replace('replace_with_random_database_password', $composeDbPassword).Replace('replace_with_base64_encoded_32_random_bytes', $composeJwtSecret)
+    $composeEnv = $composeEnv.Replace('replace_with_base64_encoded_64_random_bytes', $composePiiKeys)
     [IO.File]::WriteAllText((Join-Path (Get-Location) '.env'), $composeEnv, [Text.UTF8Encoding]::new($false))
 }
 ```
@@ -120,19 +124,25 @@ macOS·Linux에서는 OpenSSL을 이용할 수 있습니다.
 if [ ! -f .env ]; then
   compose_db_password=$(openssl rand -hex 24)
   compose_jwt_secret=$(openssl rand -base64 32)
+  compose_pii_keys=$(openssl rand -base64 64 | tr -d '\n')
   sed -e "s|replace_with_random_database_password|$compose_db_password|" \
       -e "s|replace_with_base64_encoded_32_random_bytes|$compose_jwt_secret|" \
+      -e "s|replace_with_base64_encoded_64_random_bytes|$compose_pii_keys|" \
       .env.example > .env
   chmod 600 .env
 fi
 ```
 
-직접 작성하려면 `.env.example`을 `.env`로 복사한 뒤 `DB_PASSWORD`와 `JWT_SECRET`의 예시 문자열을 실제 값으로 교체합니다. JWT 키는 **정확히 32바이트의 난수를 Base64로 인코딩한 값**이어야 합니다.
+직접 작성하려면 `.env.example`을 `.env`로 복사한 뒤 `DB_PASSWORD`, `JWT_SECRET`, `PII_KEYS`의 예시 문자열을 실제 값으로 교체합니다. JWT 키는 **정확히 32바이트**, 개인정보 키는 **정확히 64바이트**의 난수를 Base64로 인코딩한 값이어야 합니다.
+
+기존 DB를 사용하는 경우 해당 DB에 사용한 `PII_KEYS`를 그대로 유지합니다. 로컬 백엔드와 같은 DB를 사용하면 키도 같아야 합니다. 처음 적용할 때는 DB를 백업하고 이전 백엔드를 종료한 뒤 시작합니다. 새 백엔드는 시작 시 기존 개인정보를 한 트랜잭션으로 암호화하며, 별도 SQL 파일을 실행할 필요는 없습니다.
 
 | 변수 | 용도 |
 | --- | --- |
 | `DB_PASSWORD` | Docker DB 비밀번호. 백엔드·AI에 동일한 값 전달 |
 | `JWT_SECRET` | JWT 서명키. 실제 비밀값을 저장소에 올리지 않음 |
+| `PII_KEYS` | 개인정보 암호화·이메일 조회 키. 기존 DB에서 사용한 값 유지 |
+| `SMTP_USERNAME`, `SMTP_PASSWORD` | 가입·비밀번호 재설정 이메일 발송용 Gmail 주소와 Google 앱 비밀번호 |
 | `APP_URL` | 브라우저에서 접속하는 출처. 기본 `http://localhost`. 경로와 끝의 `/` 없이 입력 |
 | `KAKAO_LOGIN_ENABLED` | 카카오 로그인 활성화 여부. 기본 `false` |
 | `KAKAO_CLIENT_ID`, `KAKAO_CLIENT_SECRET` | 카카오 로그인 사용 시 입력 |

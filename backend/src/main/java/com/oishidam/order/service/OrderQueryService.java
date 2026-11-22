@@ -43,6 +43,7 @@ public class OrderQueryService {
             LocalDate from,
             String keyword,
             boolean excludePending,
+            boolean excludeCancelled,
             int page,
             int size
     ) {
@@ -66,6 +67,7 @@ public class OrderQueryService {
             predicates.add(cb.equal(root.get("member").get("id"), memberId));
             if (requestedStatus != null) predicates.add(cb.equal(root.get("orderStatus"), requestedStatus));
             if (excludePending) predicates.add(cb.notEqual(root.get("orderStatus"), OrderStatus.PAYMENT_PENDING));
+            if (excludeCancelled) predicates.add(cb.notEqual(root.get("orderStatus"), OrderStatus.CANCELLED));
             if (from != null) predicates.add(cb.greaterThanOrEqualTo(root.get("createdAt"), from.atStartOfDay()));
             if (!search.isEmpty()) {
                 String pattern = "%" + search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";

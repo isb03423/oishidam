@@ -1,6 +1,7 @@
 package com.oishidam.member.entity;
 
 import com.oishidam.common.entity.BaseEntity;
+import com.oishidam.common.privacy.PersonalDataConverter;
 import com.oishidam.member.dto.AddressRequest;
 import jakarta.persistence.*;
 import lombok.*;
@@ -21,25 +22,32 @@ public class Address extends BaseEntity {
     @JoinColumn(name = "member_id", nullable = false)
     private Member member;
 
-    @Column(name = "label", nullable = false, length = 50)
+    @Convert(converter = PersonalDataConverter.class)
+    @Column(name = "label", nullable = false)
     private String label;
 
-    @Column(name = "recipient_name", nullable = false, length = 100)
+    @Convert(converter = PersonalDataConverter.class)
+    @Column(name = "recipient_name", nullable = false)
     private String recipientName;
 
-    @Column(name = "recipient_phone", nullable = false, length = 30)
+    @Convert(converter = PersonalDataConverter.class)
+    @Column(name = "recipient_phone", nullable = false)
     private String recipientPhone;
 
-    @Column(name = "postal_code", nullable = false, length = 20)
+    @Convert(converter = PersonalDataConverter.class)
+    @Column(name = "postal_code", nullable = false)
     private String postalCode;
 
-    @Column(name = "address_line1", nullable = false, length = 255)
+    @Convert(converter = PersonalDataConverter.class)
+    @Column(name = "address_line1", nullable = false)
     private String addressLine1;
 
-    @Column(name = "address_line2", length = 255)
+    @Convert(converter = PersonalDataConverter.class)
+    @Column(name = "address_line2")
     private String addressLine2;
 
-    @Column(name = "customs_code", length = 13)
+    @Convert(converter = PersonalDataConverter.class)
+    @Column(name = "customs_code")
     private String customsCode;
 
     @Column(name = "is_default", nullable = false)

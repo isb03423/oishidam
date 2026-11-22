@@ -1,6 +1,7 @@
 package com.oishidam.order.entity;
 
 import com.oishidam.common.entity.BaseEntity;
+import com.oishidam.common.privacy.PersonalDataConverter;
 import com.oishidam.member.entity.Member;
 import com.oishidam.order.dto.OrderQuoteResponse;
 import com.oishidam.order.enums.OrderStatus;
@@ -49,25 +50,32 @@ public class Order extends BaseEntity {
     @Column(nullable = false, precision = 14, scale = 0)
     private BigDecimal totalAmount;
 
-    @Column(nullable = false, length = 100)
+    @Convert(converter = PersonalDataConverter.class)
+    @Column(nullable = false)
     private String recipientName;
 
-    @Column(nullable = false, length = 30)
+    @Convert(converter = PersonalDataConverter.class)
+    @Column(nullable = false)
     private String recipientPhone;
 
-    @Column(nullable = false, length = 20)
+    @Convert(converter = PersonalDataConverter.class)
+    @Column(nullable = false)
     private String postalCode;
 
-    @Column(nullable = false, length = 255)
+    @Convert(converter = PersonalDataConverter.class)
+    @Column(nullable = false)
     private String addressLine1;
 
-    @Column(length = 255)
+    @Convert(converter = PersonalDataConverter.class)
+    @Column
     private String addressLine2;
 
-    @Column(length = 255)
+    @Convert(converter = PersonalDataConverter.class)
+    @Column
     private String deliveryMemo;
 
-    @Column(length = 13)
+    @Convert(converter = PersonalDataConverter.class)
+    @Column
     private String customsCode;
 
     public static Order fromQuote(

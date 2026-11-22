@@ -6,6 +6,7 @@ import com.oishidam.member.repository.MemberRepository;
 import com.oishidam.order.entity.Order;
 import com.oishidam.order.enums.OrderStatus;
 import com.oishidam.order.repository.OrderRepository;
+import com.oishidam.order.service.PendingOrderExpirationService;
 import com.oishidam.payment.dto.PaymentStartRequest;
 import com.oishidam.payment.dto.PaymentStartResponse;
 import com.oishidam.payment.entity.PaymentRequest;
@@ -16,6 +17,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Service
@@ -26,6 +29,10 @@ public class PaymentService {
     private final OrderRepository orders;
 
     private final PaymentRequestRepository payments;
+
+    private final PendingOrderExpirationService expiration;
+
+    private final Clock clock;
 
     @Value("${oishidam.toss.test-client-key:}")
     private String clientKey;
@@ -46,13 +53,16 @@ public class PaymentService {
         // 회원의 결제 대기 주문 확인
         Order order = orders.findByIdAndMemberId(orderId, memberId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "ORDER_NOT_FOUND", "주문을 찾을 수 없습니다."));
+        if (order.getOrderStatus() == OrderStatus.PAYMENT_FAILED) {
+            throw new ApiException(HttpStatus.CONFLICT, "PAYMENT_FAILED", "결제가 실패했거나 만료됐어요. 다시 결제해 주세요.");
+        }
         if (order.getOrderStatus() != OrderStatus.PAYMENT_PENDING) {
             throw new ApiException(HttpStatus.CONFLICT, "ORDER_NOT_PENDING", "결제 대기 상태의 주문이 아닙니다.");
         }
-        clientKey();
-
-        // 기존 결제 요청 확인 또는 신규 요청 저장
+        // 만료 여부와 기존 결제 요청 확인
         PaymentRequest payment = payments.findByOrderId(orderId).orElse(null);
+        expiration.requireActive(order, payment);
+        clientKey();
         if (payment == null) {
             payment = payments.save(
                     PaymentRequest.builder()
@@ -64,6 +74,8 @@ public class PaymentService {
         } else if (!payment.getRequestKey().equals(request.requestKey().toString())
                 || !payment.getProvider().equals(request.provider().name())) {
             throw new ApiException(HttpStatus.CONFLICT, "PAYMENT_REQUEST_CONFLICT", "이미 결제가 시작된 주문입니다.");
+        } else {
+            payments.recordRestart(payment.getId(), LocalDateTime.now(clock));
         }
         return new PaymentStartResponse(
                 UUID.fromString(payment.getRequestKey()),

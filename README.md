@@ -139,7 +139,7 @@ fi
 
 | 변수 | 용도 |
 | --- | --- |
-| `DB_PASSWORD` | Docker DB 비밀번호. 백엔드·AI에 동일한 값 전달 |
+| `DB_PASSWORD` | Docker DB 비밀번호. 백엔드와 AI가 동일한 값을 사용 |
 | `JWT_SECRET` | JWT 서명키. 실제 비밀값을 저장소에 올리지 않음 |
 | `PII_KEYS` | 개인정보 암호화·이메일 조회 키. 기존 DB에서 사용한 값 유지 |
 | `SMTP_USERNAME`, `SMTP_PASSWORD` | 가입·비밀번호 재설정 이메일 발송용 Gmail 주소와 Google 앱 비밀번호 |
@@ -391,7 +391,7 @@ Spring API의 요청·응답 명세는 [Swagger UI](http://localhost/swagger-ui/
 
 호스트에 Java 21, Node.js, Python 3.12, PostgreSQL을 준비합니다. 서비스별 실행 안내는 [백엔드 README](backend/README.md), [프론트 README](frontend/README.md), [AI README](ai-service/README.md)를 참고하며, 통합 저장소에서는 각각 `backend`, `frontend`, `ai-service` 폴더를 사용합니다.
 
-1. `backend/.env.example`을 `backend/.env`로 복사하고 JWT·외부 연동 키를 입력합니다. DB는 `spring.datasource.url`, `spring.datasource.username`, `spring.datasource.password`로 지정합니다.
+1. `backend/.env.example`을 `backend/.env`로 복사하고 JWT·외부 연동 키를 입력합니다. DB 접속 정보는 `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`에 입력합니다.
 2. `ai-service/.env.example`을 `ai-service/.env`로 복사하고 백엔드와 같은 DB, `SPRING_API_URL=http://localhost:8080/api`를 지정합니다.
 3. `frontend/.env.example`을 `frontend/.env.development.local`로 복사하고 `VITE_API_BASE_URL=http://localhost:8080/api`, `VITE_AI_API_BASE_URL=http://localhost:8000`을 지정합니다. 저장소의 `.env.development`에 다른 개발 서버 주소가 있으므로 개인 설정 파일로 덮어씁니다.
 

@@ -49,10 +49,12 @@ public class OrderController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) String keyword,
             @RequestParam(defaultValue = "false") boolean excludePending,
+            @RequestParam(defaultValue = "false") boolean excludeCancelled,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        return ApiResponse.ok(orderQueryService.list(Long.valueOf(jwt.getSubject()), status, from, keyword, excludePending, page, size));
+        return ApiResponse.ok(orderQueryService.list(Long.valueOf(jwt.getSubject()), status, from, keyword,
+                excludePending, excludeCancelled, page, size));
     }
 
     @Operation(summary = "주문 상세 조회")

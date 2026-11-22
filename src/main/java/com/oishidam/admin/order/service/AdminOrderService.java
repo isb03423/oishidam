@@ -4,6 +4,7 @@ import com.oishidam.admin.order.dto.AdminOrderDetailResponse;
 import com.oishidam.admin.order.dto.AdminOrderStatusRequest;
 import com.oishidam.admin.order.dto.AdminOrderSummaryResponse;
 import com.oishidam.common.exception.ApiException;
+import com.oishidam.common.privacy.PrivateSearch;
 import com.oishidam.member.entity.Member;
 import com.oishidam.member.enums.MemberRole;
 import com.oishidam.member.repository.MemberRepository;
@@ -23,12 +24,15 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -53,7 +57,7 @@ public class AdminOrderService {
     private final MemberRepository members;
 
     // 관리자: 주문 목록
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Page<AdminOrderSummaryResponse> list(
             String keyword,
             String orderStatus,
@@ -77,18 +81,12 @@ public class AdminOrderService {
         if (keyword != null && keyword.length() > 100) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_KEYWORD", "검색어는 100자 이하여야 합니다.");
         }
-        String search = keyword == null ? "" : keyword.trim().toLowerCase(java.util.Locale.ROOT)
-                .replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+        String search = keyword == null ? "" : keyword.trim().toLowerCase(Locale.ROOT);
 
         // 검색 조건 구성
         Specification<Order> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
-            if (!search.isEmpty()) {
-                predicates.add(cb.or(
-                        cb.like(cb.lower(root.get("orderNumber")), "%" + search + "%", '\\'),
-                        cb.like(cb.lower(root.get("recipientName")), "%" + search + "%", '\\')
-                ));
-            }
+            predicates.add(cb.notEqual(root.get("orderStatus"), OrderStatus.PAYMENT_PENDING));
             if (requestedStatus != null) {
                 predicates.add(cb.equal(root.get("orderStatus"), requestedStatus));
             }
@@ -101,7 +99,19 @@ public class AdminOrderService {
             return cb.and(predicates.toArray(Predicate[]::new));
         };
         var pageable = PageRequest.of(page, size, Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")));
-        Page<Order> result = orders.findAll(spec, pageable);
+        Page<Order> result;
+        if (search.isEmpty()) {
+            result = orders.findAll(spec, pageable);
+        } else {
+            Page<Long> matches = orders.findBy(spec, query -> PrivateSearch.page(
+                    query.as(OrderRepository.SearchFields.class).sortBy(pageable.getSort()).stream()
+                            .filter(order -> PrivateSearch.contains(order.getOrderNumber(), search)
+                                    || PrivateSearch.contains(order.getRecipientName(), search))
+                            .map(OrderRepository.SearchFields::getId), pageable));
+            var byId = orders.findByIdIn(matches.getContent()).stream()
+                    .collect(Collectors.toMap(Order::getId, Function.identity()));
+            result = matches.map(byId::get);
+        }
         Map<Long, Long> quantities = result.isEmpty() ? Map.of() : items.findQuantitiesByOrderIds(
                 result.getContent().stream().map(Order::getId).toList()
         ).stream().collect(Collectors.toMap(OrderQuantityResponse::orderId, OrderQuantityResponse::quantity));

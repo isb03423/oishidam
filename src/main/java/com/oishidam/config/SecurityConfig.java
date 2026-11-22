@@ -94,6 +94,11 @@ public class SecurityConfig {
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/api/auth/signup",
+                                "/api/auth/signup/email-availability",
+                                "/api/auth/email-verifications",
+                                "/api/auth/email-verifications/extend",
+                                "/api/auth/email-verifications/confirm",
+                                "/api/auth/password-reset",
                                 "/api/auth/login",
                                 "/api/auth/refresh"
                         ).permitAll()

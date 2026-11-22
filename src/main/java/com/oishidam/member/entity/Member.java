@@ -1,10 +1,14 @@
 package com.oishidam.member.entity;
 
 import com.oishidam.common.entity.BaseEntity;
+import com.oishidam.common.privacy.EmailLookupConverter;
+import com.oishidam.common.privacy.PersonalDataConverter;
 import com.oishidam.member.enums.MemberGender;
 import com.oishidam.member.enums.MemberRole;
 import jakarta.persistence.*;
 import lombok.*;
+
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "members")
@@ -18,16 +22,27 @@ public class Member extends BaseEntity {
     @Column(name = "member_id")
     private Long id;
 
-    @Column(name = "email", length = 254, unique = true)
+    @Convert(converter = PersonalDataConverter.class)
+    @Column(name = "email")
     private String email;
+
+    @Getter(AccessLevel.NONE)
+    @Convert(converter = EmailLookupConverter.class)
+    @Column(name = "email_lookup", updatable = false, unique = true, length = 72)
+    private String emailLookup;
+
+    @Column(name = "email_verified_at")
+    private LocalDateTime emailVerifiedAt;
 
     @Column(name = "password", length = 255)
     private String password;
 
-    @Column(name = "name", nullable = false, length = 100)
+    @Convert(converter = PersonalDataConverter.class)
+    @Column(name = "name", nullable = false)
     private String name;
 
-    @Column(name = "phone", length = 30)
+    @Convert(converter = PersonalDataConverter.class)
+    @Column(name = "phone")
     private String phone;
 
     @Column(name = "birth_year", length = 4)
@@ -48,6 +63,11 @@ public class Member extends BaseEntity {
 
     @Column(name = "token_version", nullable = false)
     private long tokenVersion;
+
+    @PrePersist
+    private void initializeEmailLookup() {
+        emailLookup = email;
+    }
 
     public void updateProfile(String name, String phone, Integer birthYear, MemberGender gender) {
         this.name = name;

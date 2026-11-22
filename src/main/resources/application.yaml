@@ -8,6 +8,20 @@ spring:
   config:
     import: "optional:file:./.env[.properties]"
 
+  mail:
+    host: ${SMTP_HOST:smtp.gmail.com}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      "[mail.smtp.auth]": ${SMTP_AUTH:true}
+      "[mail.smtp.starttls.enable]": ${SMTP_STARTTLS:true}
+      "[mail.smtp.starttls.required]": ${SMTP_STARTTLS:true}
+      "[mail.smtp.ssl.checkserveridentity]": true
+      "[mail.smtp.connectiontimeout]": 5000
+      "[mail.smtp.timeout]": 5000
+      "[mail.smtp.writetimeout]": 5000
+
   servlet:
     multipart:
       max-file-size: 10MB
@@ -24,7 +38,7 @@ spring:
   sql:
     init:
       mode: always
-      schema-locations: classpath:sql/schema.sql
+      schema-locations: classpath:sql/schema.sql,classpath:sql/migrations/email-verification.sql,classpath:sql/migrations/email-verification-window.sql
 
   jpa:
     hibernate:
@@ -34,6 +48,7 @@ spring:
       hibernate:
         format_sql: true
         default_batch_fetch_size: 100
+        jdbc.fetch_size: 250
         dialect: org.hibernate.dialect.PostgreSQLDialect
     show-sql: false
 

@@ -3,6 +3,7 @@ package com.oishidam.auth.controller;
 import com.oishidam.auth.dto.RefreshedTokens;
 import com.oishidam.auth.dto.*;
 import com.oishidam.auth.service.AuthService;
+import com.oishidam.auth.service.EmailVerificationService;
 import com.oishidam.auth.service.RefreshTokenService;
 import com.oishidam.common.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -22,6 +23,40 @@ public class AuthController {
     private final AuthService authService;
 
     private final RefreshTokenService refreshTokenService;
+
+    private final EmailVerificationService emailVerificationService;
+
+    @Operation(summary = "가입 이메일 중복 확인")
+    @PostMapping("/signup/email-availability")
+    public ApiResponse<Void> checkSignupEmail(@Valid @RequestBody CheckSignupEmailRequest request) {
+        emailVerificationService.checkSignupEmail(request.email());
+        return ApiResponse.ok(null);
+    }
+
+    @Operation(summary = "이메일 인증번호 발송 요청")
+    @PostMapping("/email-verifications")
+    public ApiResponse<EmailVerificationWindow> sendEmailCode(@Valid @RequestBody SendEmailCodeRequest request) {
+        return ApiResponse.ok(emailVerificationService.sendCode(request));
+    }
+
+    @Operation(summary = "비밀번호 재설정 인증번호 유효 시간 연장")
+    @PostMapping("/email-verifications/extend")
+    public ApiResponse<EmailVerificationWindow> extendEmailCode(@Valid @RequestBody ExtendEmailCodeRequest request) {
+        return ApiResponse.ok(emailVerificationService.extendCode(request));
+    }
+
+    @Operation(summary = "이메일 인증번호 확인")
+    @PostMapping("/email-verifications/confirm")
+    public ApiResponse<EmailVerificationResponse> verifyEmailCode(@Valid @RequestBody VerifyEmailCodeRequest request) {
+        return ApiResponse.ok(emailVerificationService.verifyCode(request));
+    }
+
+    @Operation(summary = "이메일 인증 후 비밀번호 재설정")
+    @PostMapping("/password-reset")
+    public ApiResponse<Void> resetPassword(@Valid @RequestBody PasswordResetRequest request) {
+        authService.resetPassword(request);
+        return ApiResponse.ok(null);
+    }
 
     @Operation(summary = "회원가입")
     @PostMapping("/signup")

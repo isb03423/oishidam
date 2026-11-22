@@ -14,7 +14,7 @@ const memberName = computed(() => session.member?.name || '오이시담')
 const latestOrder = ref(null)
 const deliveryOrder = computed(() => {
   if (session.source === 'mock') return getExampleOrders(new Date()).find((order) => order.status === '배송중')
-  if (!latestOrder.value) return null
+  if (!latestOrder.value || ['CANCELLED', '취소 완료'].includes(latestOrder.value.orderStatus)) return null
   const data = latestOrder.value
   return { id: data.orderNumber, orderId: data.orderId, status: data.orderStatus, items: data.items.map((item) => ({ name: item.productName })) }
 })
@@ -36,7 +36,7 @@ let controller
 async function loadLatestOrder(revision) {
   if (session.source === 'api') {
     try {
-      const orders = await getOrders(0, { excludePending: true, size: 1 })
+      const orders = await getOrders(0, { excludePending: true, excludeCancelled: true, size: 1 })
       if (controller.signal.aborted || revision !== getSessionRevision()) return
       const latest = orders.content?.[0]
       const detail = latest ? await getOrder(latest.orderId) : null

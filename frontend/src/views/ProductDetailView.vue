@@ -32,6 +32,8 @@ const notice = ref('')
 const cartDialog = ref(null)
 const reviewDialog = ref(null)
 const activeReview = ref(null)
+const reviewImageIndex = ref(0)
+const activeReviewImage = computed(() => activeReview.value?.images?.[reviewImageIndex.value])
 const serverReviews = ref([])
 const serverReviewSummary = ref(null)
 const reviewPage = ref(1)
@@ -138,6 +140,7 @@ function changeQuantity(delta) {
 }
 
 function openReview(review) {
+  reviewImageIndex.value = 0
   activeReview.value = review
   reviewDialog.value.showModal()
 }
@@ -312,22 +315,29 @@ async function order(buyNow) {
           <p v-if="reviewError" class="activity-empty">{{ reviewError }} <button type="button" class="action outline" @click="reviewRetry++">다시 시도</button></p>
           <div v-if="reviews.length" class="review-list">
             <article v-for="review in reviews" :key="review.id" class="activity-panel review-entry">
-              <button type="button" class="review-card" aria-haspopup="dialog" @click="openReview(review)">
+              <button type="button" class="review-card" :class="{ 'has-photo': review.images?.length }" aria-haspopup="dialog" aria-label="구매 후기 상세 보기" @click="openReview(review)">
+                <span v-if="review.images?.length" class="review-preview">
+                  <img :src="review.images[0].url" :alt="review.images[0].altText || '구매 후기 사진'" loading="lazy" />
+                  <span v-if="review.images.length > 1">+{{ review.images.length - 1 }}</span>
+                </span>
                 <span class="review-main">
-                  <strong class="review-product-name">{{ product.name }}</strong>
-                  <span class="review-meta">
-                    <ReviewRating :rating="review.rating" />
-                    <time :datetime="review.date">{{ review.date }}</time>
+                  <span class="review-heading">
+                    <strong class="review-author">{{ review.authorName || '구매 회원' }}</strong>
+                    <span class="review-score"><ReviewRating :rating="review.rating" /><span v-if="review.rating != null" class="review-score-number" aria-hidden="true">{{ Number(review.rating).toFixed(1) }}</span></span>
+                    <span class="review-purchase-meta">
+                      <time :datetime="review.date">{{ review.date?.replaceAll('-', '.') }}</time>
+                      <span class="review-buyer-badge">구매자</span>
+                      <span class="review-more" aria-hidden="true">⋮</span>
+                    </span>
                   </span>
                   <span class="review-copy">{{ review.content }}</span>
-                </span>
-                <span v-if="review.images?.length" class="review-preview">
-                  <img :src="review.images[0].url" alt="" loading="lazy" />
-                  <span>첨부 {{ review.images.length }}장</span>
-                </span>
-                <span v-if="review.reply" class="review-reply">
-                  <strong>관리자 답변</strong>
-                  <span>{{ review.reply }}</span>
+                  <span v-if="review.reply" class="review-reply review-card-reply">
+                    <svg class="review-reply-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M7 18 3 21v-6a8 8 0 1 1 4 3Z" /><circle cx="8" cy="10" r=".8" fill="currentColor" /><circle cx="12" cy="10" r=".8" fill="currentColor" /><circle cx="16" cy="10" r=".8" fill="currentColor" /></svg>
+                    <span class="review-reply-body">
+                      <span class="review-reply-heading"><strong>오이시담 관리자</strong><time v-if="review.replyDate" :datetime="review.replyDate">{{ review.replyDate.replaceAll('-', '.') }}</time></span>
+                      <span class="review-reply-copy">{{ review.reply }}</span>
+                    </span>
+                  </span>
                 </span>
               </button>
             </article>
@@ -338,26 +348,40 @@ async function order(buyNow) {
             <header class="review-dialog-header">
               <h2 id="review-dialog-title">상품 후기 상세</h2>
               <form method="dialog">
-                <button type="submit" class="action outline" autofocus>닫기</button>
+                <button type="submit" class="review-dialog-close" aria-label="후기 상세 닫기" autofocus>×</button>
               </form>
             </header>
-            <div v-if="activeReview" class="review-main">
-              <strong class="review-product-name">{{ product.name }}</strong>
-              <p class="review-meta">
-                <ReviewRating :rating="activeReview.rating" />
-                <time :datetime="activeReview.date">{{ activeReview.date }}</time>
-              </p>
+            <div v-if="activeReview" class="review-dialog-body">
+              <div class="review-dialog-product">
+                <img v-if="primaryImage" :src="primaryImage.url" :alt="product.name" />
+                <div>
+                  <strong class="review-product-name">{{ product.name }}</strong>
+                  <div class="review-dialog-meta">
+                    <ReviewRating :rating="activeReview.rating" />
+                    <time :datetime="activeReview.date">{{ activeReview.date?.replaceAll('-', '.') }}</time>
+                  </div>
+                  <span class="review-dialog-author">{{ activeReview.authorName || '구매 회원' }}</span>
+                </div>
+              </div>
               <p class="review-copy">{{ activeReview.content }}</p>
-              <ul v-if="activeReview.images?.length" class="review-gallery" aria-label="후기 첨부 이미지">
-                <li v-for="(image, index) in activeReview.images" :key="index">
-                  <img :src="image.url" :alt="image.altText || `후기 첨부 이미지 ${index + 1}`" loading="lazy" />
-                </li>
-              </ul>
-              <div v-if="activeReview.reply" class="review-reply">
-                <strong>관리자 답변</strong>
+              <div v-if="activeReviewImage" class="review-dialog-gallery" role="region" aria-label="후기 첨부 사진">
+                <div class="review-dialog-slide">
+                  <img :src="activeReviewImage.url" :alt="activeReviewImage.altText || `후기 첨부 사진 ${reviewImageIndex + 1}`" />
+                  <button type="button" class="review-image-arrow previous" aria-label="이전 사진" :disabled="activeReview.images.length < 2" @click="reviewImageIndex = (reviewImageIndex - 1 + activeReview.images.length) % activeReview.images.length">‹</button>
+                  <button type="button" class="review-image-arrow next" aria-label="다음 사진" :disabled="activeReview.images.length < 2" @click="reviewImageIndex = (reviewImageIndex + 1) % activeReview.images.length">›</button>
+                </div>
+                <p class="review-image-count" aria-live="polite">{{ reviewImageIndex + 1 }} / {{ activeReview.images.length }}</p>
+              </div>
+              <div v-if="activeReview.reply" class="review-dialog-reply">
+                <div class="review-reply-heading">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M7 18 3 21v-6a8 8 0 1 1 4 3Z" /><path d="M7 10h2m2 0h2m2 0h2" /></svg>
+                  <strong>오이시담 관리자 답변</strong>
+                  <time v-if="activeReview.replyDate" :datetime="activeReview.replyDate">{{ activeReview.replyDate.replaceAll('-', '.') }}</time>
+                </div>
                 <p>{{ activeReview.reply }}</p>
               </div>
             </div>
+            <footer class="review-dialog-footer"><form method="dialog"><button type="submit" class="review-dialog-confirm">확인</button></form></footer>
           </dialog>
       </section>
       <section v-show="tab === 'customs'" id="panel-customs" class="detail-panel" role="tabpanel" aria-labelledby="tab-customs" tabindex="0">
@@ -388,17 +412,17 @@ async function order(buyNow) {
 .detail-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 18px 24px; margin-top: 24px; padding: 20px; border-radius: 10px; background: var(--color-background); }
 .detail-facts dt { color: var(--color-primary); font-size: var(--font-size-body); font-weight: 700; }
 .detail-facts dd { margin-top: 4px; }
-.review-summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 18px; margin-bottom: 14px; padding: 14px 16px; border-radius: 10px; background: var(--color-background); }
+.review-summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 18px; margin-bottom: 12px; padding: 10px 16px; border-radius: 10px; background: var(--color-background); font-size: 14px; }
 .review-summary > div { display: flex; align-items: baseline; gap: 8px; }
 .review-summary strong { color: var(--color-primary); font-size: 1.25rem; }
-.review-list { display: grid; gap: 8px; }
-.review-entry { padding: 0; }
+.review-list { display: grid; gap: 14px; }
+.review-entry { padding: 0; border: 1px solid #eee5e9; border-radius: 12px; background: var(--color-white); overflow: hidden; }
 .review-card {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px 16px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
   width: 100%;
-  padding: 14px;
+  padding: 12px 18px;
   border: 0;
   border-radius: inherit;
   background: transparent;
@@ -407,10 +431,21 @@ async function order(buyNow) {
   text-align: left;
   cursor: pointer;
 }
-.review-card:hover { background: var(--color-background); }
+.review-card.has-photo { grid-template-columns: 128px minmax(0, 1fr); }
+.review-card:hover { background: #fffcfd; }
 .review-card:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
 .review-main { display: grid; gap: 6px; min-width: 0; }
-.review-card .review-main { align-content: start; }
+.review-card .review-main { align-content: start; gap: 5px; }
+.review-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 20px; min-height: 24px; }
+.review-author { color: var(--color-text); font-size: 16px; font-weight: 700; }
+.review-score { display: inline-flex; align-items: center; gap: 12px; }
+.review-score :deep(.review-rating-stars svg) { width: 15px; height: 15px; }
+.review-score :deep(.review-rating-display > span:last-child) { display: none; }
+.review-score-number { font-size: 15px; color: var(--color-secondary); }
+.review-purchase-meta { display: inline-flex; align-items: center; gap: 14px; margin-left: auto; color: var(--color-secondary); font-size: 13px; }
+.review-buyer-badge { padding: 3px 10px; border-radius: 999px; color: #ad627c; background: #faf0f4; font-size: 12px; }
+.review-more { font-size: 24px; line-height: 1; color: #8c8189; }
+.review-card .review-copy { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; max-width: 68ch; font-size: 16px; line-height: 1.6; color: #696773; word-break: normal; overflow-wrap: break-word; }
 .review-product-name { font-weight: 700; overflow-wrap: anywhere; }
 .review-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; color: var(--color-secondary); font-size: var(--font-size-label); }
 .review-stars { color: var(--color-primary); letter-spacing: .08em; }
@@ -418,7 +453,7 @@ async function order(buyNow) {
 .review-preview {
   position: relative;
   align-self: start;
-  width: clamp(76px, 18vw, 144px);
+  width: 100%;
   overflow: hidden;
   border-radius: 8px;
   background: var(--color-background);
@@ -436,25 +471,71 @@ async function order(buyNow) {
 }
 .review-reply { display: grid; grid-column: 1 / -1; gap: 4px; padding: 10px 12px; border-radius: 8px; background: var(--color-background); font-size: var(--font-size-table); overflow-wrap: anywhere; }
 .review-reply strong { color: var(--color-secondary); }
+.review-card-reply { grid-template-columns: 18px minmax(0, 1fr); gap: 10px; margin-top: 6px; padding: 10px 12px; border-radius: 10px; background: #fbf5f8; font-size: 15px; line-height: 1.5; }
+.review-reply-icon { width: 18px; height: 18px; margin-top: 2px; color: var(--color-primary); }
+.review-reply-body { display: grid; gap: 4px; min-width: 0; color: #696773; white-space: pre-wrap; }
+.review-reply-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.review-reply-heading strong { color: var(--color-text); font-weight: 700; }
+.review-reply-heading time { padding-left: 14px; border-left: 1px solid #e6dce2; color: #98909c; font-size: 13px; line-height: 1; }
+.review-card-reply .review-reply-heading strong { font-size: 14px; }
+.review-reply-copy { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; max-width: 72ch; }
+@media (max-width: 680px) {
+  .review-card { padding: 14px; gap: 12px; }
+  .review-card.has-photo { grid-template-columns: 80px minmax(0, 1fr); }
+  .review-heading { gap: 6px 10px; }
+  .review-author { font-size: 16px; }
+  .review-purchase-meta { width: 100%; margin-left: 0; gap: 8px; }
+  .review-more { margin-left: auto; }
+  .review-card-reply { padding: 12px; gap: 8px; }
+}
+@media (max-width: 420px) {
+  .review-card.has-photo { grid-template-columns: minmax(0, 1fr); }
+  .review-preview { width: 96px; }
+}
 .review-dialog {
   position: fixed;
   inset: 0;
-  width: min(680px, calc(100% - 32px));
-  max-height: calc(100% - 32px);
+  width: min(540px, calc(100% - 24px));
+  max-height: min(760px, calc(100dvh - 32px));
   margin: auto;
-  padding: clamp(16px, 4vw, 24px);
+  padding: 0;
   border: 1px solid var(--color-border);
   border-radius: 12px;
   background: var(--color-white);
   color: var(--color-text);
   box-shadow: 0 16px 40px rgb(57 44 50 / 20%);
 }
-.review-dialog::backdrop { background: rgb(32 24 28 / 55%); }
-.review-dialog-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px; }
-.review-dialog .review-dialog-header h2 { margin: 0; }
-.review-dialog .review-dialog-header .action { margin: 0; }
-.review-gallery { display: grid; gap: 8px; margin: 8px 0; }
-.review-gallery img { display: block; width: 100%; max-height: 65vh; object-fit: contain; background: var(--color-background); border-radius: 8px; }
+.review-dialog[open] { display: flex; flex-direction: column; overflow: hidden; }
+.review-dialog::backdrop { background: rgb(51 35 45 / 25%); backdrop-filter: blur(3px); }
+.review-dialog-header { display: flex; flex: 0 0 auto; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 20px; border-bottom: 1px solid #f0e5eb; background: #fcf5f8; }
+.review-dialog .review-dialog-header h2 { margin: 0; font-size: 18px; font-weight: 700; }
+.review-dialog-close { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; background: transparent; color: var(--color-text); font-size: 25px; line-height: 1; cursor: pointer; }
+.review-dialog-body { min-height: 0; overflow-y: auto; padding: 20px; overscroll-behavior: contain; }
+.review-dialog-product { display: flex; align-items: start; gap: 12px; margin-bottom: 14px; }
+.review-dialog-product > img { flex: 0 0 auto; width: 52px; height: 52px; border-radius: 5px; object-fit: cover; background: var(--color-background); }
+.review-dialog-product > div { min-width: 0; }
+.review-dialog-product .review-product-name { display: block; font-size: 16px; line-height: 1.5; }
+.review-dialog-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.review-dialog-meta :deep(.review-rating-display > span:last-child) { display: none; }
+.review-dialog-meta :deep(.review-rating-stars svg) { width: 15px; height: 15px; }
+.review-dialog-meta time, .review-dialog-author { font-size: 13px; color: #8b808c; }
+.review-dialog-author { display: block; margin-top: 2px; }
+.review-dialog-body > .review-copy { margin: 0 0 16px; font-size: 16px; line-height: 1.7; }
+.review-dialog-slide { position: relative; display: grid; place-items: center; height: clamp(170px, 36dvh, 280px); overflow: hidden; border-radius: 7px; background: #fdf6f9; }
+.review-dialog-slide > img { display: block; width: 100%; height: 100%; min-height: 0; object-fit: contain; }
+.review-image-arrow { position: absolute; top: 50%; transform: translateY(-50%); display: grid; place-items: center; width: 28px; height: 28px; padding: 0 0 2px; border: 1px solid #f1e4e9; border-radius: 50%; background: rgb(255 255 255 / 95%); color: var(--color-primary); font-size: 25px; line-height: 1; cursor: pointer; box-shadow: 0 2px 6px #392c3210; }
+.review-image-arrow.previous { left: 8px; }
+.review-image-arrow.next { right: 8px; }
+.review-image-arrow:disabled { opacity: .45; cursor: default; }
+.review-image-count { margin: 7px 0 14px; color: #8b808c; font-size: 11px; text-align: center; }
+.review-dialog-reply { padding: 14px; border-radius: 7px; background: #fbf0f5; }
+.review-dialog-reply .review-reply-heading { gap: 6px 8px; font-size: 14px; }
+.review-dialog-reply svg { width: 15px; height: 15px; color: var(--color-primary); }
+.review-dialog-reply time { padding-left: 8px; font-size: 13px; }
+.review-dialog-reply p { margin: 6px 0 0 23px; font-size: 15px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+.review-dialog-footer { flex: 0 0 auto; display: flex; justify-content: flex-end; padding: 12px 16px; border-top: 1px solid #f0e5eb; background: #fffcfd; }
+.review-dialog-confirm { min-width: 100px; padding: 8px 20px; border: 0; border-radius: 8px; background: #b7476a; color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; }
+.review-dialog button:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; }
 .product-detail { padding: 26px 0 74px; }
 .cart-dialog {
   position: fixed;

@@ -28,10 +28,13 @@ const aiRecommended = computed(() => route.query.recommend === 'ai')
 const listType = computed(() => !aiRecommended.value && ['new', 'best'].includes(route.query.sort) ? route.query.sort : undefined)
 const listDescription = computed(() => {
   if (aiRecommended.value && !loading.value && !failed.value && products.value.length) {
-    if (recommendationSource.value === 'PERSONALIZED') return '찜과 최근 구매 내역을 바탕으로 고른 상품이에요.'
+    if (recommendationSource.value === 'PERSONALIZED') return '최근 찜·장바구니·구매 활동을 바탕으로 고른 상품이에요.'
     if (recommendationSource.value === 'DEMOGRAPHIC') return '같은 연령대·성별의 고객이 최근 많이 구매한 상품이에요.'
+    if (recommendationSource.value === 'POPULAR') return '전체 연령대의 고객이 최근 많이 구매한 상품이에요.'
+    if (recommendationSource.value === 'NEW') return '최근 등록된 상품을 모았어요.'
+    if (recommendationSource.value === 'MIXED') return '내 관심사, 같은 연령대·성별의 구매, 전체 고객의 구매, 최근 등록 상품 순으로 추천해요.'
     if (recommendationSource.value === 'PERSONALIZED_WITH_DEMOGRAPHIC') {
-      return '찜과 최근 구매 내역으로 고른 상품에 같은 연령대·성별의 고객이 많이 구매한 상품을 더했어요.'
+      return '최근 찜·장바구니·구매 활동으로 고른 상품에 같은 연령대·성별의 고객이 많이 구매한 상품을 더했어요.'
     }
   }
   if (listType.value === 'new') return '오이시담에 새로 들어온 일본 상품을 만나보세요.'

@@ -46,9 +46,9 @@ export async function loginWithKakao({ remember = false, signal } = {}) {
 
 const signupGenders = { MALE: 'M', FEMALE: 'F' }
 
-export async function signup({ email, password, passwordConfirm, name, phone = '', birthDate = '', birthYear, gender = '', termsAgreed, privacyAgreed, signal }) {
+export async function signup({ email, verificationToken, password, passwordConfirm, name, phone = '', birthDate = '', birthYear, gender = '', termsAgreed, privacyAgreed, signal }) {
   const mock = import.meta.env.DEV && development.mockEnabled
-  const data = { email: email.trim().toLowerCase(), password, passwordConfirm, name: name.trim() }
+  const data = { email: email.trim().toLowerCase(), verificationToken, password, passwordConfirm, name: name.trim() }
   const normalizedPhone = phoneDigits(phone)
   if (mock) {
     Object.assign(data, {
@@ -71,6 +71,29 @@ export async function signup({ email, password, passwordConfirm, name, phone = '
   })
   if (signal?.aborted || mock !== (import.meta.env.DEV && development.mockEnabled)) throw new DOMException('요청이 취소되었습니다.', 'AbortError')
   return mock ? response.member : response
+}
+
+export function checkSignupEmail({ email, signal }) {
+  return apiRequest({ method: 'POST', path: '/auth/signup/email-availability', data: { email }, signal })
+}
+
+export function sendEmailCode({ email, purpose, signal }) {
+  return apiRequest({ method: 'POST', path: '/auth/email-verifications', data: { email, purpose }, signal, timeout: 20000 })
+}
+
+export function extendEmailCode({ email, purpose, extensionToken, signal }) {
+  return apiRequest({ method: 'POST', path: '/auth/email-verifications/extend', data: { email, purpose, extensionToken }, signal })
+}
+
+export function verifyEmailCode({ email, purpose, code, extensionToken, signal }) {
+  return apiRequest({ method: 'POST', path: '/auth/email-verifications/confirm', data: { email, purpose, code, extensionToken }, signal })
+}
+
+export function resetPassword({ email, verificationToken, newPassword, passwordConfirm, signal }) {
+  return apiRequest({
+    method: 'POST', path: '/auth/password-reset',
+    data: { email: email.trim().toLowerCase(), verificationToken, newPassword, passwordConfirm }, signal,
+  })
 }
 
 export async function logout() {

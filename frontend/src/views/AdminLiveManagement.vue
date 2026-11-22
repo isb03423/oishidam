@@ -62,7 +62,8 @@ const headings = { products: ['상품명', '카테고리', '가격', '재고', '
 const rows = computed(() => props.section === 'categories' ? list.value.filter((row) => row.name.toLowerCase().includes(keyword.value.toLowerCase())) : list.value)
 const selectedId = computed(() => selected.value == null ? null : props.section === 'products' ? selected.value.product.productId : props.section === 'orders' ? selected.value.order.orderId : rowId(selected.value))
 const currentProductStatus = computed(() => statusCode(selected.value?.product?.saleStatus, saleStatuses))
-const statusOptions = computed(() => props.section === 'orders' ? orderStatuses : props.section === 'members' ? [['true', '활성화'], ['false', '비활성화']] : [])
+const managedOrderStatuses = orderStatuses.filter(([code]) => code !== 'PAYMENT_PENDING')
+const statusOptions = computed(() => props.section === 'orders' ? managedOrderStatuses : props.section === 'members' ? [['true', '활성화'], ['false', '비활성화']] : [])
 const descriptions = { categories: '상품의 분류 체계와 노출 순서를 관리하세요.', products: '상품 정보부터 재고와 판매 상태까지 한곳에서 관리하세요.', orders: '주문과 결제 내역을 확인하고 배송 상태를 처리하세요.', members: '회원 정보와 계정 이용 상태를 확인하세요.' }
 const searchLabels = { categories: '카테고리명', products: '상품명', orders: '주문번호·수령인', members: '회원명·이메일' }
 const hasDetail = computed(() => Boolean(selected.value || editing.value))

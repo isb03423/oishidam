@@ -20,25 +20,18 @@ function persist() {
   try { sessionStorage.setItem(storageKey, JSON.stringify(draft.value)) } catch { /* 현재 탭의 메모리로 유지 */ }
 }
 
-export function saveCheckoutInputs(form, memoChoice) {
-  if (!checkout.value) return
-  const inputs = Object.fromEntries(['recipient', 'phone', 'postalCode', 'address', 'detail', 'memo', 'customs'].map((key) => [key, form[key] ?? '']))
-  draft.value = { ...draft.value, inputs: { ...inputs, memoChoice } }
-  persist()
-}
-
 export function restoreCheckout() {
-  if (checkout.value || shoppingOwner.value === 'guest') return null
+  if (checkout.value) return
   try {
     const saved = JSON.parse(sessionStorage.getItem(storageKey) ?? 'null')
-    if (saved?.owner !== shoppingOwner.value || !Array.isArray(saved.items) || !saved.items.length || saved.items.length > 100
+    if (shoppingOwner.value === 'guest' || saved?.owner !== shoppingOwner.value || !Array.isArray(saved.items) || !saved.items.length || saved.items.length > 100
         || saved.items.some((item) => !item?.product_id || !Number.isSafeInteger(item.quantity) || item.quantity < 1)) {
       clearCheckout()
-      return null
+      return
     }
     draft.value = { owner: saved.owner, items: saved.items, fromCart: saved.fromCart === true }
-    return saved.inputs ?? null
-  } catch { clearCheckout(); return null }
+    persist()
+  } catch { clearCheckout() }
 }
 
 watch(shoppingOwner, (_, previous) => {

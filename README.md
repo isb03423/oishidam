@@ -87,12 +87,14 @@ psql -h localhost -U postgres -c "CREATE DATABASE oishidam;"
 if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 ```
 
-프로젝트 루트의 `.env`는 [application.yaml](src/main/resources/application.yaml)에서 Spring properties 형식으로 읽습니다. 다음 DB 설정을 `.env`에 추가하고 실제 접속 정보로 수정합니다.
+프로젝트 루트의 `.env`는 [application.yaml](src/main/resources/application.yaml)에서 Spring properties 형식으로 읽습니다. `.env`의 DB 설정을 실제 접속 정보에 맞게 입력합니다.
 
 ```properties
-spring.datasource.url=jdbc:postgresql://localhost:5432/oishidam
-spring.datasource.username=postgres
-spring.datasource.password=실제_DB_비밀번호
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=oishidam
+DB_USER=postgres
+DB_PASSWORD=실제_DB_비밀번호
 ```
 
 JWT 서명키는 아래 명령으로 생성한 값을 `.env`의 `JWT_SECRET`에 입력합니다. 현재 구현은 **정확히 32바이트를 Base64로 인코딩한 문자열**을 요구합니다.

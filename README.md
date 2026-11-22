@@ -194,12 +194,12 @@ DB 콘솔은 외부 포트 없이 다음 명령으로 엽니다.
 docker compose exec db psql -U oishidam -d oishidam
 ```
 
-다음 SQL의 이메일을 실제 가입 계정으로 바꿔 실행합니다. `token_version` 변경으로 기존 액세스 토큰을 무효화하므로 다시 로그인해야 합니다.
+로그인한 계정의 `GET /api/members/me` 응답에서 `memberId`를 확인하고, 다음 SQL의 회원 번호 `123`을 그 값으로 바꿔 실행합니다. 이메일은 암호화되어 있어 평문 이메일로 직접 검색할 수 없습니다. `token_version` 변경으로 기존 액세스 토큰을 무효화하므로 다시 로그인해야 합니다.
 
 ```sql
 UPDATE members
 SET role = 'ADMIN', token_version = token_version + 1
-WHERE email = 'admin@example.com';
+WHERE member_id = 123;
 ```
 
 콘솔 종료는 `\q`입니다. 기존 데이터가 있는 DB의 스키마 변경은 별도 마이그레이션을 검토해야 하며, `schema.sql`의 `CREATE TABLE IF NOT EXISTS`가 기존 테이블의 컬럼을 자동 갱신해 주지는 않습니다.

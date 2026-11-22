@@ -1,6 +1,8 @@
 <script setup>
 import { getPasswordError, passwordRequirements } from '../../services/passwordPolicy.js'
 import PhoneInput from '../../components/common/PhoneInput.vue'
+import EmailVerificationFields from '../../components/common/EmailVerificationFields.vue'
+import AuthPasswordField from '../../components/common/AuthPasswordField.vue'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import logo from '../../assets/images/oishidam_logo.png'
@@ -25,8 +27,8 @@ const form = reactive({
 })
 const touched = reactive({})
 const submitted = ref(false)
-const showPassword = ref(false)
-const showPasswordConfirm = ref(false)
+const verificationToken = ref('')
+const firstPassword = ref(null)
 const pending = ref(false)
 const requestError = ref('')
 const openedPolicy = ref('')
@@ -121,6 +123,10 @@ async function submit() {
   submitted.value = true
   requestError.value = ''
   if (Object.values(errors.value).some(Boolean) || pending.value) return
+  if (!verificationToken.value) {
+    requestError.value = '회원가입 전에 이메일 인증을 완료해주세요.'
+    return
+  }
 
   const version = ++revision
   controller?.abort()
@@ -129,6 +135,7 @@ async function submit() {
   try {
     await signup({
       email: form.email,
+      verificationToken: verificationToken.value,
       password: form.password,
       passwordConfirm: form.passwordConfirm,
       name: form.name,
@@ -143,6 +150,7 @@ async function submit() {
     if (version === revision) await router.replace({ name: 'Login', query: { signup: 'complete' } })
   } catch (error) {
     if (version === revision && !controller.signal.aborted) {
+      if (error.code === 'INVALID_EMAIL_VERIFICATION') verificationToken.value = ''
       requestError.value = error.response?.data?.message || error.message || '회원가입을 완료하지 못했어요. 잠시 후 다시 시도해주세요.'
     }
   } finally {
@@ -150,6 +158,12 @@ async function submit() {
   }
 }
 
+watch(verificationToken, (value) => {
+  if (value) {
+    requestError.value = ''
+    firstPassword.value?.focus()
+  }
+}, { flush: 'post' })
 watch(() => development.mockEnabled, () => {
   revision++
   controller?.abort()
@@ -173,38 +187,30 @@ onBeforeUnmount(() => {
       <p class="signup-welcome">간단한 정보 입력으로 오이시담 회원이 되어보세요.</p>
 
       <form class="signup-form" :aria-busy="pending" novalidate @submit.prevent="submit">
-        <label class="signup-field" :class="{ 'has-error': shouldShowError('email') }">
-          <svg class="field-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m4 7 8 6 8-6" /></svg>
-          <input v-model="form.email" type="email" name="email" autocomplete="email" placeholder="이메일 (아이디) *" aria-label="이메일 아이디" :aria-invalid="shouldShowError('email')" :disabled="pending" @blur="touch('email')" />
-        </label>
-        <p v-if="shouldShowError('email')" class="field-error">{{ errors.email }}</p>
+        <EmailVerificationFields v-model:email="form.email" v-model:token="verificationToken" purpose="SIGNUP"
+          :disabled="pending" :email-error="errors.email" :show-email-error="shouldShowError('email')" @touch-email="touch('email')" />
 
-        <label class="signup-field" :class="{ 'has-error': shouldShowError('password') }">
-          <svg class="field-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3" /></svg>
-          <input v-model="form.password" :type="showPassword ? 'text' : 'password'" name="password" autocomplete="new-password" placeholder="비밀번호 *" aria-label="비밀번호" aria-describedby="signup-password-requirements" :aria-invalid="shouldShowError('password')" :disabled="pending" @blur="touch('password')" />
-          <button class="password-toggle" type="button" :aria-label="showPassword ? '비밀번호 숨기기' : '비밀번호 표시'" @click="showPassword = !showPassword"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /><path v-if="!showPassword" d="m3 3 18 18" /></svg></button>
-        </label>
+        <AuthPasswordField ref="firstPassword" v-model="form.password" label="비밀번호" placeholder="비밀번호 *"
+          described-by="signup-password-requirements" :invalid="shouldShowError('password')"
+          :disabled="pending" @blur="touch('password')" />
         <small id="signup-password-requirements">{{ passwordRequirements }}</small>
-        <p v-if="shouldShowError('password')" class="field-error">{{ errors.password }}</p>
+        <p v-if="shouldShowError('password')" class="auth-field-error">{{ errors.password }}</p>
 
-        <label class="signup-field" :class="{ 'has-error': shouldShowError('passwordConfirm') }">
-          <svg class="field-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3" /></svg>
-          <input v-model="form.passwordConfirm" :type="showPasswordConfirm ? 'text' : 'password'" name="passwordConfirm" autocomplete="new-password" placeholder="비밀번호 확인 *" aria-label="비밀번호 확인" :aria-invalid="shouldShowError('passwordConfirm')" :disabled="pending" @blur="touch('passwordConfirm')" />
-          <button class="password-toggle" type="button" :aria-label="showPasswordConfirm ? '비밀번호 확인 숨기기' : '비밀번호 확인 표시'" @click="showPasswordConfirm = !showPasswordConfirm"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /><path v-if="!showPasswordConfirm" d="m3 3 18 18" /></svg></button>
-        </label>
-        <p v-if="shouldShowError('passwordConfirm')" class="field-error">{{ errors.passwordConfirm }}</p>
+        <AuthPasswordField v-model="form.passwordConfirm" name="passwordConfirm" label="비밀번호 확인" placeholder="비밀번호 확인 *"
+          :invalid="shouldShowError('passwordConfirm')" :disabled="pending" @blur="touch('passwordConfirm')" />
+        <p v-if="shouldShowError('passwordConfirm')" class="auth-field-error">{{ errors.passwordConfirm }}</p>
 
-        <label class="signup-field" :class="{ 'has-error': shouldShowError('name') }">
-          <svg class="field-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5" /><path d="M5 20a7 7 0 0 1 14 0" /></svg>
+        <label class="auth-field" :class="{ 'has-error': shouldShowError('name') }">
+          <svg class="auth-field-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5" /><path d="M5 20a7 7 0 0 1 14 0" /></svg>
           <input v-model="form.name" type="text" name="name" autocomplete="name" placeholder="이름 *" aria-label="이름" :aria-invalid="shouldShowError('name')" :disabled="pending" @blur="touch('name')" />
         </label>
-        <p v-if="shouldShowError('name')" class="field-error">{{ errors.name }}</p>
+        <p v-if="shouldShowError('name')" class="auth-field-error">{{ errors.name }}</p>
 
-        <div class="signup-field" :class="{ 'has-error': shouldShowError('phone') }">
-          <svg class="field-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.2 4.3 5.6 5.5c-.8.4-1.1 1.3-.8 2.1 2.1 5.6 5.9 9.4 11.5 11.5.8.3 1.7 0 2.1-.8l1.2-2.6-4-2-1.2 1.8c-2.2-1.1-4-2.9-5.1-5.1l1.8-1.2-2-4Z" /></svg>
+        <div class="auth-field" :class="{ 'has-error': shouldShowError('phone') }">
+          <svg class="auth-field-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.2 4.3 5.6 5.5c-.8.4-1.1 1.3-.8 2.1 2.1 5.6 5.9 9.4 11.5 11.5.8.3 1.7 0 2.1-.8l1.2-2.6-4-2-1.2 1.8c-2.2-1.1-4-2.9-5.1-5.1l1.8-1.2-2-4Z" /></svg>
           <PhoneInput id="signup-phone" v-model="form.phone" label="휴대폰 번호 (선택)" :invalid="shouldShowError('phone')" :disabled="pending" @blur="touch('phone')" />
         </div>
-        <p v-if="shouldShowError('phone')" class="field-error">{{ errors.phone }}</p>
+        <p v-if="shouldShowError('phone')" class="auth-field-error">{{ errors.phone }}</p>
 
         <div class="optional-profile" :class="{ 'has-error': shouldShowError('birthDate') }">
           <div class="optional-profile-heading">
@@ -225,7 +231,7 @@ onBeforeUnmount(() => {
             </select>
           </div>
           <p class="optional-profile-hint">입력하시면 연령대별 맞춤 추천에 활용됩니다.</p>
-          <p v-if="shouldShowError('birthDate')" class="field-error">{{ errors.birthDate }}</p>
+          <p v-if="shouldShowError('birthDate')" class="auth-field-error">{{ errors.birthDate }}</p>
         </div>
 
         <div class="optional-profile gender-profile">
@@ -245,7 +251,7 @@ onBeforeUnmount(() => {
             <label><input v-model="form.privacy" type="checkbox" :disabled="pending" @change="touch('agreements')" /> <span>(필수) 개인정보 수집 및 이용에 동의합니다.</span></label>
             <button type="button" @click="openPolicy('privacy')">보기 <span aria-hidden="true">›</span></button>
           </div>
-          <p v-if="shouldShowError('agreements')" class="field-error">{{ errors.agreements }}</p>
+          <p v-if="shouldShowError('agreements')" class="auth-field-error">{{ errors.agreements }}</p>
         </div>
 
         <p v-if="requestError" class="signup-request-error" role="alert">{{ requestError }}</p>
@@ -314,73 +320,6 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 8px;
   text-align: left;
-}
-
-.signup-field {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  height: 46px;
-  padding: 0 12px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: #fff;
-}
-
-.signup-field:focus-within {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px rgb(156 79 99 / 8%);
-}
-
-.signup-field.has-error {
-  border-color: #b53951;
-}
-
-.signup-field input {
-  flex: 1;
-  min-width: 0;
-  height: 100%;
-  padding: 0;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--color-text);
-  font: inherit;
-  font-size: var(--font-size-control);
-}
-
-.signup-field input::placeholder {
-  color: #9b8e94;
-}
-
-.field-icon,
-.password-toggle svg {
-  width: 17px;
-  height: 17px;
-  flex-shrink: 0;
-  fill: none;
-  stroke: #8d7e85;
-  stroke-width: 1.4;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.password-toggle {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 32px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  cursor: pointer;
-}
-
-.field-error {
-  margin: -2px 2px 2px;
-  color: #b53951;
-  font-size: var(--font-size-caption);
-  line-height: 1.4;
 }
 
 /* 선택 프로필 정보 · 생년월일과 성별 */

@@ -1,5 +1,6 @@
 <script setup>
 import { computed, nextTick, reactive, ref, watch, onMounted, onBeforeUnmount } from 'vue'
+import { useRouter } from 'vue-router'
 import PhoneInput from '../components/common/PhoneInput.vue'
 import AddressForm from '../components/common/AddressForm.vue'
 import AlertDialog from '../components/common/AlertDialog.vue'
@@ -9,13 +10,16 @@ import { deleteAddress, getAddresses, saveAddress } from '../services/addresses.
 import { formatPhone, phoneDigits } from '../services/phone.js'
 import { loadPostcode } from '../services/postcode.js'
 import { quoteOrder, createOrder, startPayment, getPaymentConfig } from '../services/orders.js'
-import { checkout, clearCheckout, shippingFee, restoreCheckout, saveCheckoutInputs } from '../stores/checkout.js'
+import { checkout, clearCheckout, shippingFee, restoreCheckout } from '../stores/checkout.js'
 import { removeCartItems } from '../stores/cart.js'
 import { session, shoppingOwner } from '../stores/session.js'
+import { addMockOrder } from '../mocks/orders.js'
 
+const router = useRouter()
+const addressFields = ['recipient', 'phone', 'postalCode', 'address', 'detail', 'customs']
 const form = reactive({ recipient: '', phone: '', postalCode: '', address: '', detail: '', customs: '', memo: '' })
 const memoChoice = ref('')
-const previousInputs = restoreCheckout()
+restoreCheckout()
 const addresses = ref([])
 const addressDialog = ref(null)
 const deleteAddressDialog = ref(null)
@@ -30,7 +34,6 @@ const detailInput = ref(null)
 const showPostcode = ref(false)
 const postcodeError = ref('')
 const notice = ref('')
-const completed = ref(false)
 const preparing = ref(false)
 const paymentReady = ref(false)
 const paymentLoading = ref(false)
@@ -76,7 +79,7 @@ watch(shoppingOwner, async (owner, _, onCleanup) => {
     if (controller.signal.aborted) return
     addresses.value = Array.isArray(saved) ? saved : []
     const preferred = addresses.value.find((item) => item.isDefault)
-    if (!previousInputs && preferred && !form.recipient && !form.phone && !form.postalCode && !form.address && !form.detail) applyAddress(preferred)
+    if (preferred && addressFields.every((key) => !form[key])) applyAddress(preferred)
   } catch {
     if (!controller.signal.aborted) addressError.value = '배송지 목록을 불러오지 못했어요. 직접 입력할 수 있어요.'
   } finally {
@@ -85,7 +88,7 @@ watch(shoppingOwner, async (owner, _, onCleanup) => {
 }, { immediate: true })
 
 function applyAddress(address) {
-  for (const key of ['recipient', 'phone', 'postalCode', 'address', 'detail', 'customs']) form[key] = address[key] ?? ''
+  for (const key of addressFields) form[key] = address[key] ?? ''
   addressDialog.value?.close()
 }
 
@@ -115,7 +118,7 @@ async function saveDraftAddress(value) {
     if (saved.isDefault) updated = updated.map((address) => ({ ...address, isDefault: address.id === saved.id }))
     if (session.source !== 'api') localStorage.setItem('oishidam:addresses:v1:' + owner, JSON.stringify(updated))
     addresses.value = updated
-    if (wasSelected) for (const key of ['recipient', 'phone', 'postalCode', 'address', 'detail', 'customs']) form[key] = saved[key] ?? ''
+    if (wasSelected) for (const key of addressFields) form[key] = saved[key] ?? ''
     addressEditing.value = false
   } catch (error) { if (owner === shoppingOwner.value) addressError.value = error.message || '배송지를 저장하지 못했어요.' }
   finally { if (owner === shoppingOwner.value) addressBusy.value = false }
@@ -213,16 +216,8 @@ async function initializePayment() {
 
 onMounted(() => {
   mounted = true
-  if (previousInputs) {
-    if (window.confirm('주문서가 새로고침되어 결제 정보가 초기화되었습니다.\n이전에 입력하신 배송지와 통관번호를 그대로 유지하시겠습니까?')) {
-      for (const key of ['recipient', 'phone', 'postalCode', 'address', 'detail', 'memo', 'customs']) form[key] = typeof previousInputs[key] === 'string' ? previousInputs[key] : ''
-      memoChoice.value = memoOptions.some((option) => option.value === previousInputs.memoChoice) ? previousInputs.memoChoice : ''
-    }
-    saveCheckoutInputs(form, memoChoice.value)
-  }
   initializePayment()
 })
-watch([form, memoChoice], () => saveCheckoutInputs(form, memoChoice.value), { deep: true })
 onBeforeUnmount(() => {
   mounted = false
   paymentRevision++
@@ -232,7 +227,7 @@ watch(shoppingOwner, () => { if (mounted) initializePayment() })
 
 async function placeOrder() {
   notice.value = ''
-  if (!checkout.value || !items.value.length) return
+  if (!checkout.value || !items.value.length || preparing.value) return
   if (!form.recipient.trim() || !form.address.trim() || !/^\d{5}$/.test(form.postalCode.trim()) || !/^\d{9,11}$/.test(phoneDigits(form.phone))) {
     notice.value = '수령인, 연락처, 우편번호와 주소를 확인해주세요.'
     return
@@ -246,7 +241,7 @@ async function placeOrder() {
     return
   }
   if (!development.mockEnabled) {
-    if (preparing.value || !paymentReady.value || !widget) return
+    if (!paymentReady.value || !widget) return
     preparing.value = true
     try {
       if (!attempt) {
@@ -272,16 +267,39 @@ async function placeOrder() {
       sessionStorage.setItem('oishidam:payment:' + payment.orderNumber, JSON.stringify({ orderId: attempt.order.orderId, orderNumber: payment.orderNumber, amount: payment.amount, paymentRequestKey: payment.paymentRequestKey, memberId: session.member.member_id }))
       await widget.setAmount({ currency: 'KRW', value: payment.amount })
       await requestPayment(payment.orderNumber)
-    } catch (error) { notice.value = error.message || '결제 준비에 실패했습니다.' }
-    finally { preparing.value = false }
+    } catch (error) {
+      if (['ORDER_EXPIRED', 'ORDER_NOT_FOUND', 'PAYMENT_FAILED'].includes(error.code)) {
+        attempt = null
+        serverQuote.value = null
+        notice.value = error.code === 'PAYMENT_FAILED'
+          ? error.message : '결제 대기 시간이 지나 주문이 만료됐어요. 다시 결제해 주세요.'
+      } else {
+        notice.value = error.message || '결제 준비에 실패했습니다.'
+      }
+    } finally { preparing.value = false }
     return
   }
-  if (checkout.value.fromCart) {
-    try { await removeCartItems(items.value.map((item) => item.product_id)) } catch (error) { notice.value = error.message; return }
+  preparing.value = true
+  const owner = shoppingOwner.value
+  const details = {
+    items: items.value, itemsAmount: subtotal.value, shippingFee, total: totalAmount.value,
+    recipient: {
+      recipientName: form.recipient, recipientPhone: phoneDigits(form.phone), postalCode: form.postalCode,
+      addressLine1: form.address, addressLine2: form.detail, customsCode: form.customs,
+      deliveryMemo: memoChoice.value === 'custom' ? form.memo.trim() : memoChoice.value,
+    },
   }
-  for (const key of Object.keys(form)) form[key] = ''
-  completed.value = true
-  clearCheckout()
+  try {
+    if (checkout.value.fromCart) await removeCartItems(details.items.map((item) => item.product_id))
+    if (shoppingOwner.value !== owner) return
+    const order = addMockOrder(owner, details)
+    clearCheckout()
+    await router.replace({ name: 'MyPageOrderDetail', params: { orderId: order.id } })
+  } catch (error) {
+    notice.value = error.message
+  } finally {
+    preparing.value = false
+  }
 }
 
 async function requestPayment(orderNumber) {
@@ -304,12 +322,7 @@ async function requestPayment(orderNumber) {
         <div><h1>주문서</h1><p>주문 정보를 확인하고 주문을 완료해 주세요.</p></div>
       </header>
 
-      <section v-if="completed" class="checkout-card checkout-state">
-        <h2>모의 주문을 완료했어요</h2>
-        <p>주문서 확인이 끝났어요.</p>
-        <RouterLink class="checkout-button primary" :to="{ name: 'Products' }">상품 더 보기</RouterLink>
-      </section>
-      <section v-else-if="!items.length" class="checkout-card checkout-state">
+      <section v-if="!items.length" class="checkout-card checkout-state">
         <h2>주문할 상품을 선택해주세요</h2>
         <p>장바구니에서 상품을 선택하거나 상품 상세에서 바로 구매할 수 있어요.</p>
         <RouterLink class="checkout-button primary" :to="{ name: 'MyPageCart' }">장바구니로 돌아가기</RouterLink>

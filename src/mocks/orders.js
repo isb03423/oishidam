@@ -8,6 +8,25 @@ const exampleProducts = {
   'calbee-usushio': { name: '칼비 포테토칩 우스시오맛', tone: 'potato', category_id: '79', price: 4500 },
 }
 
+// shortcut: 모의 주문은 현재 탭에서만 보관하며, 지속 저장이 필요하면 개발용 주문 API를 사용한다.
+const placedOrders = new Map()
+
+export function addMockOrder(owner, { items, itemsAmount, shippingFee, total, recipient }) {
+  const date = new Date()
+  const order = {
+    id: 'DEMO-' + crypto.randomUUID().slice(0, 8).toUpperCase(),
+    date,
+    displayDate: new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeStyle: 'short' }).format(date),
+    status: '결제 완료',
+    paidAt: date.toISOString(),
+    items: items.map((item) => ({ ...item })),
+    quantity: items.reduce((sum, item) => sum + item.quantity, 0),
+    itemsAmount, shippingFee, total, recipient,
+  }
+  placedOrders.set(owner, [order, ...(placedOrders.get(owner) ?? [])])
+  return order
+}
+
 export function exampleOrderProduct(key) {
   const { name, tone } = exampleProducts[key]
   return { product_id: 'example-order-' + key, name, tone }
@@ -52,8 +71,8 @@ const examples = [
   ]],
 ]
 
-export function getExampleOrders(today) {
-  return examples.map(([daysAgo, serial, status, products]) => {
+export function getExampleOrders(today, owner) {
+  const exampleOrders = examples.map(([daysAgo, serial, status, products]) => {
     const date = new Date(today)
     date.setDate(date.getDate() - daysAgo)
     const dateParts = [date.getFullYear(), date.getMonth() + 1, date.getDate()]
@@ -72,4 +91,5 @@ export function getExampleOrders(today) {
       total: items.reduce((sum, item) => sum + item.price * item.quantity, 0),
     }
   })
+  return [...(placedOrders.get(owner) ?? []), ...exampleOrders]
 }

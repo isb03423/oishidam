@@ -3,6 +3,7 @@ import { getPasswordError, passwordRequirements } from '../services/passwordPoli
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import MyPageLayout from '../components/MyPageLayout.vue'
+import AuthPasswordField from '../components/common/AuthPasswordField.vue'
 import { changePassword, clearPasswordProof } from '../services/account.js'
 
 const router = useRouter()
@@ -41,9 +42,10 @@ async function submit() {
     </section>
     <form v-else class="account-card password-card" @submit.prevent="submit">
       <small id="password-requirements" class="password-requirements">{{ passwordRequirements }}</small>
-      <label>현재 비밀번호<input v-model="current" type="password" autocomplete="current-password" required /></label>
-      <label>새 비밀번호<input v-model="password" type="password" autocomplete="new-password" minlength="8" aria-describedby="password-requirements" required /></label>
-      <label>새 비밀번호 확인<input v-model="confirmation" type="password" autocomplete="new-password" minlength="8" required :aria-invalid="passwordMismatch || undefined" :aria-describedby="passwordMismatch ? 'password-mismatch' : undefined" /></label>
+      <AuthPasswordField v-model="current" label="현재 비밀번호" name="currentPassword" autocomplete="current-password" :disabled="pending" />
+      <AuthPasswordField v-model="password" label="새 비밀번호" :minlength="8" described-by="password-requirements" :disabled="pending" />
+      <AuthPasswordField v-model="confirmation" label="새 비밀번호 확인" name="passwordConfirm" :minlength="8"
+        :invalid="passwordMismatch" :described-by="passwordMismatch ? 'password-mismatch' : undefined" :disabled="pending" />
       <p v-if="passwordMismatch" id="password-mismatch" class="account-message password-mismatch" aria-live="polite">새 비밀번호가 일치하지 않습니다.</p>
       <p v-if="errorMessage" class="account-message" role="alert">{{ errorMessage }}</p>
       <div class="account-actions">

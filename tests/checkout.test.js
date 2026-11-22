@@ -12,21 +12,17 @@ const key = 'oishidam:checkout:v1'
 const member = (id) => session.setSession({ member_id: id, name: '회원' })
 const item = { product_id: '42', name: '상품', quantity: 2, price: 5000 }
 
-test('새로고침 시 상품·배송지·통관번호를 복원한다', () => {
+test('새로고침 시 상품을 복원하고 예전 배송정보와 통관번호를 지운다', () => {
   member(1)
   store.startCheckout([item], true)
-  store.saveCheckoutInputs({ recipient: '테스트', phone: '01012345678', address: '주소', customs: 'P123456789012' }, 'custom')
-  const snapshot = saved.get(key)
-  assert.equal(JSON.parse(snapshot).inputs.customs, 'P123456789012')
+  const oldDraft = JSON.parse(saved.get(key))
+  oldDraft.inputs = { recipient: '테스트', phone: '01012345678', address: '주소', customs: 'P123456789012', memo: '배송메모' }
   store.clearCheckout()
-  saved.set(key, snapshot)
-  const inputs = store.restoreCheckout()
-  assert.equal(inputs.recipient, '테스트')
-  assert.equal(inputs.customs, 'P123456789012')
-  assert.equal(inputs.memoChoice, 'custom')
+  saved.set(key, JSON.stringify(oldDraft))
+  store.restoreCheckout()
   assert.equal(store.checkout.value.items[0].product_id, '42')
   assert.equal(store.checkout.value.fromCart, true)
-  assert.equal(store.restoreCheckout(), null)
+  assert.equal(JSON.parse(saved.get(key)).inputs, undefined)
 })
 
 test('새 주문·계정 변경·로그아웃 때 이전 입력값이 남지 않는다', () => {
@@ -37,7 +33,7 @@ test('새 주문·계정 변경·로그아웃 때 이전 입력값이 남지 않
   assert.equal(store.checkout.value, null)
   assert.equal(saved.has(key), false)
   saved.set(key, snapshot)
-  assert.equal(store.restoreCheckout(), null)
+  store.restoreCheckout()
   assert.equal(store.checkout.value, null)
   store.startCheckout([item])
   session.clearSession()

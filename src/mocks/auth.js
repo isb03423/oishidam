@@ -17,6 +17,16 @@ const registeredPasswords = new Map([
 ])
 
 const withdrawnMembers = new Set()
+const emailVerifications = new Map()
+
+function consumeVerification(email, purpose, token) {
+  const key = purpose + ':' + email
+  const verification = emailVerifications.get(key)
+  if (!verification?.token || verification.token !== token || verification.expiresAt <= Date.now()) {
+    fail(400, 'INVALID_EMAIL_VERIFICATION', '이메일 인증이 만료되었거나 유효하지 않습니다. 다시 인증해주세요.')
+  }
+  emailVerifications.delete(key)
+}
 
 export function getMockCustomers() {
   return [...registeredMembers.values()]
@@ -51,6 +61,51 @@ export function handleAuthRequest(path, data = {}) {
     return { member: { member_id: 'demo-kakao', email: null, name: '카카오회원', role: 'CUSTOMER', status: 'ACTIVE', cart_count: 0 } }
   }
   const email = String(data.email || '').trim().toLowerCase()
+  if (path === '/auth/signup/email-availability') {
+    if (registeredMembers.has(email)) fail(409, 'EMAIL_ALREADY_EXISTS', '이미 사용 중인 이메일입니다.')
+    return null
+  }
+  if (path === '/auth/email-verifications/extend') {
+    const verification = emailVerifications.get((data.purpose ?? 'PASSWORD_RESET') + ':' + email)
+    if (!verification?.requestToken || verification.requestToken !== data.extensionToken || verification.expiresAt <= Date.now()) {
+      fail(400, 'INVALID_EMAIL_WINDOW', '인증 시간을 연장할 수 없습니다. 인증번호를 다시 요청해주세요.')
+    }
+    verification.extensionToken ??= globalThis.crypto.randomUUID()
+    return { extensionToken: verification.extensionToken, expiresAt: new Date(verification.expiresAt + 300_000).toISOString(), serverTime: new Date().toISOString() }
+  }
+  if (path === '/auth/email-verifications' || path === '/auth/email-verifications/confirm') {
+    const { purpose, code } = data
+    const key = purpose + ':' + email
+    const verification = emailVerifications.get(key)
+    if (path.endsWith('/confirm')) {
+      const extended = verification?.extensionToken && verification.extensionToken === data.extensionToken
+      if (!verification || verification.eligible === false || verification.token
+          || verification.expiresAt + (extended ? 300_000 : 0) <= Date.now() || verification.attempts >= 5) {
+        fail(400, 'INVALID_EMAIL_CODE', '인증번호가 올바르지 않거나 만료되었습니다.')
+      }
+      verification.attempts++
+      if (code !== '123456') fail(400, 'INVALID_EMAIL_CODE', '인증번호가 올바르지 않습니다.')
+      verification.token = globalThis.crypto.randomUUID()
+      verification.expiresAt = Date.now() + 900_000
+      return { verificationToken: verification.token }
+    }
+    if (purpose === 'SIGNUP' && registeredMembers.has(email)) fail(409, 'EMAIL_ALREADY_EXISTS', '이미 사용 중인 이메일입니다.')
+    const expiresAt = Date.now() + 300_000
+    const requestToken = globalThis.crypto.randomUUID()
+    const eligible = purpose === 'SIGNUP' || (registeredPasswords.has(email) && !withdrawnMembers.has(registeredMembers.get(email)?.member_id))
+    emailVerifications.set(key, { expiresAt, attempts: 0, requestToken, eligible })
+    return { extensionToken: requestToken, expiresAt: new Date(expiresAt).toISOString(), serverTime: new Date().toISOString() }
+  }
+  if (path === '/auth/password-reset') {
+    validateNewPassword(data.newPassword, '새 비밀번호')
+    if (data.newPassword !== data.passwordConfirm) fail(400, 'PASSWORD_MISMATCH', '새 비밀번호 확인이 일치하지 않습니다.')
+    consumeVerification(email, 'PASSWORD_RESET', data.verificationToken)
+    if (!registeredPasswords.has(email) || withdrawnMembers.has(registeredMembers.get(email)?.member_id)) {
+      fail(400, 'INVALID_EMAIL_VERIFICATION', '이메일 인증이 만료되었거나 유효하지 않습니다.')
+    }
+    registeredPasswords.set(email, data.newPassword)
+    return null
+  }
   if (path === '/auth/signup') {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) fail(400, 'INVALID_EMAIL', '이메일 형식을 확인해주세요.')
     if (email.length > 254) fail(400, 'INVALID_EMAIL', '이메일은 254자 이내로 입력해주세요.')
@@ -61,6 +116,7 @@ export function handleAuthRequest(path, data = {}) {
     if (data.gender && !['FEMALE', 'MALE', 'NONE'].includes(data.gender)) fail(400, 'INVALID_GENDER', '성별 선택값을 확인해주세요.')
     if (!data.terms_agreed || !data.privacy_agreed) fail(400, 'REQUIRED_AGREEMENT_MISSING', '필수 약관에 동의해주세요.')
     if (registeredMembers.has(email)) fail(409, 'EMAIL_ALREADY_EXISTS', '이미 사용 중인 이메일입니다.')
+    consumeVerification(email, 'SIGNUP', data.verificationToken)
     const member = { member_id: `mock-member-${Date.now()}`, email, name: String(data.name).trim(), phone: data.phone || '', birth_date: data.birth_date || '', gender: data.gender || '', joined_at: new Date().toISOString().slice(0, 10), role: 'CUSTOMER', status: 'ACTIVE' }
     registeredMembers.set(email, member)
     registeredPasswords.set(email, String(data.password))
@@ -93,6 +149,7 @@ export function changeMockPassword(email, newPassword, confirmation) {
   if (newPassword !== confirmation) fail(400, 'PASSWORD_MISMATCH', '새 비밀번호 확인이 일치하지 않습니다.')
   if (registeredPasswords.get(email) === newPassword) fail(400, 'SAME_PASSWORD', '현재 비밀번호와 다른 비밀번호를 입력해주세요.')
   registeredPasswords.set(email, newPassword)
+  emailVerifications.delete('PASSWORD_RESET:' + email)
 }
 
 export function updateMockMember(email, { name, phone, birth_date, gender }) {

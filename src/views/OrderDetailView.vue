@@ -12,7 +12,6 @@ const route = useRoute()
 const isItemsExpanded = ref(false)
 const cancellationDialog = ref(null)
 const currency = new Intl.NumberFormat('ko-KR')
-const orders = getExampleOrders(new Date())
 const order = ref(null)
 const error = ref('')
 const cancelError = ref('')
@@ -26,7 +25,7 @@ async function load() {
   order.value = null
   error.value = ''
   if (session.source === 'mock') {
-    order.value = orders.find((item) => item.id === id) ?? null
+    order.value = getExampleOrders(new Date(), shoppingOwner.value).find((item) => item.id === id) ?? null
     if (!order.value) error.value = '주문을 찾을 수 없습니다.'
     return
   }
@@ -42,15 +41,26 @@ async function load() {
 watch([() => route.params.orderId, shoppingOwner], load, { immediate: true })
 onBeforeUnmount(() => { revision++ })
 
+function openCancellation() {
+  cancelError.value = ''
+  cancelReason.value = ''
+  cancellationDialog.value.showModal()
+}
+
 async function confirmCancellation() {
-  if (busy.value || !order.value) return
+  if (busy.value || !order.value?.canCancel || session.source === 'mock') return
+  const current = revision
   busy.value = true
   cancelError.value = ''
   try {
     await cancelOrder(order.value.orderId, cancelReason.value.trim())
-    cancellationDialog.value.close()
-    await load()
-  } catch (failure) { cancelError.value = failure.message } finally { busy.value = false }
+    if (current === revision) {
+      cancellationDialog.value?.close()
+      await load()
+    }
+  } catch (failure) {
+    if (current === revision) cancelError.value = failure.message
+  } finally { busy.value = false }
 }
 
 const visibleItems = computed(() =>
@@ -128,11 +138,31 @@ const won = (price) => `${currency.format(price)}원`
       </footer>
     </article>
 
-    <dialog ref="cancellationDialog" class="order-cancel-dialog" aria-labelledby="cancel-dialog-title">
+    <dialog ref="cancellationDialog" class="order-cancel-dialog" aria-labelledby="cancel-dialog-title"
+      aria-describedby="cancel-dialog-description" @cancel="busy && $event.preventDefault()">
       <h2 id="cancel-dialog-title">주문 취소</h2>
-      <p v-if="session.source === 'mock'">주문 취소 기능을 준비 중입니다.</p>
-      <template v-else><p>주문을 취소하시겠어요?</p><label>취소 사유 <input v-model="cancelReason" maxlength="200" /></label><p v-if="cancelError" role="alert">{{ cancelError }}</p></template>
-      <div><button class="order-cancel-button" type="button" :disabled="busy" @click="cancellationDialog.close()">닫기</button> <button v-if="session.source !== 'mock'" class="order-cancel-button" type="button" :disabled="busy" @click="confirmCancellation">주문 취소</button></div>
+      <p id="cancel-dialog-description">
+        {{ session.source === 'mock' ? '모의 주문은 취소할 수 없습니다.' : '이 주문 전체를 취소할까요?' }}
+      </p>
+      <form :aria-busy="busy" @submit.prevent="confirmCancellation">
+        <template v-if="order && session.source !== 'mock'">
+          <dl class="cancel-summary">
+            <div><dt>주문번호</dt><dd>{{ order.id }}</dd></div>
+            <div><dt>총 결제금액</dt><dd>{{ won(order.total) }}</dd></div>
+          </dl>
+          <label for="cancel-reason">취소 사유 <span>(선택)</span></label>
+          <textarea id="cancel-reason" v-model="cancelReason" rows="3" maxlength="200" :disabled="busy" />
+          <p v-if="cancelError" class="cancel-error" role="alert">{{ cancelError }}</p>
+        </template>
+        <div class="cancel-actions">
+          <button type="button" autofocus :disabled="busy" @click="cancellationDialog.close()">
+            {{ session.source === 'mock' ? '닫기' : '주문 유지' }}
+          </button>
+          <button v-if="order?.canCancel && session.source !== 'mock'" class="cancel-confirm" type="submit" :disabled="busy">
+            {{ busy ? '취소 처리 중…' : '주문 취소하기' }}
+          </button>
+        </div>
+      </form>
     </dialog>
 
     <template #side>
@@ -141,11 +171,11 @@ const won = (price) => `${currency.format(price)}원`
           <h2>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h8l3 3v15H7zM15 3v4h4M10 12h5M10 16h5" /></svg>
             주문정보
-            <button v-if="session.source === 'mock' || order.canCancel" class="order-cancel-button" type="button" @click="cancelError = ''; cancelReason = ''; cancellationDialog.showModal()">주문 취소</button>
+            <button v-if="session.source === 'mock' || order.canCancel" class="order-cancel-button" type="button" @click="openCancellation">주문 취소</button>
           </h2>
           <dl>
             <div><dt>주문번호</dt><dd>{{ order.id }}</dd></div>
-            <div><dt>주문일시</dt><dd>{{ order.displayDate }}<template v-if="session.source === 'mock'"> 14:32</template></dd></div>
+            <div><dt>주문일시</dt><dd>{{ order.displayDate }}<template v-if="session.source === 'mock' && !order.paidAt"> 14:32</template></dd></div>
             <div><dt>주문상태</dt><dd><span class="status-chip">{{ order.status }}</span></dd></div>
           </dl>
         </section>
@@ -170,8 +200,8 @@ const won = (price) => `${currency.format(price)}원`
             결제정보
           </h2>
           <dl>
-            <div><dt>결제수단</dt><dd>{{ session.source === 'mock' ? '카드 결제 (삼성카드)' : '—' }}</dd></div>
-            <div><dt>결제일시</dt><dd>{{ session.source === 'mock' ? order.displayDate + ' 14:32' : order.paidAt?.replace('T', ' ').slice(0, 16) ?? '—' }}</dd></div>
+            <div><dt>결제수단</dt><dd>{{ session.source === 'mock' ? (order.paidAt ? '모의 결제' : '카드 결제 (삼성카드)') : '—' }}</dd></div>
+            <div><dt>결제일시</dt><dd>{{ session.source === 'mock' ? order.displayDate + (order.paidAt ? '' : ' 14:32') : order.paidAt?.replace('T', ' ').slice(0, 16) ?? '—' }}</dd></div>
             <div><dt>결제금액</dt><dd>{{ won(order.total) }}</dd></div>
           </dl>
         </section>
@@ -204,28 +234,87 @@ const won = (price) => `${currency.format(price)}원`
 }
 
 .order-cancel-dialog {
-  width: min(340px, calc(100% - 32px));
-  padding: 22px;
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
+  width: min(420px, calc(100% - 32px));
+  max-height: calc(100% - 32px);
+  margin: auto;
+  padding: 24px;
+  overscroll-behavior: contain;
+  border: 0;
+  border-radius: 16px;
+  background: var(--color-white);
   color: var(--color-text);
+  box-shadow: 0 16px 48px rgb(57 44 50 / 24%);
 }
 
 .order-cancel-dialog::backdrop {
-  background: rgb(57 44 50 / 40%);
+  background: rgb(57 44 50 / 54%);
 }
 
 .order-cancel-dialog h2 {
-  font-size: var(--font-size-section);
+  margin: 0;
+  font-size: 1.375rem;
+  font-weight: 700;
 }
 
-.order-cancel-dialog p {
-  margin: 12px 0;
+#cancel-dialog-description {
+  margin: 8px 0 20px;
+  color: #62555c;
   font-size: var(--font-size-body);
 }
 
-.order-cancel-dialog form {
-  text-align: right;
+.cancel-summary {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 18px;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--color-background);
+  font-size: var(--font-size-label);
+}
+
+.cancel-summary div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; }
+.cancel-summary dd { margin: 0; font-weight: 650; overflow-wrap: anywhere; }
+.order-cancel-dialog label { display: block; margin-bottom: 6px; font-weight: 600; }
+.order-cancel-dialog label span { color: #62555c; font-weight: 400; }
+
+.order-cancel-dialog textarea {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  resize: vertical;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  color: var(--color-text);
+  font: inherit;
+}
+
+.cancel-error { margin: 8px 0 0; color: #a12c49; font-size: var(--font-size-label); }
+.cancel-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+
+.cancel-actions button {
+  flex: 1;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-white);
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.cancel-actions .cancel-confirm {
+  border-color: #a12c49;
+  background: #a12c49;
+  color: #fff;
+}
+
+.cancel-actions button:hover:enabled { filter: brightness(.94); }
+.cancel-actions button:disabled { opacity: .65; cursor: default; }
+.cancel-actions button:focus-visible, .order-cancel-dialog textarea:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 .back-to-orders {

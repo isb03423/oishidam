@@ -40,7 +40,7 @@ const won = (price) => `${currency.format(price)}원`
 watch([shoppingOwner, page, months, keyword, status], async () => {
   const current = ++revision
   error.value = ''
-  if (session.source === 'mock') { orders.value = getExampleOrders(new Date()); loading.value = false; return }
+  if (session.source === 'mock') { orders.value = getExampleOrders(new Date(), shoppingOwner.value); loading.value = false; return }
   if (session.source !== 'api') { orders.value = []; return }
   loading.value = true
   orders.value = []

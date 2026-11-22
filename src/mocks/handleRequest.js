@@ -18,7 +18,10 @@ function summarize(product) {
 }
 export function handleMockRequest({ method = 'GET', path, params = {}, data, scenario = 'normal' }) {
   if (scenario === 'error') fail(503, 'MOCK_UNAVAILABLE', '테스트용 서버 오류입니다.')
-  if (method.toUpperCase() === 'POST' && ['/auth/login', '/auth/kakao', '/auth/logout', '/auth/signup'].includes(path)) {
+  if (method.toUpperCase() === 'POST' && [
+    '/auth/login', '/auth/kakao', '/auth/logout', '/auth/signup', '/auth/signup/email-availability', '/auth/email-verifications',
+    '/auth/email-verifications/confirm', '/auth/email-verifications/extend', '/auth/password-reset',
+  ].includes(path)) {
     return handleAuthRequest(path, data)
   }
   if (method.toUpperCase() !== 'GET') fail(501, 'MOCK_NOT_IMPLEMENTED', '아직 구현하지 않은 mock API입니다.')

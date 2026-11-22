@@ -59,6 +59,12 @@ const routes = [
     component: () => import('../views/auth/SignupView.vue')
   },
   {
+    path: '/password-reset',
+    name: 'PasswordReset',
+    meta: { hideLayout: true },
+    component: () => import('../views/auth/PasswordResetView.vue'),
+  },
+  {
     path: '/mypage',
     name: 'MyPage',
     component: () => import('../views/MyPageView.vue')

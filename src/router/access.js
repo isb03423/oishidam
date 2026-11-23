@@ -11,6 +11,9 @@ export function accessDeniedReason(to, member) {
 }
 
 export function accessRedirect(to, from, member) {
+  if (member?.role === 'ADMIN' && !['AdminDashboard', 'AccessDenied', 'NotFound'].includes(to.name)) {
+    return { path: '/admin', replace: true }
+  }
   const reason = accessDeniedReason(to, member)
   if (!reason) return
   if (reason === 'login' && from !== START_LOCATION) return { name: 'Login' }

@@ -25,6 +25,16 @@ def analyze_pending_reviews(limit: int = Query(default=500, ge=1, le=500)):
     return sentiment.analyze_pending_reviews(limit)
 
 
+@router.get("/reanalyze-all")
+def full_reanalysis_status():
+    return sentiment.full_reanalysis_status()
+
+
+@router.post("/reanalyze-all", status_code=202)
+def start_full_reanalysis():
+    return sentiment.start_full_reanalysis()
+
+
 @router.get("/summary")
 def product_sentiment_summary(product_id: int | None = Query(default=None, ge=1)):
     """전체 또는 특정 상품의 5단계 감성 분포를 조회한다."""

@@ -20,7 +20,6 @@ SEGMENT_LABELS = {
 def load_rfm() -> pd.DataFrame:
     df = query_df("""
         SELECT m.member_id
-             , m.name
              , COALESCE(m.gender, 'n') AS gender
              , m.birth_year AS birth_year
              , COUNT(o.order_id) AS frequency
@@ -33,7 +32,7 @@ def load_rfm() -> pd.DataFrame:
             ON m.member_id = o.member_id
            AND o.order_status NOT IN ('PAYMENT_PENDING', 'PAYMENT_FAILED', 'CANCEL_PENDING', 'CANCELLED')
          WHERE m.role = 'USER'
-         GROUP BY m.member_id, m.name, m.gender, m.birth_year, m.created_at
+         GROUP BY m.member_id, m.gender, m.birth_year, m.created_at
         """)
     if df.empty:
         return df
@@ -411,7 +410,6 @@ def analyze(with_charts: bool = True) -> dict:
         "top_customers": top[
             [
                 "member_id",
-                "name",
                 "frequency",
                 "monetary",
                 "avg_order_value",

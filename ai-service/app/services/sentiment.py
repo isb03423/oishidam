@@ -3,7 +3,7 @@ import logging
 import re
 from functools import lru_cache
 from pathlib import Path
-from threading import Lock
+from threading import Lock, Thread
 
 from sqlalchemy import text as sql_text
 
@@ -14,6 +14,16 @@ MODEL_REVISION = "eea032081f8d247b4303ef3565e7cec1b6f201c9"
 _model_name = f"{MODEL_ID}@{MODEL_REVISION[:12]}"
 _fallback_name = "knu-sentilex"
 _load_lock = Lock()
+_REVIEW_BATCH_SIZE = 16
+_PENDING_REVIEWS = """
+    FROM reviews r
+    LEFT JOIN review_sentiments s ON s.review_id = r.review_id
+    WHERE r.deleted_at IS NULL
+      AND (s.review_id IS NULL OR (:upgrade AND s.model_name IS DISTINCT FROM :model_name))
+"""
+_reanalysis_lock = Lock()
+# shortcut: 단일 AI 서비스 프로세스에서 상태를 관리한다. 다중 워커나 재시작 복구가 필요하면 DB로 옮긴다.
+_reanalysis = {"status": "IDLE", "analyzed": 0}
 logger = logging.getLogger(__name__)
 SENTIMENT_LABELS = (
     "VERY_POSITIVE", "POSITIVE", "NEUTRAL", "NEGATIVE", "VERY_NEGATIVE"
@@ -179,10 +189,32 @@ def analyze_review(review_id: int, member_id: int) -> dict:
                 "confidence": result["confidence"], "model": result["model"]}
 
 
+def _analyze_batch(connection, reviews, classifier) -> None:
+    predictions = _analyze_many([review["content"] for review in reviews], classifier)
+    _save_results(connection, [
+        {
+            "review_id": review["review_id"],
+            "sentiment": result["sentiment"],
+            "confidence": result["confidence"],
+            "model_name": result["model"],
+        }
+        for review, result in zip(reviews, predictions, strict=True)
+    ])
+
+
 def analyze_pending_reviews(limit: int = 500) -> dict:
     """미분석·본문 수정·구버전 결과를 16건 단위 트랜잭션으로 분석·저장한다."""
     if not 1 <= limit <= 500:
         raise ValueError("limit은 1 이상 500 이하여야 합니다.")
+
+    # 미분석·구버전 후기가 없으면 모델을 초기화하지 않는다.
+    with engine.connect() as connection:
+        pending = connection.execute(
+            sql_text("SELECT 1 " + _PENDING_REVIEWS + " LIMIT 1"),
+            {"upgrade": True, "model_name": _model_name},
+        ).scalar_one_or_none()
+    if pending is None:
+        return {"analyzed": 0, "model": _model_name}
 
     classifier = _get_classifier()
     model_name = _model_name if classifier is not None else _fallback_name
@@ -190,35 +222,83 @@ def analyze_pending_reviews(limit: int = 500) -> dict:
     while analyzed < limit:
         with engine.begin() as connection:
             # 분석 중 본문 변경을 막고, 다른 분석 요청이 처리 중인 리뷰는 건너뛴다.
-            reviews = connection.execute(sql_text("""
-                SELECT r.review_id, r.content
-                FROM reviews r
-                LEFT JOIN review_sentiments s ON s.review_id = r.review_id
-                WHERE r.deleted_at IS NULL
-                  AND (s.review_id IS NULL OR (:upgrade AND s.model_name IS DISTINCT FROM :model_name))
+            reviews = connection.execute(sql_text("SELECT r.review_id, r.content " + _PENDING_REVIEWS + """
                 ORDER BY r.review_id
                 LIMIT :limit
                 FOR UPDATE OF r SKIP LOCKED
-            """), {"limit": min(16, limit - analyzed), "upgrade": classifier is not None, "model_name": model_name}).mappings().all()
+            """), {
+                "limit": min(_REVIEW_BATCH_SIZE, limit - analyzed),
+                "upgrade": classifier is not None,
+                "model_name": model_name,
+            }).mappings().all()
 
             if not reviews:
                 break
 
-            results = []
-            predictions = _analyze_many([review["content"] for review in reviews], classifier)
-            for review, result in zip(reviews, predictions):
-                results.append({
-                    "review_id": review["review_id"],
-                    "sentiment": result["sentiment"],
-                    "confidence": result["confidence"],
-                    "model_name": result["model"],
-                })
-
-            if results:
-                _save_results(connection, results)
-            analyzed += len(results)
+            _analyze_batch(connection, reviews, classifier)
+        analyzed += len(reviews)
 
     return {"analyzed": analyzed, "model": model_name}
+
+
+def full_reanalysis_status() -> dict:
+    with _reanalysis_lock:
+        return _reanalysis.copy()
+
+
+def start_full_reanalysis() -> dict:
+    with _reanalysis_lock:
+        if _reanalysis["status"] != "RUNNING":
+            _reanalysis.update(status="RUNNING", analyzed=0)
+            try:
+                Thread(target=_reanalyze_all_reviews, daemon=True).start()
+            except RuntimeError:
+                logger.exception("전체 후기 재분석을 시작하지 못했습니다.")
+                _reanalysis["status"] = "FAILED"
+        return _reanalysis.copy()
+
+
+def _reanalyze_all_reviews() -> None:
+    try:
+        with engine.connect() as connection:
+            last_id = connection.execute(sql_text("""
+                SELECT COALESCE(MAX(review_id), 0) FROM reviews WHERE deleted_at IS NULL
+            """)).scalar_one()
+
+        if last_id:
+            classifier = _get_classifier()
+            if classifier is None:
+                raise RuntimeError("문장 모델을 사용할 수 없어 전체 재분석을 중단합니다.")
+
+            after_id = 0
+            while after_id < last_id:
+                with engine.begin() as connection:
+                    reviews = connection.execute(sql_text("""
+                        SELECT review_id, content
+                        FROM reviews
+                        WHERE deleted_at IS NULL AND review_id > :after_id AND review_id <= :last_id
+                        ORDER BY review_id
+                        LIMIT :limit
+                        FOR UPDATE
+                    """), {
+                        "after_id": after_id,
+                        "last_id": last_id,
+                        "limit": _REVIEW_BATCH_SIZE,
+                    }).mappings().all()
+                    if not reviews:
+                        break
+                    _analyze_batch(connection, reviews, classifier)
+
+                after_id = reviews[-1]["review_id"]
+                with _reanalysis_lock:
+                    _reanalysis["analyzed"] += len(reviews)
+
+        with _reanalysis_lock:
+            _reanalysis["status"] = "COMPLETED"
+    except Exception:
+        logger.exception("전체 후기 재분석에 실패했습니다.")
+        with _reanalysis_lock:
+            _reanalysis["status"] = "FAILED"
 
 
 def product_sentiment_summary(product_id: int | None = None) -> dict:

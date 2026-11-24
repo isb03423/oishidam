@@ -5,7 +5,13 @@ import AdminIcon from '../components/admin/AdminIcon.vue'
 import AdminMemberDetail from '../components/admin/AdminMemberDetail.vue'
 import AdminSegmentDonut from '../components/admin/AdminSegmentDonut.vue'
 import { activateAdminRow, activateAdminRowKey } from '../utils/adminRow.js'
-import { getAdminCustomerAnalytics, getAdminDetail, setAdminMemberStatus } from '../services/admin.js'
+import {
+  getAdminCustomerAnalytics,
+  getAdminCustomerAnalysisStatus,
+  getAdminDetail,
+  setAdminMemberStatus,
+  startAdminCustomerAnalysis,
+} from '../services/admin.js'
 import {
   getSessionRevision,
   session,
@@ -15,8 +21,9 @@ import {
 const report = ref(null),
   loading = ref(false),
   error = ref(''),
-  retry = ref(0),
-  updatedAt = ref('')
+  retry = ref(0)
+const analysisRunning = ref(false), analysisError = ref('')
+let analysisController = null, analysisTimer = null
 const id = useId()
 const memberDialog = ref(null), memberId = ref(null), member = ref(null)
 const memberLoading = ref(false), memberBusy = ref(false), memberError = ref(''), memberNotice = ref(''), memberRetry = ref(0)
@@ -62,7 +69,11 @@ async function toggleMemberStatus() {
     if (valid()) memberError.value = failure.message
   } finally { if (valid()) memberBusy.value = false }
 }
-onBeforeUnmount(() => { disposed = true; memberDialog.value?.close() })
+onBeforeUnmount(() => {
+  disposed = true
+  memberDialog.value?.close()
+  clearAnalysisTracking()
+})
 
 const numbers = new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 2 })
 const number = (value) => (value == null ? '—' : numbers.format(value))
@@ -118,65 +129,119 @@ const segmentRules = [
     '가입 30일 초과, 구매 이력이 있고 마지막 구매 후 90일 초과',
   ],
 ]
+const analysisTime = new Intl.DateTimeFormat('ko-KR', {
+  timeZone: 'Asia/Seoul',
+  dateStyle: 'medium',
+  timeStyle: 'medium',
+})
+const updatedAt = computed(() => {
+  const timestamp = Date.parse(report.value?.analyzed_at)
+  return Number.isFinite(timestamp) ? analysisTime.format(timestamp) : ''
+})
+
 watch(
   [shoppingOwner, retry],
-  async (_, __, onCleanup) => {
-    const controller = new AbortController(),
-      revision = getSessionRevision()
+  async ([owner], [previousOwner], onCleanup) => {
+    const controller = new AbortController(), revision = getSessionRevision()
+    const valid = () => !controller.signal.aborted && revision === getSessionRevision()
     onCleanup(() => controller.abort())
-    report.value = null
+    if (owner !== previousOwner) report.value = null
     error.value = ''
-    updatedAt.value = ''
     loading.value = false
     if (session.source !== 'api' || session.member?.role !== 'ADMIN') return
     loading.value = true
     try {
       const result = await getAdminCustomerAnalytics(controller.signal)
-      if (controller.signal.aborted || revision !== getSessionRevision()) return
-      report.value = result
-      updatedAt.value = new Intl.DateTimeFormat('ko-KR', {
-        timeZone: 'Asia/Seoul',
-        dateStyle: 'medium',
-        timeStyle: 'short',
-      }).format(new Date())
+      if (valid()) report.value = result
     } catch (failure) {
-      if (!controller.signal.aborted && revision === getSessionRevision())
-        error.value = failure.message
+      if (valid()) error.value = failure.message
     } finally {
-      if (!controller.signal.aborted && revision === getSessionRevision())
-        loading.value = false
+      if (valid()) loading.value = false
     }
   },
   { immediate: true },
 )
+
+function clearAnalysisTracking() {
+  analysisController?.abort()
+  clearTimeout(analysisTimer)
+  analysisController = analysisTimer = null
+  analysisRunning.value = false
+  analysisError.value = ''
+}
+
+async function trackAnalysis(start = false) {
+  if (session.source !== 'api' || session.member?.role !== 'ADMIN') return
+  if (start && (loading.value || analysisRunning.value)) return
+
+  analysisController?.abort()
+  clearTimeout(analysisTimer)
+  const controller = new AbortController(), revision = getSessionRevision()
+  analysisController = controller
+  const valid = () => analysisController === controller && !controller.signal.aborted && revision === getSessionRevision()
+  const tracking = start || analysisRunning.value
+  if (start) {
+    analysisRunning.value = true
+    analysisError.value = ''
+  }
+
+  try {
+    const status = await (start ? startAdminCustomerAnalysis : getAdminCustomerAnalysisStatus)(controller.signal)
+    if (!valid()) return
+    analysisRunning.value = status === 'RUNNING'
+    if (analysisRunning.value) {
+      analysisTimer = setTimeout(trackAnalysis, 1500)
+    } else if (tracking) {
+      if (status === 'COMPLETED') retry.value++
+      else analysisError.value = '고객 분석을 완료하지 못했습니다. 잠시 후 다시 실행해 주세요.'
+    }
+  } catch (failure) {
+    if (valid()) {
+      analysisRunning.value = false
+      if (tracking) analysisError.value = failure.message
+    }
+  } finally {
+    if (valid()) analysisController = null
+  }
+}
+
+watch(shoppingOwner, () => {
+  clearAnalysisTracking()
+  trackAnalysis()
+}, { immediate: true })
 </script>
 
 <template>
-  <main class="admin-page admin-dashboard-page analytics-page" :aria-busy="loading">
+  <main class="admin-page admin-dashboard-page analytics-page" :aria-busy="loading && !report">
     <AdminPageHeading class="admin-page-heading-sticky"
       title="AI 고객 분석"
       description="고객의 구매 패턴을 분석해 고객 유형과 재구매 흐름을 확인합니다."
     >
       <button
         type="button"
-        :disabled="loading || session.source !== 'api'"
-        @click="retry++"
+        :disabled="loading || analysisRunning || session.source !== 'api'"
+        :aria-busy="analysisRunning"
+        @click="trackAnalysis(true)"
       >
-        <AdminIcon name="refresh" />{{ loading ? '분석 중…' : '분석 새로고침' }}
+        <AdminIcon name="refresh" />{{ analysisRunning ? '고객 분석 중…' : report ? '고객 분석 다시 실행' : '고객 분석 실행' }}
       </button>
     </AdminPageHeading>
     <div class="analytics-content">
+      <p v-if="session.source === 'api' && (error || analysisError)" class="analytics-feedback is-error" role="alert">
+        {{ error || analysisError }} <button v-if="error" type="button" @click="retry++">다시 조회</button>
+      </p>
       <p v-if="session.source !== 'api'" class="analytics-feedback">
         AI 고객 분석은 실제 관리자 계정으로 로그인한 뒤 사용할 수 있습니다.
       </p>
-      <p v-else-if="loading" class="analytics-feedback" role="status">
-        고객 구매 데이터를 분석하고 있습니다. 잠시만 기다려 주세요.
+      <p v-else-if="loading && !report" class="analytics-feedback" role="status">
+        저장된 고객 분석 결과를 불러오고 있습니다.
       </p>
-      <p v-else-if="error" class="analytics-feedback is-error" role="alert">
-        {{ error }} <button type="button" @click="retry++">다시 시도</button>
+      <p v-else-if="!report && !error" class="analytics-feedback">
+        {{ analysisRunning ? '첫 고객 분석을 진행하고 있습니다.' : '저장된 고객 분석 결과가 없습니다. 고객 분석을 실행해 주세요.' }}
       </p>
       <p v-else-if="report && !hasData" class="analytics-feedback">
         분석할 고객 데이터가 없습니다.
+        <time v-if="updatedAt" :datetime="report.analyzed_at">마지막 분석 {{ updatedAt }}</time>
       </p>
       <template v-else-if="hasData">
         <section
@@ -185,7 +250,7 @@ watch(
         >
           <div class="analytics-section-heading">
             <h2 id="analytics-summary-title">고객 구매 요약</h2>
-            <span>{{ updatedAt }} 조회</span>
+            <time v-if="updatedAt" :datetime="report.analyzed_at">마지막 분석 {{ updatedAt }}</time>
           </div>
           <dl class="analytics-metrics">
             <div v-for="[label, value, note] in metrics" :key="label">

@@ -7,37 +7,45 @@ import AdminListPanel from '../components/admin/AdminListPanel.vue'
 import Pagination from '../components/common/Pagination.vue'
 import NotificationToast from '../components/common/NotificationToast.vue'
 import { useToasts } from '../composables/useToasts.js'
-import { analyzeAdminPendingReviews, getAdminReviewAnalytics, getAdminSentimentProducts } from '../services/admin.js'
+import { analyzeAdminPendingReviews, getAdminReviewAnalytics, getAdminReviewReanalysis, getAdminSentimentProducts, startAdminReviewReanalysis } from '../services/admin.js'
 import { getSessionRevision, session, shoppingOwner } from '../stores/session.js'
 import { reviewSentimentFilters } from '../utils/reviewSentiments.js'
 
 const report = ref(null), loading = ref(false), error = ref(''), retry = ref(0), updatedAt = ref('')
 const products = ref([]), productTotal = ref(0), productPages = ref(0), productPage = ref(0), productFilter = ref('')
 const productsLoading = ref(false), productsError = ref(''), productRetry = ref(0)
-const analysisRunning = ref(false)
+const analysisRunning = ref(false), reanalysisRunning = ref(false)
 const { toasts, showToast, dismissToast, pauseToast, resumeToast, clearToasts } = useToasts()
-const analysisButton = ref(null), pageHeading = ref(null)
-let analysisController = null
+const analysisButton = ref(null), reanalysisButton = ref(null), pageHeading = ref(null)
+let noticeButton = analysisButton
+let analysisController = null, reanalysisController = null, reanalysisTimer = null
 
 function clearAnalysis() {
   analysisController?.abort()
-  analysisController = null
-  analysisRunning.value = false
+  reanalysisController?.abort()
+  clearTimeout(reanalysisTimer)
+  analysisController = reanalysisController = reanalysisTimer = null
+  analysisRunning.value = reanalysisRunning.value = false
+  noticeButton = analysisButton
   clearToasts()
 }
-watch(shoppingOwner, clearAnalysis)
+watch(shoppingOwner, () => {
+  clearAnalysis()
+  refreshReanalysis()
+}, { immediate: true })
 onBeforeUnmount(clearAnalysis)
 
 function dismissAnalysisNotice(id, restoreFocus = false) {
   dismissToast(id)
-  if (restoreFocus) analysisButton.value?.focus()
+  if (restoreFocus) noticeButton.value?.focus()
 }
 
 async function analyzePending() {
-  if (analysisRunning.value || loading.value || session.source !== 'api' || session.member?.role !== 'ADMIN') return
+  if (analysisRunning.value || reanalysisRunning.value || loading.value || session.source !== 'api' || session.member?.role !== 'ADMIN') return
   const controller = new AbortController(), revision = getSessionRevision()
   analysisController = controller
   const valid = () => analysisController === controller && !controller.signal.aborted && revision === getSessionRevision()
+  noticeButton = analysisButton
   analysisRunning.value = true
   try {
     const result = await analyzeAdminPendingReviews(controller.signal)
@@ -52,6 +60,48 @@ async function analyzePending() {
     if (valid()) { analysisRunning.value = false; analysisController = null }
   }
 }
+async function refreshReanalysis(start = false) {
+  if (session.source !== 'api' || session.member?.role !== 'ADMIN') return
+  if (start && (analysisRunning.value || reanalysisRunning.value || loading.value)) return
+
+  reanalysisController?.abort()
+  clearTimeout(reanalysisTimer)
+  const controller = new AbortController(), revision = getSessionRevision()
+  reanalysisController = controller
+  const valid = () => reanalysisController === controller && !controller.signal.aborted && revision === getSessionRevision()
+  const tracking = start || reanalysisRunning.value
+  if (start) reanalysisRunning.value = true
+
+  try {
+    const result = await (start ? startAdminReviewReanalysis : getAdminReviewReanalysis)(controller.signal)
+    if (!valid()) return
+    reanalysisRunning.value = result.status === 'RUNNING'
+    if (reanalysisRunning.value) {
+      reanalysisTimer = setTimeout(refreshReanalysis, 1500)
+    } else if (tracking) {
+      noticeButton = reanalysisButton
+      if (result.status === 'COMPLETED') {
+        showToast('success', result.analyzed
+          ? `전체 후기 재분석을 완료했습니다. ${number(result.analyzed)}건을 분석했습니다.`
+          : '재분석할 후기가 없습니다.')
+      } else {
+        showToast('error', '전체 후기 재분석을 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.')
+      }
+      retry.value++
+    }
+  } catch (failure) {
+    if (valid()) {
+      reanalysisRunning.value = false
+      if (tracking) {
+        noticeButton = reanalysisButton
+        showToast('error', failure.message)
+      }
+    }
+  } finally {
+    if (valid()) reanalysisController = null
+  }
+}
+
 const productOrder = computed(() => productFilter.value
   ? reviewSentimentFilters.find(item => item.value === productFilter.value).label + ' 후기 많은 순'
   : '부정 후기 많은 순')
@@ -117,8 +167,8 @@ watch([shoppingOwner, retry], async (_, __, onCleanup) => {
 <template>
   <main class="admin-page admin-dashboard-page analytics-page sentiment-page" :aria-busy="loading">
     <AdminPageHeading ref="pageHeading" class="admin-page-heading-sticky" title="후기 감정분석" description="고객 후기의 감정 분포와 상품별 반응을 확인합니다.">
-      <button ref="analysisButton" type="button" :disabled="analysisRunning || loading || session.source !== 'api'" :aria-busy="analysisRunning" @click="analyzePending"><AdminIcon name="refresh" />{{ analysisRunning ? '분석 중…' : '미분석 후기 분석' }}</button>
-      <button type="button" :disabled="analysisRunning || loading || session.source !== 'api'" @click="retry++"><AdminIcon name="refresh" />{{ loading ? '불러오는 중…' : '현황 새로고침' }}</button>
+      <button ref="analysisButton" type="button" :disabled="analysisRunning || reanalysisRunning || loading || session.source !== 'api'" :aria-busy="analysisRunning" @click="analyzePending"><AdminIcon name="refresh" />{{ analysisRunning ? '분석 중…' : '미분석 후기 분석' }}</button>
+      <button ref="reanalysisButton" type="button" :disabled="analysisRunning || reanalysisRunning || loading || session.source !== 'api'" :aria-busy="reanalysisRunning" @click="refreshReanalysis(true)"><AdminIcon name="refresh" />{{ reanalysisRunning ? '전체 후기 재분석 중…' : '전체 후기 재분석' }}</button>
     </AdminPageHeading>
     <div class="analytics-content">
       <p v-if="session.source !== 'api'" class="analytics-feedback">후기 감정분석은 실제 관리자 계정으로 로그인한 뒤 사용할 수 있습니다.</p>

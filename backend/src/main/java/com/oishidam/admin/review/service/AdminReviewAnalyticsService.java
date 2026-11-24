@@ -4,6 +4,7 @@ import com.oishidam.admin.review.dto.ReviewSentimentAnalysisResponse;
 import com.oishidam.admin.review.dto.ReviewSentimentCountResponse;
 import com.oishidam.admin.review.dto.ReviewSentimentDashboardResponse;
 import com.oishidam.admin.review.dto.ReviewSentimentProductResponse;
+import com.oishidam.admin.review.dto.ReviewSentimentReanalysisResponse;
 import com.oishidam.admin.review.enums.ReviewSentimentFilter;
 import com.oishidam.admin.review.repository.AdminReviewAnalyticsRepository;
 import com.oishidam.common.ai.AiServiceClient;
@@ -12,6 +13,7 @@ import jakarta.persistence.Tuple;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -51,6 +53,21 @@ public class AdminReviewAnalyticsService {
                     HttpStatus.BAD_GATEWAY, "AI_UNAVAILABLE",
                     "후기 분석 요청을 완료하지 못했습니다. 일부 후기가 처리되었을 수 있으니 현황을 확인한 뒤 다시 시도해 주세요."
             );
+        }
+    }
+
+    // AI 서비스에서 전체 후기 재분석을 시작하거나 진행 상태를 읽는다.
+    public ReviewSentimentReanalysisResponse fullReanalysis(HttpMethod method) {
+        try {
+            Map<String, Object> result = ai.fullReviewReanalysis(method);
+            if (result == null || !(result.get("status") instanceof String status)
+                    || !List.of("IDLE", "RUNNING", "COMPLETED", "FAILED").contains(status)
+                    || !(result.get("analyzed") instanceof Integer analyzed) || analyzed < 0) {
+                throw new ApiException(HttpStatus.BAD_GATEWAY, "AI_INVALID_RESPONSE", "전체 후기 재분석 상태를 확인할 수 없습니다.");
+            }
+            return new ReviewSentimentReanalysisResponse(status, analyzed);
+        } catch (RestClientException error) {
+            throw new ApiException(HttpStatus.BAD_GATEWAY, "AI_UNAVAILABLE", "전체 후기 재분석 서비스에 연결하지 못했습니다.");
         }
     }
 

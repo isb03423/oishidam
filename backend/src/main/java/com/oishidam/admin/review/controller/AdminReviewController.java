@@ -4,6 +4,7 @@ import com.oishidam.admin.review.dto.AdminReviewResponse;
 import com.oishidam.admin.review.dto.ReviewSentimentAnalysisResponse;
 import com.oishidam.admin.review.dto.ReviewSentimentDashboardResponse;
 import com.oishidam.admin.review.dto.ReviewSentimentProductResponse;
+import com.oishidam.admin.review.dto.ReviewSentimentReanalysisResponse;
 import com.oishidam.admin.review.enums.ReviewSentimentFilter;
 import com.oishidam.admin.review.service.AdminReviewAnalyticsService;
 import com.oishidam.admin.review.service.AdminReviewService;
@@ -14,6 +15,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
@@ -39,6 +42,19 @@ public class AdminReviewController {
             @RequestParam(defaultValue = "500") int limit
     ) {
         return ApiResponse.ok(analytics.analyzePending(limit));
+    }
+
+    @Operation(summary = "전체 후기 재분석 시작", description = "삭제되지 않은 후기를 기존 분석 결과와 관계없이 다시 분석합니다.")
+    @PostMapping("/analytics/reanalyze-all")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public ApiResponse<ReviewSentimentReanalysisResponse> startFullReanalysis() {
+        return ApiResponse.ok(analytics.fullReanalysis(HttpMethod.POST));
+    }
+
+    @Operation(summary = "전체 후기 재분석 상태 조회")
+    @GetMapping("/analytics/reanalyze-all")
+    public ApiResponse<ReviewSentimentReanalysisResponse> fullReanalysisStatus() {
+        return ApiResponse.ok(analytics.fullReanalysis(HttpMethod.GET));
     }
 
     @Operation(summary = "상품별 감정 현황 조회", description = "전체 상품 또는 선택 감정 후기가 있는 상품을 해당 감정 건수 순으로 페이징합니다.")

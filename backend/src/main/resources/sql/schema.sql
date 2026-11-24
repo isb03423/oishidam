@@ -365,3 +365,10 @@ CREATE TABLE IF NOT EXISTS inquiry_messages (
 );
 -- 문의별 본문과 답변을 작성 순서대로 조회
 CREATE INDEX IF NOT EXISTS ix_inquiry_messages_inquiry ON inquiry_messages(inquiry_id, inquiry_message_id);
+
+-- 마지막으로 완료된 고객 분석 결과를 한 행에 보관한다.
+CREATE TABLE IF NOT EXISTS customer_analytics_snapshot (
+    snapshot_id INTEGER PRIMARY KEY CHECK (snapshot_id = 1), -- 단일 분석 결과 식별자
+    report JSONB NOT NULL, -- 회원 이름을 제외한 통계와 차트
+    analyzed_at TIMESTAMPTZ NOT NULL -- 분석 완료 시각
+);

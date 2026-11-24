@@ -38,7 +38,7 @@ spring:
   sql:
     init:
       mode: always
-      schema-locations: classpath:sql/schema.sql,classpath:sql/migrations/email-verification.sql,classpath:sql/migrations/email-verification-window.sql
+      schema-locations: classpath:sql/schema.sql
 
   jpa:
     hibernate:

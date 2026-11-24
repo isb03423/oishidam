@@ -2,10 +2,7 @@ package com.oishidam.common.privacy;
 
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.boot.sql.init.dependency.DependsOnDatabaseInitialization;
-import org.springframework.core.io.ClassPathResource;
-import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.datasource.init.ScriptUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -52,10 +49,32 @@ public class PersonalDataMigration implements InitializingBean {
 
             jdbc.execute("LOCK TABLE members, addresses, orders, email_verifications IN SHARE ROW EXCLUSIVE MODE");
             if (firstMigration) {
-                jdbc.execute((ConnectionCallback<Void>) connection -> {
-                    ScriptUtils.executeSqlScript(connection, new ClassPathResource("sql/migrations/personal-data.sql"));
-                    return null;
-                });
+                // 컬럼 확장과 개인정보 암호화를 같은 트랜잭션에서 적용한다.
+                jdbc.execute("""
+                        ALTER TABLE members
+                            ALTER COLUMN email TYPE TEXT,
+                            ALTER COLUMN name TYPE TEXT,
+                            ALTER COLUMN phone TYPE TEXT,
+                            DROP CONSTRAINT IF EXISTS members_email_key,
+                            ADD COLUMN IF NOT EXISTS email_lookup VARCHAR(72);
+                        CREATE UNIQUE INDEX IF NOT EXISTS ux_members_email_lookup ON members (email_lookup);
+                        ALTER TABLE addresses
+                            ALTER COLUMN label TYPE TEXT,
+                            ALTER COLUMN recipient_name TYPE TEXT,
+                            ALTER COLUMN recipient_phone TYPE TEXT,
+                            ALTER COLUMN postal_code TYPE TEXT,
+                            ALTER COLUMN address_line1 TYPE TEXT,
+                            ALTER COLUMN address_line2 TYPE TEXT,
+                            ALTER COLUMN customs_code TYPE TEXT;
+                        ALTER TABLE orders
+                            ALTER COLUMN recipient_name TYPE TEXT,
+                            ALTER COLUMN recipient_phone TYPE TEXT,
+                            ALTER COLUMN postal_code TYPE TEXT,
+                            ALTER COLUMN address_line1 TYPE TEXT,
+                            ALTER COLUMN address_line2 TYPE TEXT,
+                            ALTER COLUMN delivery_memo TYPE TEXT,
+                            ALTER COLUMN customs_code TYPE TEXT;
+                        """);
             }
 
             encryptRows("members", "member_id", List.of("email", "name", "phone"), firstMigration);

@@ -3,6 +3,7 @@ package com.oishidam.common.ai;
 import com.oishidam.common.exception.ApiException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -47,11 +48,11 @@ public class AiServiceClient {
         return jwt.getTokenValue();
     }
 
-    // 관리자 JWT를 전달해 고객 분석 결과를 조회한다.
-    public Map<String, Object> customerAnalytics(boolean charts) {
+    // 요청에서 검증한 관리자 JWT로 백그라운드 고객 분석을 호출한다.
+    public Map<String, Object> customerAnalytics(boolean charts, String accessToken) {
         return client.get()
                 .uri(uri -> uri.path("/api/ai/analytics/customers").queryParam("charts", charts).build())
-                .headers(headers -> headers.setBearerAuth(accessToken()))
+                .headers(headers -> headers.setBearerAuth(accessToken))
                 .retrieve().body(new ParameterizedTypeReference<Map<String, Object>>() {
                 });
     }
@@ -61,6 +62,15 @@ public class AiServiceClient {
         client.post().uri("/api/ai/sentiment/reviews/{reviewId}/analyze", reviewId)
                 .headers(headers -> headers.setBearerAuth(accessToken))
                 .retrieve().toBodilessEntity();
+    }
+
+    // 관리자 JWT로 전체 후기 재분석을 시작하거나 상태를 조회한다.
+    public Map<String, Object> fullReviewReanalysis(HttpMethod method) {
+        return client.method(method)
+                .uri("/api/ai/sentiment/reanalyze-all")
+                .headers(headers -> headers.setBearerAuth(accessToken()))
+                .retrieve().body(new ParameterizedTypeReference<Map<String, Object>>() {
+                });
     }
 
     // 관리자 JWT를 전달해 미분석·본문 수정·구버전 후기를 일괄 분석한다.

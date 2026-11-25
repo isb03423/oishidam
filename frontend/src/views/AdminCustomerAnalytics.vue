@@ -3,10 +3,12 @@ import { computed, onBeforeUnmount, ref, useId, watch } from 'vue'
 import AdminPageHeading from '../components/admin/AdminPageHeading.vue'
 import AdminIcon from '../components/admin/AdminIcon.vue'
 import AdminMemberDetail from '../components/admin/AdminMemberDetail.vue'
-import AdminSegmentDonut from '../components/admin/AdminSegmentDonut.vue'
+import AdminSegmentDonut, { customerSegmentPalette } from '../components/admin/AdminSegmentDonut.vue'
+import Pagination from '../components/common/Pagination.vue'
 import { activateAdminRow, activateAdminRowKey } from '../utils/adminRow.js'
 import {
   getAdminCustomerAnalytics,
+  getAdminCustomerAnalyticsMembers,
   getAdminCustomerAnalysisStatus,
   getAdminDetail,
   setAdminMemberStatus,
@@ -23,6 +25,13 @@ const report = ref(null),
   error = ref(''),
   retry = ref(0)
 const analysisRunning = ref(false), analysisError = ref('')
+const customerList = ref(null), customerListLoading = ref(false), customerListError = ref(''), customerListRetry = ref(0)
+const customerSegment = ref(''), customerPurchased = ref(''), customerSort = ref('AMOUNT'), customerPage = ref(0)
+const customerSegmentBadgeStyles = customerSegmentPalette.map(({ swatch, surface, ink }) => ({
+  '--customer-segment-swatch': swatch,
+  '--customer-segment-surface': surface,
+  '--customer-segment-ink': ink,
+}))
 let analysisController = null, analysisTimer = null
 const id = useId()
 const memberDialog = ref(null), memberId = ref(null), member = ref(null)
@@ -79,6 +88,7 @@ const numbers = new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 2 })
 const number = (value) => (value == null ? '—' : numbers.format(value))
 const money = (value) => (value == null ? '—' : number(value) + '원')
 const percent = (value) => (value == null ? '—' : number(value) + '%')
+const customerDate = (value) => value ? value.slice(0, 10).replaceAll('-', '.') : '—'
 const summary = computed(() => report.value?.summary || {})
 const hasData = computed(() => Number(summary.value.total_members) > 0)
 function chartSource(key) {
@@ -138,6 +148,49 @@ const updatedAt = computed(() => {
   const timestamp = Date.parse(report.value?.analyzed_at)
   return Number.isFinite(timestamp) ? analysisTime.format(timestamp) : ''
 })
+
+watch(shoppingOwner, () => {
+  customerList.value = null
+  customerSegment.value = customerPurchased.value = ''
+  customerSort.value = 'AMOUNT'
+  customerPage.value = 0
+})
+const analyzedAt = computed(() => report.value?.analyzed_at)
+watch([analyzedAt, customerSegment, customerPurchased, customerSort], () => {
+  customerPage.value = 0
+})
+watch(
+  [shoppingOwner, analyzedAt, customerSegment, customerPurchased, customerSort, customerPage, customerListRetry],
+  async (_, __, onCleanup) => {
+    const controller = new AbortController(), revision = getSessionRevision()
+    const valid = () => !controller.signal.aborted && revision === getSessionRevision()
+    onCleanup(() => controller.abort())
+    customerListError.value = ''
+    customerListLoading.value = false
+    if (!analyzedAt.value || !hasData.value || session.source !== 'api' || session.member?.role !== 'ADMIN') return
+    customerListLoading.value = true
+    try {
+      const result = await getAdminCustomerAnalyticsMembers({
+        segment: customerSegment.value === '' ? undefined : customerSegment.value,
+        purchased: customerPurchased.value === '' ? undefined : customerPurchased.value,
+        sort: customerSort.value,
+        page: customerPage.value,
+      }, controller.signal)
+      if (!valid()) return
+      customerList.value = result
+      if (customerPage.value > 0 && customerPage.value >= result.totalPages) {
+        customerPage.value = Math.max(0, result.totalPages - 1)
+      }
+    } catch (failure) {
+      if (valid()) {
+        customerList.value = null
+        customerListError.value = failure.message
+      }
+    } finally {
+      if (valid()) customerListLoading.value = false
+    }
+  },
+)
 
 watch(
   [shoppingOwner, retry],
@@ -371,64 +424,171 @@ watch(shoppingOwner, () => {
             />
           </figure>
         </div>
-        <div class="analytics-customer-grid">
-          <section aria-labelledby="analytics-top-title">
-            <div class="analytics-section-heading">
-              <h2 id="analytics-top-title">구매금액 상위 고객</h2>
-              <span>최대 10명 · 누적 구매금액순</span>
+        <section class="analytics-list" aria-labelledby="analytics-customer-list-title" :aria-busy="customerListLoading">
+          <div class="analytics-section-heading analytics-list-heading">
+            <div class="analytics-list-title">
+              <h2 id="analytics-customer-list-title">고객 목록</h2>
+              <span v-if="customerList?.available && !customerListLoading" role="status">{{ number(customerList.totalElements) }}명</span>
             </div>
+            <div class="analytics-list-filters">
+              <label :for="id + '-customer-segment'">
+                고객 유형
+                <select :id="id + '-customer-segment'" v-model="customerSegment" :disabled="customerList?.available === false">
+                  <option value="">전체 유형</option>
+                  <option v-for="item in report.segments" :key="item.segment" :value="item.segment">{{ item.segment_name }}</option>
+                </select>
+              </label>
+              <label :for="id + '-customer-purchased'">
+                구매 여부
+                <select :id="id + '-customer-purchased'" v-model="customerPurchased" :disabled="customerList?.available === false">
+                  <option value="">전체</option>
+                  <option :value="true">구매 경험 있음</option>
+                  <option :value="false">미구매</option>
+                </select>
+              </label>
+              <label :for="id + '-customer-sort'">
+                정렬
+                <select :id="id + '-customer-sort'" v-model="customerSort" :disabled="customerList?.available === false">
+                  <option value="AMOUNT">누적 구매금액순</option>
+                  <option value="FREQUENCY">구매 횟수순</option>
+                  <option value="JOINED">가입 최신순</option>
+                  <option value="INACTIVE">마지막 구매 오래된 순</option>
+                </select>
+              </label>
+            </div>
+          </div>
+          <p v-if="customerListLoading" class="analytics-empty" role="status">고객 목록을 불러오고 있습니다.</p>
+          <p v-else-if="customerListError" class="analytics-feedback is-error" role="alert">
+            {{ customerListError }}
+            <button type="button" @click="customerListRetry++">다시 조회</button>
+          </p>
+          <p v-else-if="customerList?.available === false" class="analytics-empty">
+            {{ analysisRunning ? '고객 목록을 생성하고 있습니다.' : '고객 분석을 다시 실행하면 전체 고객 목록을 확인할 수 있습니다.' }}
+          </p>
+          <div
+            v-else-if="customerList?.content.length"
+            class="analytics-table-scroll analytics-customer-table"
+            tabindex="0"
+            role="region"
+            aria-label="고객 목록 표"
+          >
+            <table role="table">
+              <caption class="sr-only">분석 고객별 유형, 가입일과 구매 현황</caption>
+              <colgroup>
+                <col class="analytics-column-name" />
+                <col class="analytics-column-segment" />
+                <col class="analytics-column-joined" />
+                <col class="analytics-column-last-order" />
+                <col class="analytics-column-frequency" />
+                <col class="analytics-column-amount" />
+                <col class="analytics-column-average" />
+              </colgroup>
+              <thead role="rowgroup">
+                <tr role="row">
+                  <th scope="col" role="columnheader">고객명</th>
+                  <th scope="col" role="columnheader">고객 유형</th>
+                  <th scope="col" role="columnheader">가입일</th>
+                  <th scope="col" role="columnheader">마지막 구매일</th>
+                  <th scope="col" role="columnheader" class="numeric">구매 횟수</th>
+                  <th scope="col" role="columnheader" class="numeric">누적 구매금액</th>
+                  <th scope="col" role="columnheader" class="numeric">주문당 평균금액</th>
+                </tr>
+              </thead>
+              <tbody role="rowgroup">
+                <tr
+                  v-for="item in customerList.content"
+                  :key="item.memberId"
+                  class="admin-clickable-row analytics-customer-row"
+                  role="row"
+                  tabindex="0"
+                  aria-haspopup="dialog"
+                  :aria-label="(item.name || '회원 ' + item.memberId) + ' 회원 상세 보기'"
+                  @click="activateAdminRow($event, () => openMember(item.memberId, $event.currentTarget))"
+                  @keydown="activateAdminRowKey($event, () => openMember(item.memberId, $event.currentTarget))"
+                >
+                  <th scope="row" role="rowheader">{{ item.name || '회원 #' + item.memberId }}</th>
+                  <td role="cell">
+                    <span class="analytics-cell-label" aria-hidden="true">고객 유형</span>
+                    <span class="status-pill analytics-customer-segment" :style="customerSegmentBadgeStyles[item.segment]">
+                      {{ item.segmentName }}
+                    </span>
+                  </td>
+                  <td role="cell"><span class="analytics-cell-label" aria-hidden="true">가입일</span>{{ customerDate(item.joinedAt) }}</td>
+                  <td role="cell"><span class="analytics-cell-label" aria-hidden="true">마지막 구매일</span>{{ item.lastOrderAt ? customerDate(item.lastOrderAt) : '구매 이력 없음' }}</td>
+                  <td role="cell" class="numeric"><span class="analytics-cell-label" aria-hidden="true">구매 횟수</span>{{ number(item.frequency) }}회</td>
+                  <td role="cell" class="numeric"><span class="analytics-cell-label" aria-hidden="true">누적 구매금액</span>{{ money(item.monetary) }}</td>
+                  <td role="cell" class="numeric"><span class="analytics-cell-label" aria-hidden="true">주문당 평균금액</span>{{ money(item.avgOrderValue) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p v-else-if="customerList?.available" class="analytics-empty">조건에 맞는 고객이 없습니다.</p>
+          <Pagination
+            v-if="customerList?.available"
+            :model-value="customerPage + 1"
+            :page-count="customerList.totalPages"
+            :disabled="customerListLoading"
+            label="고객 목록 페이지"
+            @update:model-value="customerPage = $event - 1"
+          />
+        </section>
+        <div class="analytics-additional-details" role="group" aria-label="추가 분석">
+          <details class="analytics-cohort-details">
+            <summary>첫 구매 월별 리텐션 상세 수치</summary>
+            <p class="analytics-note">
+              첫 구매 월 고객 중 해당 월에 다시 구매한 비율입니다.
+            </p>
             <div
-              v-if="report.top_customers.length"
-              class="analytics-table-scroll analytics-top-customers"
+              v-if="report.retention.length"
+              class="analytics-table-scroll"
               tabindex="-1"
               role="region"
-              aria-label="구매금액 상위 고객 표"
+              aria-label="첫 구매 월별 리텐션 표"
             >
               <table>
                 <caption class="sr-only">
-                  누적 구매금액 상위 고객의 구매 횟수, 구매금액, 주문당
-                  평균금액과 고객 유형
+                  첫 구매 월별로 경과 개월에 따른 재구매율. 미도래 기간은 대시로
+                  표시합니다.
                 </caption>
                 <thead>
                   <tr>
-                    <th scope="col">고객</th>
-                    <th scope="col">고객 유형</th>
-                    <th scope="col" class="numeric">구매 횟수</th>
-                    <th scope="col" class="numeric">누적 구매금액</th>
-                    <th scope="col" class="numeric">주문당 평균금액</th>
+                    <th scope="col">첫 구매 월</th>
+                    <th
+                      v-for="period in cohortPeriods"
+                      :key="period"
+                      scope="col"
+                      class="numeric"
+                    >
+                      {{
+                        Number(period) === 0 ? '첫 구매 월' : period + '개월 후'
+                      }}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr
-                    v-for="item in report.top_customers"
-                    :key="item.member_id"
-                    class="admin-clickable-row analytics-customer-row"
-                    tabindex="0"
-                    aria-haspopup="dialog"
-                    :aria-label="item.name + ' 회원 상세 보기'"
-                    @click="activateAdminRow($event, () => openMember(item.member_id, $event.currentTarget))"
-                    @keydown="activateAdminRowKey($event, () => openMember(item.member_id, $event.currentTarget))"
-                  >
-                    <th scope="row">
-                      {{ item.name }}
-                    </th>
-                    <td>{{ item.segment_name }}</td>
-                    <td class="numeric">{{ number(item.frequency) }}회</td>
-                    <td class="numeric">{{ money(item.monetary) }}</td>
-                    <td class="numeric">{{ money(item.avg_order_value) }}</td>
+                  <tr v-for="item in report.retention" :key="item.cohort_month">
+                    <th scope="row">{{ item.cohort_month }}</th>
+                    <td
+                      v-for="period in cohortPeriods"
+                      :key="period"
+                      class="numeric"
+                    >
+                      {{ percent(item[period]) }}
+                    </td>
                   </tr>
                 </tbody>
               </table>
             </div>
             <p v-else class="analytics-empty">
-              구매 이력이 있는 고객이 없습니다.
+              리텐션을 분석할 구매 이력이 없습니다.
             </p>
-          </section>
-          <section aria-labelledby="analytics-age-title">
-            <div class="analytics-section-heading">
-              <h2 id="analytics-age-title">연령대별 구매 현황</h2>
-              <span>출생 연도 기준 · 정보가 없으면 미상</span>
-            </div>
+            <p class="analytics-note">
+              —는 아직 도래하지 않은 기간입니다. 0%는 해당 기간에 재구매한 고객이
+              없다는 뜻입니다.
+            </p>
+          </details>
+          <details class="analytics-age-details">
+            <summary>연령대별 구매 현황</summary>
             <div
               class="analytics-table-scroll"
               tabindex="-1"
@@ -436,9 +596,7 @@ watch(shoppingOwner, () => {
               aria-label="연령대별 구매 현황 표"
             >
               <table>
-                <caption class="sr-only">
-                  연령대별 고객 수와 평균 누적 구매금액
-                </caption>
+                <caption class="sr-only">연령대별 고객 수와 평균 누적 구매금액</caption>
                 <thead>
                   <tr>
                     <th scope="col">연령대</th>
@@ -456,64 +614,10 @@ watch(shoppingOwner, () => {
               </table>
             </div>
             <p class="analytics-note">
-              연령대별 평균은 미구매 고객을 포함합니다.
+              출생 연도 기준이며 정보가 없으면 미상으로 표시합니다. 평균에는 미구매 고객이 포함됩니다.
             </p>
-          </section>
+          </details>
         </div>
-        <details class="analytics-cohort-details">
-          <summary>첫 구매 월별 리텐션 상세 수치</summary>
-          <p class="analytics-note">
-            첫 구매 월 고객 중 해당 월에 다시 구매한 비율입니다.
-          </p>
-          <div
-            v-if="report.retention.length"
-            class="analytics-table-scroll"
-            tabindex="-1"
-            role="region"
-            aria-label="첫 구매 월별 리텐션 표"
-          >
-            <table>
-              <caption class="sr-only">
-                첫 구매 월별로 경과 개월에 따른 재구매율. 미도래 기간은 대시로
-                표시합니다.
-              </caption>
-              <thead>
-                <tr>
-                  <th scope="col">첫 구매 월</th>
-                  <th
-                    v-for="period in cohortPeriods"
-                    :key="period"
-                    scope="col"
-                    class="numeric"
-                  >
-                    {{
-                      Number(period) === 0 ? '첫 구매 월' : period + '개월 후'
-                    }}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="item in report.retention" :key="item.cohort_month">
-                  <th scope="row">{{ item.cohort_month }}</th>
-                  <td
-                    v-for="period in cohortPeriods"
-                    :key="period"
-                    class="numeric"
-                  >
-                    {{ percent(item[period]) }}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <p v-else class="analytics-empty">
-            리텐션을 분석할 구매 이력이 없습니다.
-          </p>
-          <p class="analytics-note">
-            —는 아직 도래하지 않은 기간입니다. 0%는 해당 기간에 재구매한 고객이
-            없다는 뜻입니다.
-          </p>
-        </details>
       </template>
     </div>
     <dialog ref="memberDialog" class="analytics-member-dialog" :aria-labelledby="id + '-member-title'" @close="clearMember" @cancel="memberBusy && $event.preventDefault()">

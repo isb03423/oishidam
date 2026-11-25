@@ -31,7 +31,7 @@ API 주소가 없는데 mock을 끄면 `API_BASE_URL_MISSING` 오류를 표시�
 
 ## 홈 상품 카드
 
-- PICKS FOR YOU(추천 상품), JUST ARRIVED(신상품)를 각각 3개씩 표시합니다. PC는 좌우, 태블릿은 세로, 작은 모바일은 섹션별 가로 스크롤입니다.
+- 신상품과 베스트 상품을 각각 3개씩 표시합니다. PC는 좌우, 태블릿은 세로, 작은 모바일은 섹션별 가로 스크롤입니다.
 - `src/components/product/ProductCard.vue`는 이미지·하트·판매 가격을 표시하고, `ProductSection.vue`는 제목·3개 카드·로딩·빈 목록·오류를 담당합니다.
 - 화면 전체는 흰색, 상품 이미지 영역은 #f4f2f2입니다. 실제 제품 사진은 아직 없어 이미지 준비 중으로 표시합니다. 투명 배경 제품 이미지는 `images: [{ url, alt_text, is_primary }]` 형태로 연결합니다. 서버의 storage_key는 API에서 접근 가능한 url로 변환해야 합니다.
 - 추천은 `GET /api/recommendations/products`를 사용합니다. API 모드의 로그인 고객은 액세스 토큰을 함께 전송합니다.

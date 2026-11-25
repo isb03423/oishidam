@@ -14,6 +14,7 @@ import * as liveApi from '../services/admin.js'
 import { getSessionRevision, session, shoppingOwner } from '../stores/session.js'
 import { saleStatuses, statusCode } from '../utils/adminStatus.js'
 import { adminStatusTone } from '../utils/adminPresentation.js'
+import { buildCategoryTree, findCategoryNode } from '../utils/categoryTree.js'
 
 const props = defineProps({ modalOnly: Boolean })
 const emit = defineEmits(['saved'])
@@ -25,11 +26,17 @@ const list = ref([]), categories = ref([]), total = ref(0), pages = ref(0)
 const page = ref(0), size = ref(10), query = ref(''), keyword = ref(''), reload = ref(0)
 const filterStatus = ref('ON_SALE'), filterCategory = ref(''), stockComparison = ref('LT'), filterStock = ref('')
 const appliedFilters = ref({ saleStatus: 'ON_SALE' }), filterError = ref(''), categoryPicker = ref(null)
+const categoryTree = computed(() => buildCategoryTree(categories.value))
 const filterCategoryLabel = computed(() => filterCategory.value === '' ? '전체 카테고리' : categoryName(filterCategory.value))
 const stockDraft = ref(0), stockEditor = ref(null)
 const loading = ref(false), listError = ref(''), categoryError = ref('')
 const selected = ref(null), draft = ref(null), targetStatus = ref(''), tab = ref('info')
 const detailLoading = ref(false), detailError = ref(''), actionError = ref(''), notice = ref('')
+const productCategoryPicker = ref(null), productCategoryButton = ref(null), categoryMissing = ref(false)
+const productCategoryLabel = computed(() => {
+  const category = findCategoryNode(categoryTree.value, draft.value?.categoryId)
+  return category ? category.path + (category.isActive ? '' : ' (숨김)') : '카테고리 선택'
+})
 const saving = ref(false), imagesBusy = ref(false)
 const detailDialog = ref(null)
 const detailHeading = ref(null), editor = ref(null), listRegion = ref(null), createButton = ref(null)
@@ -77,6 +84,7 @@ function resetDetail() {
   selected.value = draft.value = null
   detailError.value = actionError.value = ''
   detailLoading.value = false
+  categoryMissing.value = false
   targetStatus.value = ''
   stockDraft.value = 0
   visited.value = new Set()
@@ -173,9 +181,15 @@ async function mutate(action, success, { deleted = false, created = false, scope
 }
 function save() {
   if (!editor.value?.checkValidity()) { tab.value = 'info'; nextTick(() => editor.value?.reportValidity()); return }
+  if (!draft.value.categoryId) {
+    tab.value = 'info'
+    categoryMissing.value = true
+    nextTick(() => productCategoryButton.value?.focus())
+    return
+  }
   const data = { ...formData(draft.value), stockQuantity: creating.value ? stockDraft.value : product.value.stockQuantity, name: draft.value.name.trim(), description: draft.value.description.trim() }
-  if (!data.name || !data.description || !data.categoryId || !Number.isSafeInteger(data.price) || data.price < 0 || !Number.isSafeInteger(data.stockQuantity) || data.stockQuantity < 0 || data.stockQuantity > 2147483647) {
-    actionError.value = '상품명, 설명, 카테고리와 0 이상의 정수 가격·재고를 확인해 주세요.'
+  if (!data.name || !data.description || !Number.isSafeInteger(data.price) || data.price < 0 || !Number.isSafeInteger(data.stockQuantity) || data.stockQuantity < 0 || data.stockQuantity > 2147483647) {
+    actionError.value = '상품명, 설명과 0 이상의 정수 가격·재고를 확인해 주세요.'
     return
   }
   if (creating.value) mutate(() => backend.value.createAdminProduct(data), '상품을 등록했습니다. 판매 상태는 판매 준비입니다.', { created: true })
@@ -183,6 +197,10 @@ function save() {
     data.expectedStockQuantity = product.value.stockQuantity
     mutate(() => backend.value.updateAdminProduct(product.value.productId, data), '상품 정보를 저장했습니다.')
   }
+}
+function selectProductCategory(categoryId) {
+  draft.value.categoryId = categoryId
+  categoryMissing.value = false
 }
 function saveStatus() {
   mutate(() => backend.value.setAdminProductStatus(product.value.productId, targetStatus.value), '판매 상태를 변경했습니다.', { scope: 'status' })
@@ -196,6 +214,7 @@ async function resetDraft() {
   if (!await confirmDiscard()) return
   imageEditor.value?.reset(); draft.value = formData(product.value); stockDraft.value = product.value?.stockQuantity ?? 0
   targetStatus.value = statusCode(product.value?.saleStatus, saleStatuses); actionError.value = ''
+  categoryMissing.value = false
 }
 async function search(reset = false) {
   if (busy.value) return
@@ -296,11 +315,11 @@ onBeforeUnmount(() => { disposed = true; detailController?.abort(); discardResol
       </div>
       <template #footer><span>{{ total ? (page * size + 1) + '–' + Math.min((page + 1) * size, total) + ' / ' + total.toLocaleString('ko-KR') + '건' : '0건' }}</span><Pagination :model-value="page + 1" :page-count="pages" :disabled="loading || busy" label="상품 목록 페이지" @update:model-value="changePage" /></template>
     </AdminListPanel>
+    <AdminCategoryPicker ref="categoryPicker" :categories="categoryTree" @select="filterCategory = $event" />
     </template>
-    <AdminCategoryPicker ref="categoryPicker" :categories="categories" @select="filterCategory = $event" />
     <dialog v-if="hasDetail" ref="detailDialog" class="pw-detail" @cancel.prevent="closeDetail" :aria-labelledby="id + '-detail-heading'" :aria-busy="detailLoading">
       <header class="pw-detail-heading"><div class="pw-detail-title"><h2 :id="id + '-detail-heading'" ref="detailHeading" tabindex="-1">{{ creating ? '새 상품 등록' : product?.name || '상품 상세' }}</h2><span v-if="hasChanges" class="pw-unsaved">저장 전</span></div><button type="button" aria-label="선택 상품 닫기" :disabled="busy" @click="closeDetail"><AdminIcon name="close" /><span>닫기</span></button></header>
-      <p v-if="modalOnly && categoryError" class="pw-feedback is-error" role="alert">카테고리를 불러오지 못했습니다. {{ categoryError }} <button type="button" @click="retryCategories">다시 조회</button></p>
+      <p v-if="categoryError" class="pw-feedback is-error" role="alert">카테고리를 불러오지 못했습니다. {{ categoryError }} <button type="button" @click="retryCategories">다시 조회</button></p>
       <div v-if="detailLoading" class="pw-detail-loading" role="status">상품 정보를 불러오는 중입니다.</div><p v-else-if="detailError" class="pw-feedback is-error" role="alert">{{ detailError }}<button type="button" @click="openProduct(requestedId)">다시 조회</button></p>
       <template v-else-if="draft">
         <div class="pw-detail-toolbar"><div class="pw-tabs" role="group" aria-label="선택 상품 관리"><button v-for="[key,label] in tabs" :key="key" type="button" :aria-pressed="tab === key" :disabled="busy" @click="changeTab(key)">{{ label }}</button></div></div>
@@ -311,7 +330,22 @@ onBeforeUnmount(() => { disposed = true; detailController?.abort(); discardResol
             <form :id="id + '-editor'" ref="editor" class="pw-editor" @submit.prevent="save">
               <div class="pw-info-fields">
                 <label class="pw-field pw-field-name" :for="id + '-name'">상품명 (필수)<input :id="id + '-name'" v-model="draft.name" name="name" maxlength="200" required :disabled="busy" /></label>
-                <label class="pw-field" :for="id + '-category'">카테고리 (필수)<select :id="id + '-category'" v-model="draft.categoryId" name="categoryId" required :disabled="busy"><option value="" disabled>카테고리 선택</option><option v-for="item in categories" :key="item.categoryId" :value="item.categoryId">{{ item.name }}{{ item.isActive ? '' : ' (숨김)' }}</option></select></label>
+                <div class="pw-field pw-field-category">
+                  <span :id="id + '-category-label'">카테고리 (필수)</span>
+                  <button
+                    ref="productCategoryButton"
+                    type="button"
+                    aria-haspopup="dialog"
+                    :aria-labelledby="id + '-category-label ' + id + '-product-category-value'"
+                    :aria-invalid="categoryMissing || undefined"
+                    :aria-describedby="categoryMissing ? id + '-category-required' : undefined"
+                    :disabled="busy || !!categoryError"
+                    @click="productCategoryPicker.open(draft.categoryId)"
+                  >
+                    <span :id="id + '-product-category-value'">{{ productCategoryLabel }}</span><AdminIcon name="chevron" />
+                  </button>
+                  <p v-if="categoryMissing" :id="id + '-category-required'" class="pw-filter-error" role="alert">카테고리를 선택해 주세요.</p>
+                </div>
                 <label class="pw-field" :for="id + '-price'">판매가 · 원 (필수)<input :id="id + '-price'" v-model.number="draft.price" name="price" type="number" min="0" max="99999999999999" step="1" required :disabled="busy" /></label>
                 <div v-if="product" class="pw-status-form"><label class="pw-field" :for="id + '-status'">판매 상태<select :id="id + '-status'" v-model="targetStatus" :form="id + '-status-editor'" :disabled="busy"><option v-for="[key,label] in saleStatuses" :key="key" :value="key">{{ label }}</option></select></label><button type="submit" :form="id + '-status-editor'" :disabled="busy || !statusDirty">판매 상태 변경</button></div>
               </div>
@@ -326,6 +360,7 @@ onBeforeUnmount(() => { disposed = true; detailController?.abort(); discardResol
           </div>
         </div>
         <footer class="pw-detail-actions"><button v-if="product" type="button" class="pw-delete" :disabled="busy" @click="deletion.open([product.productId])">상품 삭제</button><span v-else class="pw-create-note">필수 정보를 입력해 주세요.</span><div><button type="button" :disabled="busy || !hasChanges" @click="resetDraft">변경 되돌리기</button><button v-if="tab === 'info' || creating" type="button" class="admin-primary" :disabled="busy || (!dirty && !creating) || !!categoryError" @click="save">{{ saving ? '저장 중…' : creating ? '상품 등록' : '변경사항 저장' }}</button></div></footer>
+        <AdminCategoryPicker ref="productCategoryPicker" :categories="categoryTree" for-product @select="selectProductCategory" />
       </template>
     </dialog>
     <AdminDeleteDialog ref="deletion" description="상품을 삭제합니다. 기존 주문 내역은 유지됩니다." @confirm="([productId]) => mutate(() => backend.deleteAdminProduct(productId), '상품을 삭제했습니다.', { deleted: true })" />

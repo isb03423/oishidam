@@ -6,6 +6,7 @@ const idPath = (section, id) => `/${section}/${encodeURIComponent(id)}`
 export const getAdminOperations = (period, signal) => request('/dashboard/operations', { params: typeof period === 'number' ? { days: period } : period, signal })
 export const getAdminStockAlerts = (params, signal) => request('/dashboard/stock-alerts', { params, signal })
 export const getAdminCustomerAnalytics = (signal) => request('/analytics/customers', { params: { charts: true }, signal })
+export const getAdminCustomerAnalyticsMembers = (params, signal) => request('/analytics/customers/members', { params, signal })
 export const getAdminCustomerAnalysisStatus = (signal) => request('/analytics/customers/reanalyze', { signal })
 export const startAdminCustomerAnalysis = (signal) => request('/analytics/customers/reanalyze', { method: 'POST', signal })
 export const getAdminReviewAnalytics = (signal) => request('/reviews/analytics', { signal })

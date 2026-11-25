@@ -6,10 +6,11 @@ export function buildCategoryTree(categories) {
     if (parent && parent !== node) parent.children.push(node)
     else roots.push(node)
   }
-  function annotate(items, depth) {
+  function annotate(items, depth, parentPath = '') {
     for (const node of items) {
       node.depth = depth
-      annotate(node.children, depth + 1)
+      node.path = parentPath ? parentPath + ' › ' + node.name : node.name
+      annotate(node.children, depth + 1, node.path)
       node.height = 1 + Math.max(0, ...node.children.map((child) => child.height))
     }
   }
@@ -17,12 +18,12 @@ export function buildCategoryTree(categories) {
   return roots
 }
 
-export function filterCategoryTree(nodes, keyword) {
+export function filterCategoryTree(nodes, keyword, matchPath = false) {
   const query = keyword.trim().toLocaleLowerCase('ko-KR')
   if (!query) return nodes
   return nodes.flatMap((node) => {
-    if (node.name.toLocaleLowerCase('ko-KR').includes(query)) return [node]
-    const children = filterCategoryTree(node.children, query)
+    if ((matchPath ? node.path : node.name).toLocaleLowerCase('ko-KR').includes(query)) return [node]
+    const children = filterCategoryTree(node.children, query, matchPath)
     return children.length ? [{ ...node, children }] : []
   })
 }

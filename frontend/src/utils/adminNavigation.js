@@ -1,6 +1,6 @@
 export const adminNavigation = [
   ['', '대시보드', '운영 현황'],
-  ['sentiments', '후기 감정분석', '운영 현황'],
+  ['sentiments', '후기 감정 분석', '운영 현황'],
   ['analytics', 'AI 고객 분석', '운영 현황'],
   ['products', '상품·재고 관리', '스토어 관리'],
   ['categories', '카테고리 관리', '스토어 관리'],

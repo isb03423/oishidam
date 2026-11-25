@@ -108,9 +108,9 @@ async function requestCode() {
     if (isSignup.value) {
       await checkSignupEmail({ email: emailAddress, signal })
       if (signal.aborted) return
+      requested.value = true
+      focusCode()
     }
-    requested.value = true
-    focusCode()
     const result = await sendEmailCode({ email: emailAddress, purpose: props.purpose, signal })
     if (signal.aborted) return
     resendAt = performance.now() + 60_000
@@ -118,6 +118,10 @@ async function requestCode() {
     extensionGrant.value = result?.extensionToken ?? ''
     startTimer()
     sent.value = true
+    if (!isSignup.value) {
+      requested.value = true
+      focusCode()
+    }
   })
 }
 
@@ -228,7 +232,7 @@ async function run(action, execute) {
     await execute(request.signal)
   } catch (failure) {
     if (request.signal.aborted) return
-    if (action === 'sending' && isSignup.value && failure.code === 'EMAIL_ALREADY_EXISTS') {
+    if (action === 'sending' && (failure.code === 'EMAIL_ALREADY_EXISTS' || failure.code === 'PASSWORD_RESET_EMAIL_UNAVAILABLE')) {
       const hadCodeFocus = codeInput.value && document.activeElement === codeInput.value
       requested.value = false
       code.value = ''
@@ -326,7 +330,7 @@ function submitCode(event) {
           <span>이메일 인증이 완료되었습니다.</span>
         </template>
         <template v-else-if="pending === 'sending'">
-          {{ isSignup && !requested ? '이메일을 확인하는 중입니다.' : '인증번호를 보내는 중입니다.' }}
+          {{ !requested ? '이메일을 확인하는 중입니다.' : '인증번호를 보내는 중입니다.' }}
         </template>
         <template v-else-if="expired">입력 시간이 지났습니다. 인증번호를 다시 요청해주세요.</template>
         <template v-else-if="sent && (isSignup || mockEnabled)">

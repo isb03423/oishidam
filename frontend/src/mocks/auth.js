@@ -79,7 +79,7 @@ export function handleAuthRequest(path, data = {}) {
     const verification = emailVerifications.get(key)
     if (path.endsWith('/confirm')) {
       const extended = verification?.extensionToken && verification.extensionToken === data.extensionToken
-      if (!verification || verification.eligible === false || verification.token
+      if (!verification || verification.token
           || verification.expiresAt + (extended ? 300_000 : 0) <= Date.now() || verification.attempts >= 5) {
         fail(400, 'INVALID_EMAIL_CODE', '인증번호가 올바르지 않거나 만료되었습니다.')
       }
@@ -90,10 +90,12 @@ export function handleAuthRequest(path, data = {}) {
       return { verificationToken: verification.token }
     }
     if (purpose === 'SIGNUP' && registeredMembers.has(email)) fail(409, 'EMAIL_ALREADY_EXISTS', '이미 사용 중인 이메일입니다.')
+    if (purpose === 'PASSWORD_RESET' && (!registeredPasswords.has(email) || withdrawnMembers.has(registeredMembers.get(email)?.member_id))) {
+      fail(400, 'PASSWORD_RESET_EMAIL_UNAVAILABLE', '비밀번호를 재설정할 수 없는 이메일입니다. 가입할 때 사용한 이메일을 확인해주세요.')
+    }
     const expiresAt = Date.now() + 300_000
     const requestToken = globalThis.crypto.randomUUID()
-    const eligible = purpose === 'SIGNUP' || (registeredPasswords.has(email) && !withdrawnMembers.has(registeredMembers.get(email)?.member_id))
-    emailVerifications.set(key, { expiresAt, attempts: 0, requestToken, eligible })
+    emailVerifications.set(key, { expiresAt, attempts: 0, requestToken })
     return { extensionToken: requestToken, expiresAt: new Date(expiresAt).toISOString(), serverTime: new Date().toISOString() }
   }
   if (path === '/auth/password-reset') {

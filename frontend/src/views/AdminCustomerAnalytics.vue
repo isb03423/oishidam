@@ -5,6 +5,8 @@ import AdminIcon from '../components/admin/AdminIcon.vue'
 import AdminMemberDetail from '../components/admin/AdminMemberDetail.vue'
 import AdminSegmentDonut, { customerSegmentPalette } from '../components/admin/AdminSegmentDonut.vue'
 import Pagination from '../components/common/Pagination.vue'
+import NotificationToast from '../components/common/NotificationToast.vue'
+import { useToasts } from '../composables/useToasts.js'
 import { activateAdminRow, activateAdminRowKey } from '../utils/adminRow.js'
 import {
   getAdminCustomerAnalytics,
@@ -25,6 +27,9 @@ const report = ref(null),
   error = ref(''),
   retry = ref(0)
 const analysisRunning = ref(false), analysisError = ref('')
+const analysisCompletionPending = ref(false)
+const analysisButton = ref(null), pageHeading = ref(null)
+const { toasts, showToast, dismissToast, pauseToast, resumeToast, clearToasts } = useToasts()
 const customerList = ref(null), customerListLoading = ref(false), customerListError = ref(''), customerListRetry = ref(0)
 const customerSegment = ref(''), customerPurchased = ref(''), customerSort = ref('AMOUNT'), customerPage = ref(0)
 const customerSegmentBadgeStyles = customerSegmentPalette.map(({ swatch, surface, ink }) => ({
@@ -221,6 +226,13 @@ function clearAnalysisTracking() {
   analysisController = analysisTimer = null
   analysisRunning.value = false
   analysisError.value = ''
+  analysisCompletionPending.value = false
+  clearToasts()
+}
+
+function dismissAnalysisToast(id, restoreFocus) {
+  dismissToast(id)
+  if (restoreFocus) analysisButton.value?.focus()
 }
 
 async function trackAnalysis(start = false) {
@@ -245,8 +257,12 @@ async function trackAnalysis(start = false) {
     if (analysisRunning.value) {
       analysisTimer = setTimeout(trackAnalysis, 1500)
     } else if (tracking) {
-      if (status === 'COMPLETED') retry.value++
-      else analysisError.value = '고객 분석을 완료하지 못했습니다. 잠시 후 다시 실행해 주세요.'
+      if (status === 'COMPLETED') {
+        retry.value++
+        analysisCompletionPending.value = true
+      } else {
+        analysisError.value = '고객 분석을 완료하지 못했습니다. 잠시 후 다시 실행해 주세요.'
+      }
     }
   } catch (failure) {
     if (valid()) {
@@ -262,15 +278,21 @@ watch(shoppingOwner, () => {
   clearAnalysisTracking()
   trackAnalysis()
 }, { immediate: true })
+watch([analysisCompletionPending, memberId], ([completed, openMemberId]) => {
+  if (!completed || openMemberId != null) return
+  showToast('success', '고객 분석을 완료했습니다.')
+  analysisCompletionPending.value = false
+})
 </script>
 
 <template>
   <main class="admin-page admin-dashboard-page analytics-page" :aria-busy="loading && !report">
-    <AdminPageHeading class="admin-page-heading-sticky"
+    <AdminPageHeading ref="pageHeading" class="admin-page-heading-sticky"
       title="AI 고객 분석"
       description="고객의 구매 패턴을 분석해 고객 유형과 재구매 흐름을 확인합니다."
     >
       <button
+        ref="analysisButton"
         type="button"
         :disabled="loading || analysisRunning || session.source !== 'api'"
         :aria-busy="analysisRunning"
@@ -627,6 +649,7 @@ watch(shoppingOwner, () => {
       <p v-if="memberNotice" class="analytics-member-feedback" role="status">{{ memberNotice }}</p>
       <AdminMemberDetail v-if="member" :member="member" :busy="memberBusy" @toggle-status="toggleMemberStatus" />
     </dialog>
+    <NotificationToast :items="toasts" :anchor="pageHeading" @dismiss="dismissAnalysisToast" @pause="pauseToast" @resume="resumeToast" />
   </main>
 </template>
 

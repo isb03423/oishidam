@@ -77,7 +77,7 @@ public class AdminReviewAnalyticsService {
     public ReviewSentimentDashboardResponse dashboard() {
         Map<String, Long> counts = new LinkedHashMap<>();
         SENTIMENTS.forEach(sentiment -> counts.put(sentiment, 0L));
-        long pending = 0, negativeUnanswered = 0;
+        long pending = 0, unanswered = 0;
         for (Tuple row : repository.distribution()) {
             String sentiment = row.get("sentiment", String.class);
             if (sentiment == null) {
@@ -85,13 +85,11 @@ public class AdminReviewAnalyticsService {
             } else {
                 counts.put(sentiment, count(row, "amount"));
             }
-            if ("NEGATIVE".equals(sentiment) || "VERY_NEGATIVE".equals(sentiment)) {
-                negativeUnanswered += count(row, "unanswered");
-            }
+            unanswered += count(row, "unanswered");
         }
         long analyzed = counts.values().stream().mapToLong(Long::longValue).sum();
         return new ReviewSentimentDashboardResponse(
-                analyzed + pending, analyzed, pending, negativeUnanswered,
+                analyzed + pending, analyzed, pending, unanswered,
                 counts.entrySet().stream().map(item -> new ReviewSentimentCountResponse(item.getKey(), item.getValue())).toList()
         );
     }

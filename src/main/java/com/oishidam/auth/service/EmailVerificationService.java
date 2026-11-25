@@ -74,12 +74,16 @@ public class EmailVerificationService {
         this.hashKey = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
     }
 
-    // 가입 인증번호를 발송하고 비밀번호 찾기는 계정 존재 여부와 상관없이 같은 응답을 반환
+    // 가입 가능 여부나 비밀번호 재설정 대상 여부를 확인한 뒤 인증번호 발송 요청을 처리한다.
     public EmailVerificationWindow sendCode(SendEmailCodeRequest request) {
         if (sender.isBlank()) throw mailUnavailable();
         String email = request.email().trim().toLowerCase(Locale.ROOT);
         EmailVerificationPurpose purpose = request.purpose();
         if (purpose == EmailVerificationPurpose.SIGNUP) checkSignupEmail(email);
+        if (purpose == EmailVerificationPurpose.PASSWORD_RESET && members.findPasswordResetVersion(email).isEmpty()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "PASSWORD_RESET_EMAIL_UNAVAILABLE",
+                    "비밀번호를 재설정할 수 없는 이메일입니다. 가입할 때 사용한 이메일을 확인해주세요.");
+        }
 
         var requestToken = tokens.issueRefreshToken();
         Instant expiresAt = clock.instant().truncatedTo(ChronoUnit.MILLIS).plusSeconds(CODE_VALIDITY_SECONDS);

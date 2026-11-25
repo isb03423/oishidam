@@ -1,8 +1,17 @@
+<script>
+export const customerSegmentPalette = [
+  { swatch: '#9fd5c5', surface: '#e7f4ef', ink: '#265c4e' },
+  { swatch: '#aec8ed', surface: '#eaf1fb', ink: '#39597e' },
+  { swatch: '#e7b8c9', surface: '#f8eaf0', ink: '#804158' },
+  { swatch: '#f0d397', surface: '#fff3db', ink: '#79521e' },
+  { swatch: '#cdbfe5', surface: '#f2edf8', ink: '#5d497d' },
+]
+</script>
+
 <script setup>
 import { computed, ref, watch } from 'vue'
 
 const props = defineProps({ segments: { type: Array, required: true }, total: { type: Number, required: true } })
-const colors = ['#9fd5c5', '#aec8ed', '#e7b8c9', '#f0d397', '#cdbfe5']
 const hovered = ref(null), focused = ref(null), selected = ref(null)
 const number = value => new Intl.NumberFormat('ko-KR').format(value)
 const percentage = value => new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 1 }).format(value) + '%'
@@ -12,7 +21,8 @@ const slices = computed(() => {
   let offset = 0
   return props.segments.map((item, index) => {
     const share = total ? counts[index] / total * 100 : 0
-    const slice = { ...item, members: counts[index], share, start: offset, color: colors[index % colors.length] }
+    const palette = customerSegmentPalette[item.segment] ?? customerSegmentPalette[index % customerSegmentPalette.length]
+    const slice = { ...item, members: counts[index], share, start: offset, color: palette.swatch }
     offset += share
     return slice
   })

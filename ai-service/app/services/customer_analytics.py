@@ -332,6 +332,7 @@ def analyze(with_charts: bool = True) -> dict:
             "summary": {},
             "segments": [],
             "top_customers": [],
+            "customers": [],
             "by_age_band": [],
             "by_region": [],
             "retention": [],
@@ -376,6 +377,24 @@ def analyze(with_charts: bool = True) -> dict:
         .head(10)
     )
 
+    # 구매가 없는 회원도 유형별 목록에 포함하고, 이름은 저장하지 않는다.
+    customer_rows = df[
+        ["member_id", "segment", "segment_name", "joined_at", "last_order_at", "frequency", "monetary", "avg_order_value"]
+    ].rename(columns={
+        "member_id": "memberId",
+        "segment_name": "segmentName",
+        "joined_at": "joinedAt",
+        "last_order_at": "lastOrderAt",
+        "avg_order_value": "avgOrderValue",
+    })
+    for column in ("joinedAt", "lastOrderAt"):
+        customer_rows[column] = customer_rows[column].dt.tz_localize(None).map(
+            lambda value: value.isoformat() if pd.notna(value) else None
+        )
+    customer_rows["monetary"] = customer_rows["monetary"].astype("int64")
+    customer_rows["avgOrderValue"] = customer_rows["avgOrderValue"].astype("Int64").where(customer_rows["frequency"] > 0)
+    customer_rows = customer_rows.astype(object).where(pd.notna(customer_rows), None)
+
     # 4. 연령대별 통계
     age_stats = (
         df.groupby("age_band")
@@ -416,6 +435,7 @@ def analyze(with_charts: bool = True) -> dict:
                 "segment_name"
             ]
         ].to_dict(orient="records"),
+        "customers": customer_rows.to_dict(orient="records"),
         "by_age_band": age_stats.to_dict(orient="records"),
         "by_region": [],  # 회원 지역 정보가 없으므로 빈 목록 반환
         "retention": retention_records,

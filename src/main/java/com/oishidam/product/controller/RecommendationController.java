@@ -6,8 +6,6 @@ import com.oishidam.product.service.RecommendationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -20,17 +18,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class RecommendationController {
     private final RecommendationService recommendationService;
 
-    @Operation(summary = "추천 상품 조회")
+    @Operation(summary = "신상품 및 베스트 상품 조회")
     @GetMapping("/products")
     public ApiResponse<RecommendationResponse> products(
             @RequestParam(defaultValue = "best") String type,
-            @RequestParam(defaultValue = "3") int limit,
-            @AuthenticationPrincipal Jwt jwt
+            @RequestParam(defaultValue = "3") int limit
     ) {
-        return ApiResponse.ok(recommendationService.recommend(
-                type,
-                limit,
-                jwt == null ? null : Long.valueOf(jwt.getSubject())
-        ));
+        return ApiResponse.ok(recommendationService.recommend(type, limit));
     }
 }

@@ -230,4 +230,4 @@ Authorization: Bearer <accessToken>
 
 후기는 DB 저장 확정 후 백그라운드에서 감정분석을 요청합니다. AI 호출이 실패하면 후기는 저장된 상태로 남고 관리자 재분석이 필요합니다. 현재 작업은 메모리에서 실행하므로 서버 재시작 시 자동 복구되지 않습니다.
 
-`/api/recommendations/products`의 개인화 추천은 현재 Spring Boot에서 찜한 카테고리를 기준으로 계산하며, 추천 후보가 없으면 인기 상품을 사용합니다. FastAPI의 상품 추천 API와는 별도 구현입니다.
+`/api/recommendations/products`는 신상품(`type=new`)과 베스트 상품(`type=best`, 기본값)을 조회합니다. 로그인 회원의 개인화 추천은 프론트엔드에서 FastAPI의 `GET /api/ai/recommend/products`를 호출해 조회합니다.

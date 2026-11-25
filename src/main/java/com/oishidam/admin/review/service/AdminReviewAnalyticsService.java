@@ -6,6 +6,7 @@ import com.oishidam.admin.review.dto.ReviewSentimentDashboardResponse;
 import com.oishidam.admin.review.dto.ReviewSentimentProductResponse;
 import com.oishidam.admin.review.dto.ReviewSentimentReanalysisResponse;
 import com.oishidam.admin.review.enums.ReviewSentimentFilter;
+import com.oishidam.admin.review.enums.ReviewSentimentProductSort;
 import com.oishidam.admin.review.repository.AdminReviewAnalyticsRepository;
 import com.oishidam.common.ai.AiServiceClient;
 import com.oishidam.common.exception.ApiException;
@@ -95,13 +96,15 @@ public class AdminReviewAnalyticsService {
         );
     }
 
-    // 감정 조건에 맞는 모든 상품을 페이지 단위로 조회한다.
+    // 상품명과 후기 조건에 맞는 상품을 정렬해 페이지 단위로 조회한다.
     @Transactional(readOnly = true)
-    public Page<ReviewSentimentProductResponse> products(ReviewSentimentFilter sentiment, int page, int size) {
+    public Page<ReviewSentimentProductResponse> products(
+            ReviewSentimentFilter sentiment, String keyword, Boolean reviewed, ReviewSentimentProductSort sort, int page, int size
+    ) {
         if (page < 0 || size < 1 || size > 100 || (long) page * size > Integer.MAX_VALUE) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_PAGINATION", "페이지 번호 또는 크기가 올바르지 않습니다.");
         }
-        return repository.products(sentiment, PageRequest.of(page, size)).map(row -> {
+        return repository.products(sentiment, keyword.strip(), reviewed, sort, PageRequest.of(page, size)).map(row -> {
             Map<String, Long> sentiments = new LinkedHashMap<>();
             SENTIMENTS.forEach(code -> sentiments.put(code, count(row, code.toLowerCase(Locale.ROOT))));
             return new ReviewSentimentProductResponse(

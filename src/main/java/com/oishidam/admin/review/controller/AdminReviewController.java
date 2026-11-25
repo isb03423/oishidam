@@ -6,6 +6,7 @@ import com.oishidam.admin.review.dto.ReviewSentimentDashboardResponse;
 import com.oishidam.admin.review.dto.ReviewSentimentProductResponse;
 import com.oishidam.admin.review.dto.ReviewSentimentReanalysisResponse;
 import com.oishidam.admin.review.enums.ReviewSentimentFilter;
+import com.oishidam.admin.review.enums.ReviewSentimentProductSort;
 import com.oishidam.admin.review.service.AdminReviewAnalyticsService;
 import com.oishidam.admin.review.service.AdminReviewService;
 import com.oishidam.common.dto.ApiResponse;
@@ -57,14 +58,17 @@ public class AdminReviewController {
         return ApiResponse.ok(analytics.fullReanalysis(HttpMethod.GET));
     }
 
-    @Operation(summary = "상품별 감정 현황 조회", description = "전체 상품 또는 선택 감정 후기가 있는 상품을 해당 감정 건수 순으로 페이징합니다.")
+    @Operation(summary = "상품별 감정 현황 조회", description = "상품명, 감정, 후기 유무에 맞는 상품을 정렬해 페이지 단위로 조회합니다.")
     @GetMapping("/analytics/products")
     public ApiResponse<Page<ReviewSentimentProductResponse>> sentimentProducts(
             @RequestParam(required = false) ReviewSentimentFilter sentiment,
+            @RequestParam(defaultValue = "") String keyword,
+            @RequestParam(required = false) Boolean reviewed,
+            @RequestParam(defaultValue = "SENTIMENT") ReviewSentimentProductSort sort,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size
     ) {
-        return ApiResponse.ok(analytics.products(sentiment, page, size));
+        return ApiResponse.ok(analytics.products(sentiment, keyword, reviewed, sort, page, size));
     }
 
     @Operation(summary = "리뷰 목록 조회", description = "상품 ID 또는 주문 당시 상품명과 후기 내용, 답변 여부, 감정 단계로 조회합니다.")

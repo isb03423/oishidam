@@ -1,6 +1,8 @@
 package com.oishidam.admin.analytics.controller;
 
+import com.oishidam.admin.analytics.dto.CustomerAnalyticsMembersResponse;
 import com.oishidam.admin.analytics.enums.CustomerAnalyticsRunStatus;
+import com.oishidam.admin.analytics.enums.CustomerAnalyticsSort;
 import com.oishidam.admin.analytics.service.AdminCustomerAnalyticsService;
 import com.oishidam.common.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -27,6 +29,18 @@ public class AdminCustomerAnalyticsController {
     @GetMapping("/customers")
     public ApiResponse<Map<String, Object>> customers(@RequestParam(defaultValue = "true") boolean charts) {
         return ApiResponse.ok(service.latest(charts));
+    }
+
+    @Operation(summary = "분석 고객 목록 조회", description = "마지막 고객 분석 결과에서 유형과 구매 여부로 필터링해 조회합니다.")
+    @GetMapping("/customers/members")
+    public ApiResponse<CustomerAnalyticsMembersResponse> customerMembers(
+            @RequestParam(required = false) Integer segment,
+            @RequestParam(required = false) Boolean purchased,
+            @RequestParam(defaultValue = "AMOUNT") CustomerAnalyticsSort sort,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        return ApiResponse.ok(service.customerMembers(segment, purchased, sort, page, size));
     }
 
     @Operation(summary = "AI 고객 분석 실행", description = "최신 데이터를 백그라운드에서 분석해 결과를 저장합니다.")

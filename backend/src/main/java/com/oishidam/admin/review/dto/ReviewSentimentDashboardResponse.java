@@ -6,7 +6,7 @@ public record ReviewSentimentDashboardResponse(
         long total,
         long analyzed,
         long pending,
-        long negativeUnanswered,
+        long unanswered,
         List<ReviewSentimentCountResponse> distribution
 ) {
 }

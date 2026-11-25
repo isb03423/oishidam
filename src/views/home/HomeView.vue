@@ -87,7 +87,7 @@ onBeforeUnmount(() => {
     <div class="home-products site-container">
       <ProductSection
         id="just-arrived"
-        title="JUST ARRIVED"
+        title="신상품"
         subtitle="지금 막 도착한 일본의 새로운 아이템"
         :more-to="{ path: '/products', query: { sort: 'new' } }"
         :products="arrivals.items"
@@ -97,7 +97,7 @@ onBeforeUnmount(() => {
       />
       <ProductSection
         id="picks-for-you"
-        title="PICKS FOR YOU"
+        title="베스트"
         subtitle="지금 가장 사랑받는 일본 직구 아이템"
         :more-to="{ path: '/products', query: { sort: 'best' } }"
         :products="recommended.items"

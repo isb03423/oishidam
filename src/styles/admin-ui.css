@@ -14,6 +14,7 @@
   --admin-warning: #8b5a16;
   --admin-warning-soft: #fff5e2;
   --admin-danger: #b13e3e;
+  --admin-danger-hover: #943232;
   --admin-danger-soft: #fdf0ef;
   --admin-info: #385d94;
   --admin-info-soft: #edf2fa;
@@ -170,6 +171,7 @@
 .admin-shell .alert-actions button, .admin-shell .delete-actions button { flex: initial; min-width: 76px; min-height: 36px; border-radius: 6px; font-size: var(--font-size-control); }
 .admin-shell .delete-symbol { width: 40px; height: 40px; margin: 0 0 16px; border-radius: 8px; color: var(--admin-danger); background: var(--admin-danger-soft); }
 .admin-shell button.delete-confirm { background: var(--admin-danger); border-color: var(--admin-danger); color: #fff; }
+.admin-shell button.delete-confirm:not(:disabled):hover { background: var(--admin-danger-hover); border-color: var(--admin-danger-hover); }
 .admin-shell .delete-close { position: absolute; top: 8px; right: 10px; min-width: 36px; padding: 0; border: 0; }
 .admin-shell .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 @media (prefers-reduced-motion: no-preference) {

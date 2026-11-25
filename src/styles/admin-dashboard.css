@@ -216,7 +216,8 @@
 :global(html:has(.overview)) { scroll-padding-block-start: 116px; }
 @media(max-width:760px) { :global(html:has(.overview)) { scroll-padding-block-start: 88px; } }
 
-.overview .overview-task-row:focus-visible .overview-expand-button { color: var(--admin-brand); background: var(--admin-brand-soft); border-radius: 4px; }.overview :is(.overview-text-link,.overview-stock-name):is(:hover,:focus-visible) { text-decoration: none; }.overview .overview-stock-name { width: 100%; min-height: 24px; padding: 0; border: 0; border-radius: 0; background: transparent; text-align: left; font-size: var(--font-size-table); font-weight: 500; }.overview .overview-stock-name:is(:hover,:focus) { border: 0; outline: none; background: transparent; }
+.overview .overview-task-row:focus-visible .overview-expand-button { color: var(--admin-brand); }
+.overview :is(.overview-text-link,.overview-stock-name):is(:hover,:focus-visible) { text-decoration: none; }.overview .overview-stock-name { width: 100%; min-height: 24px; padding: 0; border: 0; border-radius: 0; background: transparent; text-align: left; font-size: var(--font-size-table); font-weight: 500; }.overview .overview-stock-name:is(:hover,:focus) { border: 0; outline: none; background: transparent; }
 .overview-completion { position: fixed; z-index: 60; right: 24px; bottom: 24px; width: min(460px, calc(100% - 32px)); }
 .overview-stock-table { height: clamp(224px, calc(100dvh - 340px), 480px); flex: none; overflow: hidden; }.overview-stock-table tbody tr { height: 44px; }.overview-stock-table tbody :is(th,td) { padding-block: 4px; }.overview-stock-pager { min-height: 52px; }
 @media(min-width:1101px) { .overview-stock-table { height: auto; flex: 1; min-height: 0; overflow: hidden; } }
@@ -226,7 +227,10 @@
 
 @media(pointer:coarse) { .overview-stock-table tbody tr { height: 48px; }.overview-stock-table tbody th { padding-block: 0; }.overview .overview-stock-name { min-height: 44px; } }
 
-.task-column-reference { width: 70px; }.task-column-customer { width: 68px; }.task-column-state { width: 84px; }.task-column-age { width: 132px; }.task-open-column { width: 24px; }.task-grid-orders .task-column-reference { width: auto; }.task-column-quantity { width: 64px; }.task-column-amount { width: 110px; }.task-grid-orders .task-column-state { width: 96px; }.task-grid-orders .task-column-customer { width: 72px; }.task-grid-orders .task-column-age { width: 132px; }.task-grid-orders .task-open-column { width: 24px; }.task-field { display: block; font-size: var(--font-size-table); overflow-wrap: anywhere; }.task-field-reference { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }.task-field-title { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }.task-state { font-size: var(--font-size-table); white-space: nowrap; }.overview-task-table .task-open-column { padding-inline: 0; }.overview-task-table .overview-task-row > td { padding-inline: 8px; }.overview-task-table .overview-expand-button { width: 20px; margin-left: auto; }.overview-task-table .overview-task-row:focus-visible .overview-expand-button { outline: none; }
+.task-column-reference { width: 70px; }.task-column-customer { width: 68px; }.task-column-state { width: 84px; }.task-column-age { width: 132px; }.task-grid-orders .task-column-reference { width: auto; }.task-column-quantity { width: 64px; }.task-column-amount { width: 110px; }.task-grid-orders .task-column-state { width: 96px; }.task-grid-orders .task-column-customer { width: 72px; }.task-grid-orders .task-column-age { width: 132px; }.task-field { display: block; font-size: var(--font-size-table); overflow-wrap: anywhere; }.task-field-reference { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }.task-field-title { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }.task-state { font-size: var(--font-size-table); white-space: nowrap; }
+.overview-task-table .overview-task-row > td { padding-inline: 8px; }
+.overview-task-table .task-open-column, .overview-task-table .overview-task-row > .task-open-column { width: 36px; padding-inline: 0; }
+.overview-task-table .overview-expand-button { width: 20px; margin-inline: auto; }
 
 .task-column-sentiment { width: 118px; }
 .overview-task-results,.overview-stock-table { position: relative; min-width: 0; max-width: 100%; }
@@ -235,12 +239,21 @@
 @container (max-width: 680px) {
   .overview-task-table colgroup, .overview-task-table thead { display: none; }
   .overview-task-table, .overview-task-table tbody { display: block; width: 100%; }
-  .overview-task-table .overview-task-row { position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); height: auto; gap: 10px 16px; padding: 14px 28px 14px 10px; border-bottom: 1px solid var(--admin-line); }
-  .overview-task-table .overview-task-row > td { display: block; min-width: 0; width: auto; padding: 0; border: 0; text-align: start; }
+  .overview .overview-task-table .overview-task-row { position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); height: auto; gap: 10px 16px; padding: 14px 36px 14px 10px; border-bottom: 1px solid var(--admin-line); }
+  .overview .overview-task-table .overview-task-row > td { display: block; min-width: 0; width: auto; padding: 0; border: 0; background: transparent; text-align: start; }
+  .overview .overview-task-table .overview-task-row:focus:not(:focus-visible):not(:hover):not([aria-expanded='true']) { background: transparent; }
+  .overview .overview-task-table .overview-task-row:focus-visible { outline: 2px solid var(--admin-brand); outline-offset: -2px; background: var(--admin-brand-soft); }
   .overview-task-table .overview-task-row > td::before { content: attr(data-label); display: block; margin-bottom: 3px; color: var(--admin-muted); font-size: var(--font-size-table); }
   .overview-task-table .overview-task-row > td:first-child,
   .overview-task-table:not(.task-grid-orders) .overview-task-row > td:nth-child(2) { grid-column: 1 / -1; }
-  .overview-task-table .overview-task-row > .task-open-column { position: absolute; right: 0; top: 14px; width: 20px; }
+  .overview .overview-task-table .overview-task-row > .task-open-column {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-end: 8px;
+    display: flex;
+    align-items: center;
+    width: 20px;
+  }
   .overview-task-table .task-open-column::before { display: none; }
   .overview-task-table .task-field-title { white-space: normal; overflow-wrap: anywhere; }
   .overview-task-table .overview-task-age { white-space: normal; overflow-wrap: anywhere; }

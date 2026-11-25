@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
+import { RouterLink } from 'vue-router'
 
 const props = defineProps({
   slides: { type: Array, default: () => [] },
@@ -8,7 +9,7 @@ const activeIndex = ref(0)
 const currentSlide = computed(() => props.slides[activeIndex.value])
 const hasMultipleSlides = computed(() => props.slides.length > 1)
 
-watch(() => props.slides, () => { activeIndex.value = 0 })
+watch(() => props.slides.length, () => { activeIndex.value = 0 })
 function moveSlide(direction) {
   if (!hasMultipleSlides.value) return
   activeIndex.value = (activeIndex.value + direction + props.slides.length) % props.slides.length
@@ -27,11 +28,12 @@ function formatSlideNumber(index) {
     aria-label="오이시담 추천 컬렉션"
   >
     <Transition name="banner-fade" mode="out-in">
-      <RouterLink
+      <component
+        :is="currentSlide.to ? RouterLink : 'div'"
         :key="currentSlide.id"
         class="banner-visual"
         :to="currentSlide.to"
-        :aria-label="`${currentSlide.title.replace(/\n/g, ' ')} · ${currentSlide.buttonLabel}`"
+        :aria-label="currentSlide.to ? `${currentSlide.title.replace(/\n/g, ' ')} · ${currentSlide.buttonLabel}` : undefined"
       >
         <img
           class="banner-image"
@@ -45,12 +47,12 @@ function formatSlideNumber(index) {
         <div class="banner-content">
           <h1 class="banner-title">{{ currentSlide.title }}</h1>
           <p class="banner-description">{{ currentSlide.description }}</p>
-          <span class="banner-cta">
+          <span v-if="currentSlide.to" class="banner-cta">
             {{ currentSlide.buttonLabel }}
             <span aria-hidden="true">→</span>
           </span>
         </div>
-      </RouterLink>
+      </component>
     </Transition>
 
     <div class="banner-controls">

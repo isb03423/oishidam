@@ -33,9 +33,9 @@
 
 ```text
 oishidam/
-├─ compose.yaml                   # 외부: Caddy 80·443, 로컬: AI 8000
+├─ compose.yaml                   # 호스트 공개 포트는 Caddy 80·443
 ├─ caddy/Caddyfile                # APP_URL에 따른 HTTP/HTTPS·인증서 자동 관리
-├─ compose.db-access.yaml         # 선택: 로컬 DB 관리용 127.0.0.1:5433
+├─ compose.db-access.yaml         # 선택 적용 시 호스트의 DB 관리 포트 5433 공개
 ├─ .env.example                   # Compose 환경변수 예시
 ├─ frontend/
 │  ├─ src/                        # 화면·컴포넌트·라우터·API 클라이언트
@@ -68,13 +68,13 @@ ai-service ──→ backend:8080/api   # 전달받은 JWT·현재 회원 권한
 backend / ai-service ──→ db:5432 # 같은 PostgreSQL 사용
 ```
 
-- 외부 공개 포트는 Caddy의 **80·443**입니다. AI는 배포 PC에서 상태·문서를 확인할 수 있도록 **127.0.0.1:8000**에만 연결합니다. 프론트·백엔드·DB에는 `ports`를 지정하지 않습니다.
+- 기본 Compose가 호스트에 공개하는 포트는 Caddy의 **80·443**입니다. AI 서비스는 Docker 네트워크에서 `ai-service:8000`으로 연결합니다. DB 포트 공개는 [DB 관리 도구 연결](#db-관리-도구-연결)에 설명한 선택 설정을 사용합니다.
 - `APP_URL=http://localhost`는 기존처럼 HTTP로 실행합니다. 공개 도메인의 `https://` 주소를 설정하면 Caddy가 인증서를 자동 발급·갱신하고 HTTP를 HTTPS로 이동시킵니다. [Caddy 자동 HTTPS 문서](https://caddyserver.com/docs/automatic-https)
 - Nginx는 내부 Caddy가 전달한 HTTPS·클라이언트 IP 정보를 사용합니다. Nginx의 8080 포트를 별도로 공개하지 않습니다.
-- 백엔드와 AI의 업무 API는 프론트 주소 아래에서 접근하며 JWT·역할 검증을 적용합니다. AI 서비스의 상태 확인·API 문서는 인증 없이 공개합니다. 포트 비공개가 업무 API 인증을 대신하지는 않습니다.
+- 백엔드와 AI의 업무 API는 프론트 주소 아래에서 접근하며 JWT·역할 검증을 적용합니다. AI 상태 확인과 API 문서는 컨테이너 내부에서 인증 없이 조회할 수 있습니다.
 - 컨테이너끼리는 `localhost`가 아닌 `backend`, `ai-service`, `db` 서비스 이름으로 통신합니다.
 - DB 준비 → 백엔드 준비·스키마 초기화 → AI 준비 → 프론트 준비 → Caddy 순서로 시작합니다. 단순 실행 여부뿐 아니라 healthcheck 결과를 기다립니다. [Docker 실행 순서 문서](https://docs.docker.com/compose/how-tos/startup-order/)
-- 백엔드 healthcheck는 공개 카테고리 API로 DB 연결까지 확인합니다. AI는 공개 `/health`의 **200 응답**을 준비 상태로 사용합니다. DB 연결이나 모델 추론 성공까지 확인하는 검사는 아닙니다.
+- 백엔드 healthcheck는 공개 카테고리 API로 DB 연결까지 확인합니다. AI healthcheck는 컨테이너 내부에서 `/health`의 **200 응답**을 확인합니다.
 - `restart: unless-stopped`로 비정상 종료 시 재시작합니다. healthcheck 실패 자체가 자동 재시작을 일으키지는 않습니다.
 
 ## Docker로 처음 실행하기
@@ -242,7 +242,7 @@ docker compose up -d --build --wait --wait-timeout 300
 
 `DB_PASSWORD`를 `.env`에서 바꾸더라도 이미 생성된 PostgreSQL 사용자의 비밀번호는 자동 변경되지 않습니다. 기존 데이터를 유지한다면 DB의 사용자 비밀번호도 함께 변경해야 합니다. 비밀번호 변경을 위해 볼륨을 삭제하면 기존 데이터가 사라집니다.
 
-## DB 관리 도구 연결: 필요한 경우에만
+## DB 관리 도구 연결
 
 기본 구성은 DB 포트를 공개하지 않습니다. DBeaver·DataGrip·pgAdmin에서 DB를 직접 관리할 때만 보조 Compose를 함께 적용합니다.
 
@@ -252,20 +252,20 @@ docker compose -f compose.yaml -f compose.db-access.yaml up -d --wait --wait-tim
 
 | 항목 | 값 |
 | --- | --- |
-| 호스트 | `127.0.0.1` |
+| 호스트 | Docker 호스트에서 접속할 때 `127.0.0.1`, 다른 PC에서 접속할 때 Docker 호스트의 IP 또는 호스트명 |
 | 포트 | `5433` |
 | 데이터베이스 / 사용자 | `oishidam` / `oishidam` |
 | 비밀번호 | 루트 `.env`의 `DB_PASSWORD` |
 
-`127.0.0.1:5433:5432`이므로 Docker 호스트에서만 접근할 수 있습니다. `5433:5432`로 바꾸면 외부 인터페이스에도 공개됩니다. [Docker 포트 공개 문서](https://docs.docker.com/engine/network/port-publishing/)
+보조 설정의 `5433:5432`는 Docker 호스트의 모든 네트워크 인터페이스에 DB 포트 `5433`을 엽니다. 원격에서 직접 접속할 때는 방화벽에서 필요한 접속 출발지에만 `5433`을 허용합니다. [Docker 포트 공개 문서](https://docs.docker.com/engine/network/port-publishing/)
 
-원격 서버의 DB를 관리하려면 **서버에서 위 보조 설정을 적용한 뒤**, 개발 PC에서 SSH 터널을 열어 사용합니다. 서버에 SSH 접속 권한과 포트 포워딩 허용이 필요합니다.
+원격 서버의 DB에 SSH 터널로 접속하려면 서버의 `compose.db-access.yaml`에서 매핑을 `127.0.0.1:5433:5432`로 지정한 뒤 위 실행 명령을 적용합니다. 서버에 SSH 접속 권한과 포트 포워딩 허용이 필요합니다. 개발 PC에서 다음 명령으로 터널을 엽니다.
 
 ```sh
 ssh -N -L 15433:127.0.0.1:5433 user@server-address
 ```
 
-터널 실행 중 개발 PC의 관리 도구를 `127.0.0.1:15433`에 연결합니다. 원격 서버의 `5433` 포트를 인터넷에 열 필요가 없습니다. 관리를 마친 뒤 서버에서 다음 명령을 실행하면 DB 포트 매핑을 제거합니다.
+터널 실행 중 개발 PC의 관리 도구를 `127.0.0.1:15433`에 연결합니다. DB 관리를 마치면 Docker 호스트에서 기본 Compose 설정을 다시 적용해 DB 포트 매핑을 제거합니다.
 
 ```sh
 docker compose -f compose.yaml up -d db
@@ -303,7 +303,7 @@ APP_URL=http://192.168.0.204
 docker compose up -d --build --wait --wait-timeout 300
 ```
 
-이후 `http://192.168.0.204`로 접속합니다. 호스트 방화벽·클라우드 보안 그룹은 필요한 HTTP `80` 접근을 허용해야 합니다. 프론트·백엔드 `8080`, AI `8000`, DB `5432`는 공개하지 않습니다. 내부 포트가 달라도 브라우저 요청은 모두 공개 프론트 주소를 사용합니다.
+이후 `http://192.168.0.204`로 접속합니다. 호스트 방화벽·클라우드 보안 그룹은 필요한 HTTP `80` 접근을 허용해야 합니다. 브라우저의 웹·API 요청은 Caddy를 거쳐 프론트 주소로 들어옵니다.
 
 ### 공개 도메인 HTTPS: oishidam.kro.kr
 
@@ -385,7 +385,13 @@ Spring API의 요청·응답 명세는 [Swagger UI](http://localhost/swagger-ui/
 | AI 감정분석 | `/api/ai/sentiment/*` |
 | AI 고객 분석 | `/api/ai/analytics/customers` |
 
-인증이 필요한 API에는 `Authorization: Bearer <accessToken>`을 전달합니다. AI도 백엔드의 현재 회원 조회로 JWT와 권한을 확인합니다. 개인화 추천과 본인 후기 단건 분석 외의 AI 업무 API는 관리자 권한이 필요합니다. AI 서비스의 `/health`, `/docs`, `/docs/oauth2-redirect`, `/redoc`, `/openapi.json`은 로그인 없이 접근할 수 있습니다. Docker 배포 PC에서는 [AI 상태 확인](http://localhost:8000/health), [Swagger UI](http://localhost:8000/docs), [ReDoc](http://localhost:8000/redoc), [OpenAPI](http://localhost:8000/openapi.json)을 사용할 수 있습니다. 8000 포트는 로컬 전용이므로 다른 PC에서는 직접 접근할 수 없습니다.
+인증이 필요한 API에는 `Authorization: Bearer <accessToken>`을 전달합니다. AI도 백엔드의 현재 회원 조회로 JWT와 권한을 확인합니다. 개인화 추천과 본인 후기 단건 분석 외의 AI 업무 API는 관리자 권한이 필요합니다.
+
+AI 서비스의 `/health`, `/docs`, `/docs/oauth2-redirect`, `/redoc`, `/openapi.json`은 컨테이너 내부에서 인증 없이 접근할 수 있습니다. Docker 호스트에서 AI 상태를 확인하려면 다음 명령을 사용합니다. Docker 없이 AI를 직접 실행하는 경우 문서 주소는 [AI README](ai-service/README.md)를 참고합니다.
+
+```sh
+docker compose exec -T ai-service python -c "from urllib.request import urlopen; print(urlopen('http://127.0.0.1:8000/health', timeout=3).read().decode())"
+```
 
 ## Docker 없이 개발하기
 
@@ -445,7 +451,7 @@ docker compose up -d --wait --wait-timeout 300
 | HTTPS 인증서 발급 실패 | `docker compose logs --tail=100 caddy`, DNS A/AAAA·공인 IP·TCP 80/443 포워딩·Windows 방화벽 확인 |
 | `unhealthy`, 준비 시간 초과 | `docker compose logs --tail=100 db backend ai-service frontend`로 원인 확인 |
 | Nginx 502 | backend·ai-service의 실행·healthcheck 확인. 해당 컨테이너만 재생성한 뒤에는 `docker compose restart frontend`로 프록시 연결도 갱신 |
-| API 인증 오류 | 업무 API는 로그인·토큰 만료·현재 회원 상태·권한 확인. AI `/health`·문서 조회는 로그인 없이 200 응답이어야 함 |
+| API 인증 오류 | 업무 API의 로그인 상태·토큰 만료·현재 회원 상태·권한 확인 |
 | 다른 PC에서 AI 요청이 localhost로 감 | 루트 `.env`의 `APP_URL`을 실제 접속 출처로 바꾸고 frontend 재빌드 |
 | 카카오 콜백 실패 | 공개 주소의 Redirect URI 등록, `APP_URL`과 실제 브라우저 출처 일치 여부 |
 | 이미지 업로드·결제 실패 | 외부 연동 키·서비스 네트워크 접근·요청 크기 확인 |

@@ -124,7 +124,7 @@ const distribution = computed(() => sentiments.map(([sentiment, color]) => ({
 const count = (...codes) => distribution.value.filter(item => codes.includes(item.sentiment)).reduce((sum, item) => sum + item.count, 0)
 const metrics = computed(() => [
   ['전체 후기', report.value?.total], ['분석 완료', report.value?.analyzed],
-  ['미분석', report.value?.pending], ['답변 대기 부정 후기', report.value?.negativeUnanswered],
+  ['미분석', report.value?.pending], ['답변 대기 후기', report.value?.unanswered],
 ])
 
 function filterProducts(value) { productFilter.value = value; productPage.value = 0 }
@@ -211,7 +211,7 @@ watch([shoppingOwner, retry], async (_, __, onCleanup) => {
           <section class="sentiment-response" aria-labelledby="sentiment-response-title">
             <div class="analytics-section-heading"><h2 id="sentiment-response-title">고객 반응</h2></div>
             <dl class="sentiment-rates"><div><dt>긍정 비율<small>매우 긍정 + 긍정</small></dt><dd>{{ percent(count('VERY_POSITIVE', 'POSITIVE')) }}</dd></div><div><dt>부정 비율<small>부정 + 매우 부정</small></dt><dd>{{ percent(count('NEGATIVE', 'VERY_NEGATIVE')) }}</dd></div></dl>
-            <p class="analytics-note">부정 후기 중 {{ number(report.negativeUnanswered) }}건이 답변을 기다리고 있습니다.</p>
+            <p class="analytics-note">후기 {{ number(report.unanswered) }}건이 답변을 기다리고 있습니다.</p>
             <RouterLink class="sentiment-review-link" :to="{ name: 'AdminDashboard', params: { section: 'reviews' }, query: { status: 'OPEN' } }">답변 대기 후기 보기<AdminIcon name="chevron" /></RouterLink>
           </section>
         </div>

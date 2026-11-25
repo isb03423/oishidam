@@ -83,6 +83,7 @@ public class SecurityConfig {
                         // API 문서
                         .requestMatchers(
                                 HttpMethod.GET,
+                                "/docs",
                                 "/swagger-ui.html",
                                 "/swagger-ui/**",
                                 "/v3/api-docs",

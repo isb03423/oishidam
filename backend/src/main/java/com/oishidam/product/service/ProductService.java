@@ -24,7 +24,6 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -81,22 +80,6 @@ public class ProductService {
                 : productRepository.searchByKeyword(SaleStatus.ON_SALE, now, categoryIds, search, pageable);
         Map<Long, ProductImage> images = primaryImages(products.getContent());
         return products.map(product -> toSummary(product, images));
-    }
-
-    @Transactional(readOnly = true)
-    public List<ProductSummaryResponse> availableSummaries(List<Long> rankedIds) {
-        List<Long> categoryIds = categoryService.categoryIds(null);
-        if (rankedIds.isEmpty() || categoryIds.isEmpty()) {
-            return List.of();
-        }
-        List<Product> available = productRepository
-                .findByIdInAndSaleStatusAndDeletedAtIsNullAndPublishedAtLessThanEqualAndCategoryIdIn(
-                        rankedIds, SaleStatus.ON_SALE, LocalDateTime.now(clock), categoryIds
-                ).stream().filter(product -> product.getStockQuantity() > 0).toList();
-        Map<Long, ProductImage> images = primaryImages(available);
-        Map<Long, Product> byId = available.stream().collect(Collectors.toMap(Product::getId, Function.identity()));
-        return rankedIds.stream().distinct().map(byId::get).filter(Objects::nonNull)
-                .map(product -> toSummary(product, images)).toList();
     }
 
     private Map<Long, ProductImage> primaryImages(List<Product> products) {

@@ -186,7 +186,7 @@ JAR 실행 시에도 프로젝트 루트에서 실행해야 위에서 만든 `.e
 | 찜·장바구니 | `/api/wishes`, `/api/cart` |
 | 주문·결제 | `/api/orders`, `/api/orders/{orderId}/payments`, `/api/payments` |
 | 후기 | `/api/products/{productId}/reviews`, `/api/orders/items/{itemId}/review`, `/api/reviews` |
-| 문의 | `/api/inquiries` |
+| 문의 | `GET /api/inquiries/mine`, `POST /api/inquiries`, `GET/DELETE /api/inquiries/{inquiryId}` |
 | 관리자 | `/api/admin/members`, `/api/admin/categories`, `/api/admin/products`, `/api/admin/orders`, `/api/admin/reviews`, `/api/admin/inquiries` |
 | 대시보드·고객 분석 | `/api/admin/dashboard`, `/api/admin/analytics` |
 
@@ -200,7 +200,7 @@ Authorization: Bearer <accessToken>
 
 일반 API는 세션 없이 JWT를 사용합니다. 액세스 토큰 유효기간은 1시간, 리프레시 토큰 유효기간은 14일입니다. 토큰 검증 시 서명·만료·issuer·audience뿐 아니라 회원 활성 상태, 토큰 버전, 로그아웃으로 폐기된 토큰 여부도 확인합니다.
 
-회원가입·로그인·토큰 갱신, 상품·카테고리·상품 후기 조회, 공개 문의 목록, API 문서는 비로그인 접근을 허용합니다. 개인화 추천은 로그인이 필요하며, `/api/admin/**`는 `ADMIN` 권한이 필요합니다. 문의 작성·개별 조회 등은 `USER` 권한을 요구합니다. 세부 권한은 [SecurityConfig.java](src/main/java/com/oishidam/config/SecurityConfig.java)와 각 컨트롤러를 기준으로 합니다.
+회원가입·로그인·토큰 갱신, 상품·카테고리·상품 후기 조회, API 문서는 비로그인 접근을 허용합니다. 개인화 추천은 로그인이 필요하며, `/api/admin/**`는 `ADMIN` 권한이 필요합니다. 문의 작성·개별 조회 등은 `USER` 권한을 요구합니다. 세부 권한은 [SecurityConfig.java](src/main/java/com/oishidam/config/SecurityConfig.java)와 각 컨트롤러를 기준으로 합니다.
 
 공통 응답은 `success`, `message`, `data` 필드를 사용합니다.
 

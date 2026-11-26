@@ -69,25 +69,6 @@ public class ReviewService {
         return reviews.ratingSummary(productId);
     }
 
-    // 리뷰 작성 가능 여부
-    @Transactional(readOnly = true)
-    public ReviewEligibilityResponse eligibility(Long memberId, Long itemId) {
-        activeMember(memberId);
-        OrderItem item = item(itemId, memberId);
-        Review review = reviews.findByOrderItemId(itemId).orElse(null);
-
-        // 배송 완료 여부와 리뷰 작성 기한 확인
-        LocalDateTime deadline = writeDeadline(item);
-        boolean eligible = review == null && deadline != null && LocalDateTime.now(clock).isBefore(deadline);
-        ReviewResponse response = review == null || review.getDeletedAt() != null ? null : ReviewResponse.from(review);
-        return new ReviewEligibilityResponse(
-                eligible,
-                deadline,
-                response == null ? null : response.editableUntil(),
-                response
-        );
-    }
-
     // 리뷰 작성
     @Transactional
     public ReviewResponse create(

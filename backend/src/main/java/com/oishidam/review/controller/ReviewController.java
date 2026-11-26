@@ -62,15 +62,6 @@ public class ReviewController {
         return ApiResponse.ok(service.ratingSummary(productId));
     }
 
-    @Operation(summary = "리뷰 작성 가능 여부 조회")
-    @GetMapping("/api/orders/items/{itemId}/review")
-    public ApiResponse<ReviewEligibilityResponse> eligibility(
-            @AuthenticationPrincipal Jwt jwt,
-            @PathVariable Long itemId
-    ) {
-        return ApiResponse.ok(service.eligibility(Long.valueOf(jwt.getSubject()), itemId));
-    }
-
     @Operation(summary = "리뷰 작성")
     @PostMapping(value = "/api/orders/items/{itemId}/review", consumes = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(HttpStatus.CREATED)

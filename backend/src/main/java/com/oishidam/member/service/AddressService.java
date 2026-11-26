@@ -28,13 +28,6 @@ public class AddressService {
         return addressRepository.findAllByMemberIdOrderByIdDesc(memberId).stream().map(AddressResponse::from).toList();
     }
 
-    // 배송지 상세 조회
-    @Transactional(readOnly = true)
-    public AddressResponse detail(Long memberId, Long addressId) {
-        memberRepository.findById(memberId).filter(Member::isActive).orElseThrow(this::invalidMember);
-        return AddressResponse.from(findAddress(memberId, addressId));
-    }
-
     // 기본 배송지 설정
     @Transactional
     public AddressResponse setDefault(Long memberId, Long addressId) {

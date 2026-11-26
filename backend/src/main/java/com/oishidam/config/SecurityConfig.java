@@ -114,7 +114,6 @@ public class SecurityConfig {
                                 "/api/categories/**"
                         ).permitAll()
 
-                        .requestMatchers(HttpMethod.GET, "/api/inquiries").permitAll()
                         .requestMatchers("/api/inquiries/**", "/api/inquiries").hasRole("USER")
 
                         // 관리자 전용

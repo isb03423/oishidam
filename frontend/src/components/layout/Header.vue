@@ -102,7 +102,7 @@
     </div>
 
     <!-- 하단 내비게이션 -->
-    <nav ref="navigation" class="header-nav" aria-label="주요 메뉴" @keydown.esc="dismissCategories">
+    <nav class="header-nav" aria-label="주요 메뉴" @keydown.esc="dismissCategories">
       <div class="header-container nav-inner">
 
         <!-- 전체 카테고리 -->
@@ -152,14 +152,14 @@
 
       </div>
       <div v-if="categoriesOpen" ref="categoryPanel" class="header-container category-panel">
-        <CategoryMenu @select="categoriesOpen = false" />
+        <CategoryMenu class="category-panel-content" @select="categoriesOpen = false" />
       </div>
     </nav>
   </header>
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import CategoryMenu from './CategoryMenu.vue'
 import logo from '../../assets/images/oishidam_logo.png'
@@ -173,7 +173,6 @@ import { logout } from '../../services/auth.js'
 const router = useRouter()
 const route = useRoute()
 const categoriesOpen = ref(false)
-const navigation = ref(null)
 const categoryButton = ref(null)
 const categoryPanel = ref(null)
 
@@ -190,12 +189,21 @@ function dismissCategories() {
   categoryButton.value?.focus()
 }
 
-function closeOnOutsideClick(event) {
-  if (!navigation.value?.contains(event.target)) categoriesOpen.value = false
+function closeOnOutsideInteraction(event) {
+  if (event.button !== 0) return
+  if (categoryButton.value?.contains(event.target) || categoryPanel.value?.firstElementChild?.contains(event.target)) return
+  categoriesOpen.value = false
 }
 
-onMounted(() => document.addEventListener('click', closeOnOutsideClick))
-onUnmounted(() => document.removeEventListener('click', closeOnOutsideClick))
+watch(categoriesOpen, (open, _, onCleanup) => {
+  if (!open) return
+  document.addEventListener('pointerdown', closeOnOutsideInteraction, true)
+  document.addEventListener('click', closeOnOutsideInteraction, true)
+  onCleanup(() => {
+    document.removeEventListener('pointerdown', closeOnOutsideInteraction, true)
+    document.removeEventListener('click', closeOnOutsideInteraction, true)
+  })
+})
 watch(() => route.fullPath, () => { categoriesOpen.value = false })
 const cartAnimationRun = ref(0)
 const isCartAnimationShown = ref(false)
@@ -531,6 +539,11 @@ function requireLogin(memberRoute) {
   position: absolute;
   z-index: 5;
   inset: 100% 0 auto;
+  pointer-events: none;
+}
+
+.category-panel-content {
+  pointer-events: auto;
 }
 
 .header-nav {

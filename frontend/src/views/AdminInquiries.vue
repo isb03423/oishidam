@@ -13,11 +13,12 @@ import { getAdminList } from '../services/admin.js'
 import { getSessionRevision, session, shoppingOwner } from '../stores/session.js'
 
 const route = useRoute()
+const defaultStatus = 'OPEN'
 const items = ref([])
 const total = ref(0)
 const pages = ref(0)
 const page = ref(0)
-const status = ref('')
+const status = ref(defaultStatus)
 const query = ref('')
 const keyword = ref('')
 const retry = ref(0)
@@ -33,7 +34,8 @@ watch(shoppingOwner, () => {
   successNotice.value = ''
   items.value = []
   total.value = pages.value = page.value = 0
-  status.value = query.value = keyword.value = notice.value = ''
+  filterFromRoute(route.query.status)
+  query.value = keyword.value = notice.value = ''
 }, { immediate: true })
 
 watch([shoppingOwner, page, status, keyword, retry], async (_, __, onCleanup) => {
@@ -59,7 +61,8 @@ watch([shoppingOwner, page, status, keyword, retry], async (_, __, onCleanup) =>
 
 function search() { keyword.value = query.value.trim(); page.value = 0; retry.value++ }
 function filter(value) { status.value = value; page.value = 0 }
-watch(() => route.query.status, (value) => { if (filters.some((item) => item.value === value)) filter(value) }, { immediate: true })
+function filterFromRoute(value) { filter(filters.some(item => item.value === value) ? value : defaultStatus) }
+watch(() => route.query.status, filterFromRoute)
 
 async function open(id) {
   await nextTick()
@@ -97,7 +100,7 @@ watch(() => route.query.id, (id) => { if (typeof id === 'string' && /^\d+$/.test
 
           </tr></tbody>
         </table>
-        <p v-else-if="!error" class="inquiry-empty" role="status">{{ loading ? '문의 내역을 불러오고 있어요.' : keyword ? '검색 조건에 맞는 문의가 없습니다.' : '아직 등록된 문의가 없습니다.' }}</p>
+        <p v-else-if="!error" class="inquiry-empty" role="status">{{ loading ? '문의 내역을 불러오고 있어요.' : keyword || status ? '검색 조건에 맞는 문의가 없습니다.' : '아직 등록된 문의가 없습니다.' }}</p>
       </div>
       <template #footer>
         <Pagination :model-value="page + 1" :page-count="pages" :disabled="loading" label="문의 목록 페이지" @update:model-value="page = $event - 1" />

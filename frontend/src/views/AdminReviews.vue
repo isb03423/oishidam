@@ -16,11 +16,12 @@ import { getSessionRevision, session, shoppingOwner } from '../stores/session.js
 import { reviewSentimentFilters } from '../utils/reviewSentiments.js'
 
 const route = useRoute()
+const defaultStatus = 'OPEN'
 const items = ref([])
 const total = ref(0)
 const pages = ref(0)
 const page = ref(0)
-const status = ref('')
+const status = ref(defaultStatus)
 const sentimentFilter = ref('')
 const query = ref('')
 const keyword = ref('')
@@ -40,7 +41,8 @@ watch(shoppingOwner, () => {
   successNotice.value = ''
   items.value = []
   total.value = pages.value = page.value = 0
-  status.value = query.value = keyword.value = productQuery.value = productFilter.value = notice.value = ''
+  filterFromRoute(route.query.status)
+  query.value = keyword.value = productQuery.value = productFilter.value = notice.value = ''
   sentimentFilter.value = ''
 }, { immediate: true })
 
@@ -71,7 +73,8 @@ function filterSentiment(value) { sentimentFilter.value = value; page.value = 0 
 watch(() => route.query.sentiment, (value) => {
   filterSentiment(typeof value === 'string' && reviewSentimentFilters.some(item => item.value === value) ? value : '')
 }, { immediate: true })
-watch(() => route.query.status, (value) => { if (filters.some((item) => item.value === value)) filter(value) }, { immediate: true })
+function filterFromRoute(value) { filter(filters.some(item => item.value === value) ? value : defaultStatus) }
+watch(() => route.query.status, filterFromRoute)
 watch(() => route.query.productId, (value, previous) => {
   if (typeof value === 'string' && /^\d+$/.test(value)) {
     productQuery.value = productFilter.value = value; page.value = 0

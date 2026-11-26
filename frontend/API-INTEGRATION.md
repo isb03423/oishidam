@@ -42,7 +42,7 @@
 | 관리자 주문 | `GET /api/admin/orders`, `GET /api/admin/orders/{orderId}`, `PATCH /api/admin/orders/{orderId}/status` | 주문번호/수령인·상태·기간 검색, 상세 수령인/상품/금액/상태 이력 및 서버가 허용한 다음 배송 단계 변경을 처리한다. 결제·취소 상태는 임의로 전환하지 않는다. |
 | 관리자 회원 | `GET /api/admin/members`, `GET /api/admin/members/{memberId}`, `PATCH /api/admin/members/{memberId}/status` | 검색·활성 필터·상세 및 활성/비활성 상태 변경을 연결했다. 화면의 모의 관리 메모는 실 API에 저장하지 않는다. |
 | 관리자 문의·리뷰 | `GET /api/admin/inquiries`, `GET /api/admin/inquiries/{inquiryId}`, `POST /api/admin/inquiries/{inquiryId}/messages`, `GET /api/admin/reviews`, `GET /api/admin/reviews/{reviewId}`, `PUT /api/admin/reviews/{reviewId}/answer` | 문의 목록은 memberName으로 실제 작성자 이름을 표시하고 날짜·시간은 한 줄로 표시한다. 답변하기 버튼으로 채팅형 모달을 열어 문의·답변 확인과 최초 답변 등록을 처리한다. 수동 상태 변경 API와 고객 추가 문의 API는 제거했다. 최초 관리자 답변 시 ANSWERED로 전환하며 재답변은 409로 거부한다. 완료된 문의는 답변 보기만 제공한다. 리뷰 사진·관리자 답변 등록/수정도 연결했다. 실 리뷰에는 API에 없는 별점을 표시하지 않는다. 검색/필터 및 서버 페이지 이동을 제공한다. |
-| 관리자 고객 분석 | `/api/admin/dashboard/customers` | 사용자 요청으로 이번 연결 범위에서 제외했다. 기존 화면 유지. |
+| 관리자 고객 분석 | `GET /api/admin/analytics/customers`, `GET /api/admin/analytics/customers/members`, `GET/POST /api/admin/analytics/customers/reanalyze` | 고객 분석 결과와 회원 목록 조회, 재분석 시작과 진행 상태 조회에 사용한다. |
 
 ## 서버 팀에 확인할 명세
 

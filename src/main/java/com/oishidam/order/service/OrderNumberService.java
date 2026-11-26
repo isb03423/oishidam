@@ -15,14 +15,14 @@ import java.util.Locale;
 @Service
 @RequiredArgsConstructor
 public class OrderNumberService {
-    private static final DateTimeFormatter PREFIX = DateTimeFormatter.ofPattern("yyyyMMddHHmmss", Locale.ROOT)
+    private static final DateTimeFormatter PREFIX = DateTimeFormatter.ofPattern("yyyyMMdd", Locale.ROOT)
             .withZone(ZoneId.of("Asia/Seoul"));
 
     private final OrderNumberSequenceRepository sequences;
 
     private final Clock clock;
 
-    // 한국 시간과 DB에서 원자적으로 증가하는 초별 일련번호로 주문번호를 발급한다.
+    // 한국 날짜와 DB에서 원자적으로 증가하는 일별 일련번호로 주문번호를 발급한다.
     @Transactional
     public String next() {
         String prefix = PREFIX.format(clock.instant());

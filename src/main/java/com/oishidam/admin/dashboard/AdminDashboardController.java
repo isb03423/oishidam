@@ -1,6 +1,5 @@
 package com.oishidam.admin.dashboard;
 
-import com.oishidam.admin.dashboard.dto.DashboardCustomersResponse;
 import com.oishidam.admin.dashboard.dto.DashboardOperationsResponse;
 import com.oishidam.admin.dashboard.dto.DashboardStockAlertsResponse;
 import com.oishidam.admin.dashboard.service.AdminDashboardService;
@@ -15,7 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
 
-@Tag(name = "관리자 - 대시보드", description = "운영 현황 및 고객 구매 집계")
+@Tag(name = "관리자 - 대시보드", description = "운영 현황 및 재고 알림")
 @RestController
 @RequestMapping("/api/admin/dashboard")
 @RequiredArgsConstructor
@@ -37,15 +36,5 @@ public class AdminDashboardController {
             @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "4") int size
     ) {
         return ApiResponse.ok(service.stockAlerts(page, size));
-    }
-
-    @Operation(summary = "고객별 구매 금액 및 주문 횟수 조회")
-    @GetMapping("/customers")
-    public ApiResponse<DashboardCustomersResponse> customers(
-            @RequestParam LocalDate from, @RequestParam LocalDate to,
-            @RequestParam(required = false) Long memberId,
-            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size
-    ) {
-        return ApiResponse.ok(service.customers(from, to, memberId, page, size));
     }
 }

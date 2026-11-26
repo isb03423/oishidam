@@ -1,7 +1,6 @@
 package com.oishidam.admin.dashboard.repository;
 
 import com.oishidam.admin.dashboard.dto.DashboardAlertResponse;
-import com.oishidam.admin.dashboard.dto.DashboardCustomerResponse;
 import com.oishidam.admin.dashboard.dto.DashboardRecentOrderResponse;
 import com.oishidam.admin.dashboard.dto.DashboardStatusResponse;
 import com.oishidam.admin.dashboard.dto.DashboardStockAlertResponse;
@@ -171,28 +170,5 @@ public class AdminDashboardRepository {
                 SELECT NEW com.oishidam.admin.dashboard.dto.DashboardAlertResponse(r.id, r.content)
                 FROM Review r WHERE r.deletedAt IS NULL AND r.answerContent IS NULL ORDER BY r.id DESC
                 """, DashboardAlertResponse.class).setMaxResults(10).getResultList();
-    }
-
-    // 승인된 결제가 있는 고객 수를 조회한다.
-    public long countCustomers(LocalDateTime from, LocalDateTime until, Long memberId) {
-        return entityManager.createQuery("""
-                SELECT COUNT(DISTINCT p.order.member.id) FROM PaymentConfirmation p
-                WHERE p.paidAt >= :from AND p.paidAt < :until AND p.order.orderStatus IN :approved
-                AND (:memberId IS NULL OR p.order.member.id = :memberId)
-                """, Long.class).setParameter("from", from).setParameter("until", until)
-                .setParameter("approved", APPROVED).setParameter("memberId", memberId).getSingleResult();
-    }
-
-    // 고객별 승인 구매액과 주문 횟수를 구매액 내림차순으로 조회한다.
-    public List<DashboardCustomerResponse> customers(LocalDateTime from, LocalDateTime until, Long memberId, int offset, int size) {
-        return entityManager.createQuery("""
-                SELECT NEW com.oishidam.admin.dashboard.dto.DashboardCustomerResponse(m.id, m.name, SUM(o.totalAmount), COUNT(o))
-                FROM PaymentConfirmation p JOIN p.order o JOIN o.member m
-                WHERE p.paidAt >= :from AND p.paidAt < :until AND o.orderStatus IN :approved
-                AND (:memberId IS NULL OR m.id = :memberId)
-                GROUP BY m.id, m.name ORDER BY SUM(o.totalAmount) DESC, m.id
-                """, DashboardCustomerResponse.class).setParameter("from", from).setParameter("until", until)
-                .setParameter("approved", APPROVED).setParameter("memberId", memberId)
-                .setFirstResult(offset).setMaxResults(size).getResultList();
     }
 }

@@ -18,7 +18,7 @@ import lombok.NoArgsConstructor;
 @Builder
 public class OrderNumberSequence {
     @Id
-    @Column(name = "time_prefix", length = 14)
+    @Column(name = "time_prefix", length = 8)
     private String timePrefix;
 
     @Column(name = "last_value", nullable = false)

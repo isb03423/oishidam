@@ -13,18 +13,12 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
-@Tag(name = "문의", description = "문의 제목 조회 및 비공개 문의·답변")
+@Tag(name = "문의", description = "비공개 문의 및 답변 조회")
 @RestController
 @RequestMapping("/api/inquiries")
 @RequiredArgsConstructor
 public class InquiryController {
     private final InquiryService service;
-
-    @Operation(summary = "공개 문의 제목 목록")
-    @GetMapping
-    public ApiResponse<Page<InquiryPublicResponse>> list(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
-        return ApiResponse.ok(service.publicList(page, size));
-    }
 
     @Operation(summary = "내 문의 목록")
     @GetMapping("/mine")

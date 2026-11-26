@@ -34,12 +34,6 @@ public class InquiryService {
 
     private final OrderRepository orders;
 
-    // 공개 문의 목록은 제목만 반환한다.
-    @Transactional(readOnly = true)
-    public Page<InquiryPublicResponse> publicList(int page, int size) {
-        return inquiries.findAll(pageable(page, size)).map(i -> new InquiryPublicResponse(i.getId(), i.getTitle()));
-    }
-
     // 로그인 고객의 문의 목록
     @Transactional(readOnly = true)
     public Page<InquirySummaryResponse> myList(Long memberId, String status, int page, int size) {

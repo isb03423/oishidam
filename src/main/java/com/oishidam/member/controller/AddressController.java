@@ -30,13 +30,6 @@ public class AddressController {
         return ApiResponse.ok(result);
     }
 
-    @Operation(summary = "배송지 상세 조회")
-    @GetMapping("/{addressId}")
-    public ApiResponse<AddressResponse> detail(@AuthenticationPrincipal Jwt jwt, @PathVariable Long addressId) {
-        Long memberId = Long.valueOf(jwt.getSubject());
-        return ApiResponse.ok(addressService.detail(memberId, addressId));
-    }
-
     @Operation(summary = "기본 배송지 설정")
     @PatchMapping("/{addressId}/default")
     public ApiResponse<AddressResponse> setDefault(@AuthenticationPrincipal Jwt jwt, @PathVariable Long addressId) {

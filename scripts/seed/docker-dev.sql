@@ -1402,7 +1402,7 @@ INSERT INTO _seed_counts(table_name, expected, condition_sql) VALUES
  ('cart_items',2000,'member_id IN (SELECT member_id FROM _seed_members)'),
  ('orders',4200,'order_id IN (SELECT order_id FROM _seed_orders)'),
  ('order_items',8400,'order_id IN (SELECT order_id FROM _seed_orders)'),
- ('order_number_sequences',4200,'time_prefix IN (SELECT left(order_number,14) FROM _seed_orders)'),
+ ('order_number_sequences',360,'time_prefix IN (SELECT left(order_number,length(order_number)-4) FROM _seed_orders)'),
  ('payment_requests',4200,'order_id IN (SELECT order_id FROM _seed_orders)'),
  ('payment_confirmations',3780,'order_id IN (SELECT order_id FROM _seed_orders)'),
  ('order_cancellations',210,'order_id IN (SELECT order_id FROM _seed_orders)'),
@@ -1623,12 +1623,12 @@ BEGIN
             SELECT price INTO price_value FROM products WHERE product_id=product_ids[1+(seq*7+k-1)%cardinality(product_ids)];
             item_total := item_total + price_value*(CASE WHEN k=1 THEN order_row.quantity1 ELSE order_row.quantity2 END);
         END LOOP;
-        INSERT INTO order_number_sequences(time_prefix,last_value) VALUES (to_char(created,'YYYYMMDDHH24MISS'),1)
+        INSERT INTO order_number_sequences(time_prefix,last_value) VALUES (to_char(created,'YYYYMMDD'),1)
         ON CONFLICT (time_prefix) DO UPDATE SET last_value=order_number_sequences.last_value+1
         RETURNING last_value INTO serial;
         INSERT INTO orders(member_id,order_number,request_key,request_hash,order_status,items_amount,shipping_fee,total_amount,
             recipient_name,recipient_phone,postal_code,address_line1,address_line2,delivery_memo,customs_code,created_at,updated_at)
-        VALUES (member_key,to_char(created,'YYYYMMDDHH24MISS')||lpad(serial::text,4,'0'),
+        VALUES (member_key,to_char(created,'YYYYMMDD')||lpad(serial::text,4,'0'),
             md5('oishidam-docker-seed-order-'||seq)::uuid::text,repeat(md5('seed-order-'||seq),2),
             status_value,item_total,3000,item_total+3000,address_row.recipient_name,address_row.recipient_phone,
             address_row.postal_code,address_row.address_line1,address_row.address_line2,'문 앞에 놓아주세요.',

@@ -378,7 +378,7 @@ Spring API의 요청·응답 명세는 [Swagger UI](http://localhost/swagger-ui/
 | 상품·카테고리·추천 | `/api/products`, `/api/categories`, `/api/recommendations/products` |
 | 찜·장바구니 | `/api/wishes`, `/api/cart` |
 | 주문·결제 | `/api/orders`, `/api/orders/{orderId}/payments`, `/api/payments` |
-| 후기·문의 | `/api/reviews`, `/api/products/{productId}/reviews`, `/api/inquiries` |
+| 후기·문의 | `/api/reviews`, `/api/products/{productId}/reviews`, `GET /api/inquiries/mine`, `POST /api/inquiries`, `GET/DELETE /api/inquiries/{inquiryId}` |
 | 관리자·대시보드 | `/api/admin/*`, `/api/admin/dashboard/*` |
 | 관리자 고객 분석·후기 분석 | `/api/admin/analytics/customers`, `/api/admin/reviews/analytics` |
 | AI 개인화 추천 | `/api/ai/recommend/products` |

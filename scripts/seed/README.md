@@ -37,7 +37,7 @@ DB 이름이 `oishidam` 또는 검증용 `oishidam_seed_verify`이고, 해당 �
 | cart_items | 2,000 | 회원별 장바구니 2개 |
 | orders | 4,200 | 최근 약 12개월, 9개 최종 상태 |
 | order_items | 8,400 | 주문별 서로 다른 상품 2개, 각 수량 1~7개 |
-| order_number_sequences | 4,200 | 날짜·시간 14자리와 일련번호 4자리 주문번호 발급 |
+| order_number_sequences | 360 | 날짜 8자리와 일련번호 4자리 주문번호 발급 |
 | payment_requests | 4,200 | 토스 결제 시작 요청 |
 | payment_confirmations | 3,780 | 결제 완료 이력; 결제키는 가상 값 |
 | order_cancellations | 210 | 취소 완료 및 재고 복구 |
